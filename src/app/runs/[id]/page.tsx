@@ -100,11 +100,31 @@ function HeadlessLog({ run }: { run: Run }) {
   const scroller = React.useRef<HTMLDivElement>(null);
   const [follow, setFollow] = React.useState(true);
 
+  const [live, setLive] = React.useState(false);
+
   React.useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
+    let es: EventSource | null = null;
+    let pending: Ev[] = [];
+    let frame = 0;
     offset.current = 0;
-    const tick = async () => {
+
+    // Batch incoming lines into one state update per animation frame.
+    const flush = () => {
+      frame = 0;
+      if (!pending.length) return;
+      const batch = pending;
+      pending = [];
+      setEvents((prev) => [...prev, ...batch].slice(-3000));
+    };
+    const push = (e: Ev) => {
+      pending.push(e);
+      if (!frame) frame = requestAnimationFrame(flush);
+    };
+
+    // Fallback: incremental polling (also used if SSE is unavailable).
+    const poll = async () => {
       try {
         let more = true;
         let status = "running";
@@ -113,18 +133,44 @@ function HeadlessLog({ run }: { run: Run }) {
           more = log.nextOffset > offset.current && log.events.length > 0;
           offset.current = log.nextOffset;
           status = log.status;
-          if (log.events.length) setEvents((prev) => [...prev, ...log.events].slice(-3000));
+          log.events.forEach(push);
         }
-        if (!cancelled && status === "running") timer = setTimeout(tick, 1000);
+        if (!cancelled && status === "running") timer = setTimeout(poll, 1000);
         else refresh(`/api/runs/${run.id}`);
       } catch {
-        if (!cancelled) timer = setTimeout(tick, 3000);
+        if (!cancelled) timer = setTimeout(poll, 3000);
       }
     };
-    tick();
+
+    if (typeof EventSource === "undefined") {
+      void poll();
+    } else {
+      es = new EventSource(`/api/runs/${run.id}/stream`);
+      es.onopen = () => setLive(true);
+      es.onmessage = (m) => {
+        try {
+          push(JSON.parse(m.data));
+        } catch {}
+        if (m.lastEventId) offset.current = Number(m.lastEventId);
+      };
+      es.addEventListener("end", () => {
+        es?.close();
+        setLive(false);
+        refresh(`/api/runs/${run.id}`);
+      });
+      es.onerror = () => {
+        // The browser retries on its own (resuming via Last-Event-ID); if it gave up, poll instead.
+        if (es?.readyState === EventSource.CLOSED && !cancelled) {
+          setLive(false);
+          void poll();
+        }
+      };
+    }
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      es?.close();
+      if (frame) cancelAnimationFrame(frame);
     };
   }, [run.id]);
 
@@ -138,6 +184,11 @@ function HeadlessLog({ run }: { run: Run }) {
       <CardHeader className="items-center border-b py-2.5">
         <CardTitle className="flex items-center gap-2">
           <TerminalIcon className="size-4" /> Salida
+          {live && (
+            <span className="flex items-center gap-1 text-[11px] font-normal text-success">
+              <StatusDot status="idle" className="size-1.5" /> en vivo
+            </span>
+          )}
         </CardTitle>
         <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
           <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} className="accent-primary" /> Seguir

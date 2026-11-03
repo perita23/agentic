@@ -412,6 +412,50 @@ export class RunManager {
     return { events, nextOffset: start + usable.length, status: run.status, run };
   }
 
+  /**
+   * Server-Sent Events stream of a run's log. Each event's `id` is the byte
+   * offset after it, so a reconnecting EventSource (Last-Event-ID) resumes
+   * exactly where it stopped. Ends with `event: end` once the run is over and
+   * the log is drained; aborts when the client goes away.
+   */
+  streamLog(id: string, offset: number, signal: AbortSignal, { pollMs = 250, heartbeatMs = 15_000 } = {}): ReadableStream<Uint8Array> {
+    this.get(id); // 404 before opening the stream
+    const enc = new TextEncoder();
+    let pos = Math.max(0, offset);
+    return new ReadableStream<Uint8Array>({
+      start: async (controller) => {
+        const send = (s: string) => controller.enqueue(enc.encode(s));
+        let lastBeat = Date.now();
+        send(": connected\n\n");
+        try {
+          while (!signal.aborted) {
+            const chunk = this.readLog(id, pos);
+            if (chunk.events.length) {
+              // One SSE event per log line; the final one carries the new offset as id.
+              chunk.events.forEach((e, i) => send(`${i === chunk.events.length - 1 ? `id: ${chunk.nextOffset}\n` : ""}data: ${JSON.stringify(e)}\n\n`));
+              pos = chunk.nextOffset;
+              continue; // drain fast while there is backlog
+            }
+            if (chunk.status !== "running") {
+              send(`event: end\ndata: ${JSON.stringify({ status: chunk.status })}\n\n`);
+              break;
+            }
+            if (Date.now() - lastBeat > heartbeatMs) {
+              send(": ping\n\n");
+              lastBeat = Date.now();
+            }
+            await new Promise((r) => setTimeout(r, pollMs));
+          }
+        } catch {
+          // run deleted mid-stream or client gone: just close
+        }
+        try {
+          controller.close();
+        } catch {}
+      },
+    });
+  }
+
   /** Snapshot of a tmux pane + refresh liveness. */
   async capture(id: string) {
     const run = this.get(id);
