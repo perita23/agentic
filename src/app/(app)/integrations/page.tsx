@@ -12,7 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { errorMessage, PageHeader } from "@/components/app/common";
 import { ProviderIcon } from "@/components/app/provider-icon";
-import { ConnectActions } from "@/components/app/oauth-connect";
+import { ConnectActions, type OAuthInfo } from "@/components/app/oauth-connect";
+import { SimpleConnect, type SimpleProvider } from "@/components/app/simple-connect";
 import { api, refresh, useApi } from "@/lib/api";
 
 type Status = Record<string, { configured: boolean; secretHint?: string | null; updatedAt?: string } & Record<string, unknown>>;
@@ -205,6 +206,28 @@ export default function IntegrationsPage() {
     return () => clearTimeout(t);
   }, [waiting]);
   const [editing, setEditing] = React.useState<(typeof PROVIDERS)[number] | null>(null);
+  const [wizard, setWizard] = React.useState<SimpleProvider | null>(null);
+  const [connecting, setConnecting] = React.useState<string | null>(null);
+  const { data: oauth } = useApi<OAuthInfo>("/api/integrations/oauth");
+
+  /** One button: GitHub first tries your existing `gh` login silently, everything else opens the 2-step wizard. */
+  async function startConnect(id: SimpleProvider) {
+    if (id === "github") {
+      setConnecting(id);
+      try {
+        await api("POST", "/api/integrations/oauth/github/cli");
+        const t = await api<{ account: string }>("POST", "/api/integrations/github/test");
+        toast.success("GitHub conectado con tu sesión de gh", { description: t.account });
+        refresh("/api/integrations");
+        return;
+      } catch {
+        // no gh session: fall through to the wizard
+      } finally {
+        setConnecting(null);
+      }
+    }
+    setWizard(id);
+  }
   const [testing, setTesting] = React.useState<string | null>(null);
 
   async function test(id: string, name: string) {
@@ -255,7 +278,19 @@ export default function IntegrationsPage() {
                 </div>
               </CardHeader>
               <CardContent className="flex flex-wrap items-center gap-2">
-                {!st?.configured && <ConnectActions provider={p.id} onManual={() => setEditing(p)} onWaiting={setWaiting} />}
+                {!st?.configured && (
+                  <>
+                    <Button size="sm" onClick={() => startConnect(p.id)} disabled={connecting === p.id}>
+                      <PlugZapIcon /> {connecting === p.id ? "Conectando…" : "Conectar"}
+                    </Button>
+                    <details className="basis-full text-xs text-muted-foreground">
+                      <summary className="w-fit cursor-pointer select-none hover:text-foreground">Avanzado</summary>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <ConnectActions provider={p.id} onManual={() => setEditing(p)} onWaiting={setWaiting} />
+                      </div>
+                    </details>
+                  </>
+                )}
                 {st?.configured && (
                   <>
                     <span className="mr-auto flex items-center gap-2 font-mono text-xs text-muted-foreground">
@@ -279,6 +314,7 @@ export default function IntegrationsPage() {
           );
         })}
       </div>
+      {wizard && <SimpleConnect provider={wizard} slackManifestUrl={oauth?.slackManifestUrl} onClose={() => setWizard(null)} />}
       {editing && <ConfigureDialog provider={editing} current={data?.[editing.id]} onClose={() => setEditing(null)} />}
     </div>
   );

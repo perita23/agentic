@@ -364,7 +364,8 @@ try {
 
   // Integrations: connect Slack through the UI, then read and reply from Mensajes.
   await page.goto(`${base}/integrations`);
-  // One-click connections: OAuth buttons, gh CLI reuse and Slack's app manifest.
+  // Advanced options (OAuth, gh CLI) stay available under "Avanzado".
+  for (const summary of await page.getByText("Avanzado", { exact: true }).all()) await summary.click();
   for (const name of ["Conectar con GitHub", "Usar mi sesión de gh", "Conectar con Jira", "Conectar con Bitbucket", "Conectar con Slack"]) await page.getByRole("button", { name }).waitFor();
   await page.getByRole("button", { name: "Conectar con Jira" }).click();
   await page.getByText("Activar «Conectar con Jira»").waitFor();
@@ -372,9 +373,19 @@ try {
   await page.keyboard.press("Escape");
   const cbRes = await fetch(`${base}/api/integrations/oauth/callback?state=forged&code=x`);
   check(cbRes.status === 400 && (await cbRes.text()).includes("caducó"), "OAuth callback is reachable without a session but rejects unknown states");
-  await page.locator("main").getByRole("button", { name: "Token", exact: true }).first().click();
-  await page.getByLabel("Token (usuario xoxp- o bot xoxb-)").fill("xoxb-smoke-token");
-  await page.getByRole("button", { name: "Guardar y probar" }).click();
+  // The simple path: one "Conectar" button, a 2-step wizard, paste, done.
+  await page.reload();
+  await page.locator("main").getByRole("button", { name: "Conectar", exact: true }).first().click();
+  await page.getByRole("dialog").getByRole("button", { name: "Abrir Slack" }).waitFor();
+  await shot("10b-connect-slack");
+  await page.getByLabel("Pega el token").fill("xoxb-wrong-token");
+  const errorsBefore = consoleErrors.length;
+  await page.getByRole("dialog").getByRole("button", { name: "Conectar", exact: true }).click();
+  await page.getByText("Ese token no funciona").waitFor();
+  consoleErrors.splice(errorsBefore); // the rejected test request is expected here
+  check((await (await fetch(base + "/api/integrations", { headers: { authorization: `Bearer ${token}` } })).json()).slack.configured === false, "a wrong token gives a plain message and leaves nothing half-configured");
+  await page.getByLabel("Pega el token").fill("xoxb-smoke-token");
+  await page.getByRole("dialog").getByRole("button", { name: "Conectar", exact: true }).click();
   await page.getByText("agentic @ Smoke").waitFor();
   const integrations = await (await fetch(base + "/api/integrations", { headers: { authorization: `Bearer ${token}` } })).text();
   check(!integrations.includes("xoxb-smoke-token"), "integration secrets are never returned by the API");
