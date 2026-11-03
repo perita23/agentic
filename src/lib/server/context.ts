@@ -1,6 +1,7 @@
 import { AgentManager } from "./agents";
 import { getConfig, type Config } from "./config";
 import { ProjectService } from "./projects";
+import { TaskQueue } from "./queue";
 import { RunManager } from "./runs";
 import { loadOrCreateToken } from "./security";
 import { SessionIndex } from "./sessions";
@@ -16,6 +17,7 @@ export interface Context {
   tasks: TaskService;
   runs: RunManager;
   projects: ProjectService;
+  queue: TaskQueue;
 }
 
 const g = globalThis as unknown as { __agentic?: Context };
@@ -31,8 +33,11 @@ export function createContext(config: Config): Context {
     maxLogBytes: config.maxLogBytes,
     onFinished: (run) => {
       if (run.taskId) tasks.onRunFinished(run.taskId, run.status === "completed");
+      // Late-bound: the queue is created right after the run manager.
+      void queue.onRunFinished(run).catch((e) => console.error("[agentic] queue error", e));
     },
   });
+  const queue: TaskQueue = new TaskQueue(store, tasks, runs);
   return {
     config,
     token: loadOrCreateToken(config.dataDir),
@@ -42,6 +47,7 @@ export function createContext(config: Config): Context {
     tasks,
     runs,
     projects: new ProjectService(store, sessions),
+    queue,
   };
 }
 

@@ -390,6 +390,62 @@ export class SessionIndex {
     };
   }
 
+  /**
+   * Full-text search over prompts and Claude's replies, newest sessions first.
+   * Bounded by a hit limit and a time budget so it stays responsive on huge histories.
+   */
+  async search(query: string, { limit = 50, budgetMs = 3000, project }: { limit?: number; budgetMs?: number; project?: string | null } = {}) {
+    const q = query.trim().toLowerCase();
+    const hits: { sessionId: string; title: string; cwd: string | null; role: "user" | "assistant"; snippet: string; timestamp: string | null }[] = [];
+    if (q.length < 2) return { hits, partial: false, scanned: 0 };
+    // Raw-line prefilter must match how the text appears inside JSON strings.
+    const raw = JSON.stringify(q).slice(1, -1);
+    const deadline = Date.now() + budgetMs;
+    const files = this.files().sort((a, b) => b.st.mtimeMs - a.st.mtimeMs);
+    let scanned = 0;
+    let partial = false;
+    for (const { file, st } of files) {
+      if (hits.length >= limit) break;
+      if (Date.now() > deadline) {
+        partial = true;
+        break;
+      }
+      const summary = this.summarize(file, st);
+      if (project && summary.cwd !== project) continue;
+      scanned++;
+      let perSession = 0;
+      const rl = readline.createInterface({ input: fs.createReadStream(file, "utf8"), crlfDelay: Infinity });
+      for await (const line of rl) {
+        if (!line.toLowerCase().includes(raw)) continue;
+        let o: Line;
+        try {
+          o = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        let role: "user" | "assistant" | null = null;
+        let text = "";
+        if (o?.type === "assistant" && !o.isSidechain) {
+          role = "assistant";
+          text = contentText(o.message?.content);
+        } else if (isHumanPrompt(o)) {
+          role = "user";
+          text = contentText(o.message.content);
+        }
+        const idx = text.toLowerCase().indexOf(q);
+        if (!role || idx < 0) continue;
+        const start = Math.max(0, idx - 80);
+        const snippet = (start > 0 ? "…" : "") + text.slice(start, idx + q.length + 120).replace(/\s+/g, " ") + (idx + q.length + 120 < text.length ? "…" : "");
+        hits.push({ sessionId: summary.id, title: summary.title, cwd: summary.cwd, role, snippet, timestamp: strOrNull(o.timestamp) });
+        if (++perSession >= 3 || hits.length >= limit) {
+          rl.close();
+          break;
+        }
+      }
+    }
+    return { hits, partial, scanned };
+  }
+
   /** Condensed transcript for the viewer (last `limit` messages). */
   async transcript(sessionId: string, limit = 400) {
     const file = this.findFile(sessionId);

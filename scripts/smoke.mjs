@@ -127,6 +127,11 @@ try {
   await page.getByText("Añade modo oscuro al dashboard").first().click();
   await page.getByText("Claro, voy a revisar los estilos.").waitFor();
   check(true, "session transcript renders");
+  await page.goto(`${base}/sessions`);
+  await page.getByRole("button", { name: "En el contenido" }).click();
+  await page.getByPlaceholder("Buscar dentro de las conversaciones…").fill("revisar los estilos");
+  await page.locator("main mark").first().waitFor();
+  check((await page.locator("main mark").first().textContent()) === "revisar los estilos", "full-text search highlights matches in replies");
   await shot("02-session");
 
   // Launch a headless run through the UI.
@@ -182,6 +187,18 @@ try {
   const after = await (await fetch(base + `/api/tasks/${bug.id}`, { headers: { authorization: `Bearer ${token}` } })).json();
   check(after.status === "review" && after.labels.includes("bug") && after.checklist.length === 4 && after.prompt.length > 0, "moving a task keeps labels, checklist and prompt");
   await shot("04-tasks");
+
+  // Autonomous queue: one To do task with a project gets executed and moves to review.
+  const qt = await (
+    await fetch(base + "/api/tasks", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ title: "Tarea en cola", projectPath: project, prompt: "cola" }) })
+  ).json();
+  await page.reload();
+  await page.getByRole("button", { name: "Ejecutar cola" }).click();
+  await page.getByText("Se ejecutarán 1 de 1 tareas pendientes").waitFor();
+  await page.getByRole("button", { name: "Iniciar cola" }).click();
+  await page.getByText("Cola finalizada").waitFor({ timeout: 20000 });
+  const qtAfter = await (await fetch(base + `/api/tasks/${qt.id}`, { headers: { authorization: `Bearer ${token}` } })).json();
+  check(qtAfter.status === "review" && qtAfter.runIds.length === 1, "task queue runs To do tasks and moves them to review");
 
   // Agents
   await page.goto(`${base}/agents`);

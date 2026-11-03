@@ -4,10 +4,11 @@
 
 Consola **web local** para gestionar Claude Code en tu máquina, con estética oscura estilo Cursor.
 
-- **Sesiones** — todas las conversaciones de `~/.claude`, estado en vivo (trabajando / esperando), visor de transcripciones con tokens y herramientas, comando para reanudar.
+- **Sesiones** — todas las conversaciones de `~/.claude` (con búsqueda de texto completo), estado en vivo (trabajando / esperando), visor de transcripciones con tokens y herramientas, comando para reanudar.
 - **Ejecuciones** — lanza Claude Code *headless* (log en vivo, coste, parar) o *interactivo en tmux* (ver pantalla, enviar mensajes, `tmux attach`). Continúa cualquier sesión con `--resume`. Pestaña **Cambios** con el diff git de lo que modificó Claude (commits, ficheros, ficheros nuevos) y **notificaciones** de escritorio al terminar.
 - **Agentes** — crea/edita subagentes de usuario (`~/.claude/agents`) y de proyecto (`.claude/agents`), y lánzalos.
 - **Tareas** — tablero Kanban con drag & drop, prioridades, etiquetas, checklist, fecha límite y botón *Ejecutar con Claude* (la tarea pasa a *En curso* y luego a *Revisión*).
+- **Cola autónoma** — ejecuta las tareas «To do» una a una por prioridad, con límite por tanda, presupuesto y parada ante fallos.
 - **Plantillas** — plantillas con variables `{{var}}` para crear tareas y prompts (bug, feature, review, tests, refactor, auditoría…).
 - **Proyectos** — detectados desde tus sesiones o registrados a mano; ficha con git (rama, commits, cambios), `CLAUDE.md`, scripts, stack, sesiones, tareas y agentes.
 - **Analítica** — tokens por día, proyecto, modelo y herramienta a partir de tus transcripciones locales.

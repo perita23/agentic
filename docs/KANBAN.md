@@ -41,12 +41,21 @@ Leyenda: ✅ hecho · 🔄 en curso · ⏳ pendiente
 | 30 | Diff git por ejecución + endurecimiento de git contra filtros/textconv | #4 | ✅ v0.2.0 |
 | 31 | Notificaciones de escritorio al terminar una ejecución | #4 | ✅ v0.2.0 |
 | 31b | Releases automáticas (tag + GitHub Release al pasar CI en main) | #4 | ✅ v0.2.0 |
-| 32 | Analítica de uso (tokens por día / proyecto / modelo / herramienta) | #5 | 🔄 v0.3.0 |
-| 33 | Cola de tareas autónoma (ejecutar To do en secuencia) | #6 | ⏳ |
+| 32 | Analítica de uso (tokens por día / proyecto / modelo / herramienta) | #5 | ✅ v0.3.0 |
+| 33 | Cola de tareas autónoma (ejecutar To do en secuencia) | #6 | 🔄 v0.4.0 |
+| 35 | Búsqueda de texto completo dentro de transcripciones | #6 | 🔄 v0.4.0 |
+
+## Épica: integraciones (GitHub, Bitbucket, Jira, Slack)
+| # | Tarea | Versión | Estado |
+|---|-------|---------|--------|
+| 40 | Framework: credenciales locales 0600 nunca expuestas, cliente HTTP seguro (https, timeout, sin redirecciones, tope de tamaño) | v0.5.0 | 🔄 |
+| 41 | Slack: canales, leer historial e hilos, enviar y responder, avisos de ejecuciones/cola | v0.5.0 | ⏳ |
+| 42 | Pull Requests GitHub + Bitbucket: bandeja, detalle (diff, checks, reviews, comentarios), comentar, aprobar/pedir cambios, merge, cerrar | v0.6.0 | ⏳ |
+| 43 | Jira: incidencias por JQL, detalle y comentarios, comentar, transiciones, importar como tarea | v0.7.0 | ⏳ |
+| 44 | Confluence: buscar páginas y usarlas como contexto del prompt | backlog | ⏳ |
 
 ## ⏳ Backlog
 | # | Tarea |
 |---|-------|
 | 34 | Streaming por SSE en lugar de polling |
-| 35 | Búsqueda de texto completo dentro de transcripciones |
 | 36 | Empaquetado como app de escritorio (Tauri) |
