@@ -161,6 +161,16 @@ function serverEntry() {
   return path.join(__dirname, "..", ".next", "standalone", "server.js");
 }
 
+/** Public OAuth client ids shipped with this build (never secrets). */
+function builtInOAuth(dir) {
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(dir, "oauth-apps.json"), "utf8"));
+    return Object.fromEntries(Object.entries(raw).filter(([k, v]) => /^AGENTIC_GITHUB_CLIENT_ID$/.test(k) && typeof v === "string" && !process.env[k]));
+  } catch {
+    return {};
+  }
+}
+
 async function startServer() {
   const port = await pickPort(Number(process.env.PORT) || 4317);
   const entry = serverEntry();
@@ -177,6 +187,7 @@ async function startServer() {
       AGENTIC_HOME: DATA_DIR,
       PATH: loginShellPath(),
       NEXT_TELEMETRY_DISABLED: "1",
+      ...builtInOAuth(path.dirname(entry)),
     },
     stdio: ["ignore", "inherit", "inherit", "ipc"],
   });

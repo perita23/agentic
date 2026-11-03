@@ -109,6 +109,9 @@ jobs:
           ref: ${{ needs.release.outputs.sha }}
           persist-credentials: false
       - uses: ./.github/actions/build-desktop
+        env:
+          # Public client id for GitHub's device flow ("Conectar con GitHub" = one login).
+          AGENTIC_GITHUB_CLIENT_ID: ${{ secrets.AGENTIC_GITHUB_CLIENT_ID }}
       - name: Upload dmg, zip and update manifest
         env:
           GH_TOKEN: ${{ github.token }}
