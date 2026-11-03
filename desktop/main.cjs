@@ -5,7 +5,7 @@
 //   external links open in the default browser, minimal permissions.
 "use strict";
 
-const { app, BrowserWindow, dialog, ipcMain, shell, session, systemPreferences, Menu } = require("electron");
+const { app, BrowserWindow, clipboard, dialog, ipcMain, shell, session, systemPreferences, Menu } = require("electron");
 const { fork } = require("node:child_process");
 const os = require("node:os");
 const path = require("node:path");
@@ -204,9 +204,18 @@ async function startServer() {
 }
 
 function harden(ses) {
-  // Only notifications (run finished) are ever granted; camera, mic, location… are denied.
-  ses.setPermissionRequestHandler((_wc, permission, cb) => cb(permission === "notifications"));
-  ses.setPermissionCheckHandler((_wc, permission) => permission === "notifications");
+  // Granted only to our own local server: notifications (run finished) and
+  // writing to the clipboard ("Copiar"). Camera, mic, location… are denied.
+  const allowed = new Set(["notifications", "clipboard-sanitized-write"]);
+  const ours = (url) => {
+    try {
+      return !!origin && new URL(url).origin === origin;
+    } catch {
+      return false;
+    }
+  };
+  ses.setPermissionRequestHandler((wc, permission, cb, details) => cb(allowed.has(permission) && ours(details?.requestingUrl ?? wc.getURL())));
+  ses.setPermissionCheckHandler((_wc, permission, requestingOrigin) => allowed.has(permission) && ours(requestingOrigin));
 }
 
 function createWindow(onShown) {
@@ -416,6 +425,12 @@ app.whenReady().then(async () => {
     ipcMain.handle("agentic:open-privacy", (e) => {
       if (!fromApp(e) || process.platform !== "darwin") return false;
       shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles");
+      return true;
+    });
+    // Fallback for "Copiar" (text only, bounded size).
+    ipcMain.handle("agentic:copy", (e, text) => {
+      if (!fromApp(e) || typeof text !== "string" || text.length > 100_000) return false;
+      clipboard.writeText(text);
       return true;
     });
     ipcMain.handle("agentic:lock-info", (e) => (fromApp(e) ? lockInfo() : null));

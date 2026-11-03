@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, refresh, useApi } from "@/lib/api";
 import { errorMessage } from "./common";
+import { copyText } from "@/lib/clipboard";
 
 type OAuthProvider = "github" | "jira" | "bitbucket" | "slack";
 export interface OAuthInfo {
@@ -39,7 +40,7 @@ function Copy({ value }: { value: string }) {
       size="icon-sm"
       variant="ghost"
       aria-label="Copiar"
-      onClick={() => navigator.clipboard.writeText(value).then(() => toast.success("Copiado"), () => toast.error("No se pudo copiar"))}
+      onClick={async () => ((await copyText(value)) ? toast.success("Copiado") : toast.error("No se pudo copiar"))}
     >
       <CopyIcon />
     </Button>
@@ -211,7 +212,7 @@ function DeviceDialog({ flow: initial, onClose }: { flow: DeviceFlow; onClose: (
           </Button>
           <Button
             onClick={() => {
-              navigator.clipboard?.writeText(flow.userCode).catch(() => {});
+              void copyText(flow.userCode);
               openExternal(flow.verificationUri);
             }}
           >

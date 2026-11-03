@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.14.2] - 2026-11-03
+
+### Corregido
+- App de Mac: los botones «Copiar» fallaban con «No se pudo copiar al portapapeles» porque la ventana denegaba el permiso de escribir en el portapapeles. Ahora se concede (sólo a las páginas de Agentic) y, si aun así fallase, se copia con el portapapeles nativo de macOS. macOS no pide permiso para copiar, así que no aparece ningún aviso.
+
 ## [0.14.1] - 2026-11-03
 
 ### Cambiado

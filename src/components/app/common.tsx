@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { copyText } from "@/lib/clipboard";
 
 export function PageHeader({ title, description, icon: Icon, actions }: { title: string; description?: React.ReactNode; icon?: React.ElementType; actions?: React.ReactNode }) {
   return (
@@ -76,13 +77,10 @@ export function CopyButton({ value, label = "Copiar", className }: { value: stri
           className={className}
           aria-label={label}
           onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(value);
+            if (await copyText(value)) {
               setDone(true);
               setTimeout(() => setDone(false), 1500);
-            } catch {
-              toast.error("No se pudo copiar al portapapeles");
-            }
+            } else toast.error("No se pudo copiar al portapapeles");
           }}
         >
           {done ? <CheckIcon className="text-success" /> : <CopyIcon />}
