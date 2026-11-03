@@ -62,7 +62,7 @@ function TaskCard({ task, overlay }: { task: Task; overlay?: boolean }) {
   return (
     <div
       className={cn(
-        "group cursor-grab touch-none rounded-lg border bg-card p-3 text-left shadow-sm transition-colors hover:border-[#8b949e]/50 active:cursor-grabbing",
+        "group cursor-grab touch-none rounded-lg border bg-card p-3 text-left shadow-sm transition-colors hover:border-border-strong active:cursor-grabbing",
         overlay && "rotate-2 border-primary/60 shadow-2xl shadow-black/60",
       )}
     >

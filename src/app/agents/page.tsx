@@ -200,10 +200,10 @@ function AgentsInner() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.03 }}
-            className="flex flex-col gap-3 rounded-lg border bg-card p-4 transition-colors hover:border-[#8b949e]/40"
+            className="flex flex-col gap-3 rounded-lg border bg-card p-4 transition-colors hover:border-border-strong"
           >
             <div className="flex items-start gap-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#a371f7]/30 to-[#2f81f7]/30 ring-1 ring-border">
+              <span className="grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-purple/25 to-primary/25 ring-1 ring-border">
                 <BotIcon className="size-4" />
               </span>
               <div className="min-w-0 flex-1">

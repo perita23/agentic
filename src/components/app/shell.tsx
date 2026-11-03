@@ -42,8 +42,8 @@ function isActive(pathname: string, href: string) {
 function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2 px-2 py-1">
-      <span className="grid size-7 place-items-center rounded-md bg-gradient-to-br from-[#2f81f7] via-[#a371f7] to-[#f78166] shadow-lg shadow-primary/20">
-        <svg viewBox="0 0 24 24" className="size-4 text-white" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <span className="grid size-7 place-items-center rounded-md bg-foreground shadow-lg shadow-white/5">
+        <svg viewBox="0 0 24 24" className="size-4 text-background" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M12 3 4 21M12 3l8 18M7.5 14h9" />
         </svg>
       </span>
@@ -76,7 +76,7 @@ function Sidebar({ overview }: { overview?: Overview }) {
             >
               {active && (
                 <motion.span layoutId="nav-active" className="absolute inset-0 rounded-md bg-accent" transition={{ type: "spring", stiffness: 500, damping: 40 }}>
-                  <span className="absolute top-1.5 bottom-1.5 -left-2 w-1 rounded-full bg-primary" />
+                  <span className="absolute top-1.5 bottom-1.5 -left-2 w-0.5 rounded-full bg-foreground" />
                 </motion.span>
               )}
               <item.icon className="relative size-4" />
@@ -182,7 +182,7 @@ function Topbar({ onSearch }: { onSearch: () => void }) {
       </div>
       <button
         onClick={onSearch}
-        className="flex h-8 w-full max-w-md cursor-pointer items-center gap-2 rounded-md border bg-inset px-3 text-sm text-muted-foreground transition-colors hover:border-[#8b949e]/50"
+        className="flex h-8 w-full max-w-md cursor-pointer items-center gap-2 rounded-md border bg-inset px-3 text-sm text-muted-foreground transition-colors hover:border-border-strong"
       >
         <SearchIcon className="size-4" />
         <span className="flex-1 text-left">Buscar o ejecutar un comando…</span>

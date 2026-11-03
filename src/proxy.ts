@@ -53,9 +53,9 @@ export const config = {
 
 const UNAUTHORIZED_HTML = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Agentic · acceso</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{background:#0d1117;color:#e6edf3;font:15px/1.6 system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0}
-main{max-width:520px;padding:32px;border:1px solid #30363d;border-radius:12px;background:#161b22}
-code{background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:2px 6px}h1{font-size:20px;margin-top:0}</style></head>
+<style>body{background:#0a0a0a;color:#e6e6e6;font:15px/1.6 system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0}
+main{max-width:520px;padding:32px;border:1px solid #212121;border-radius:12px;background:#111111}
+code{background:#0a0a0a;border:1px solid #212121;border-radius:6px;padding:2px 6px}h1{font-size:20px;margin-top:0}</style></head>
 <body><main><h1>🔒 Acceso protegido</h1><p>Agentic sólo acepta peticiones con el token local.</p>
 <p>Abre el enlace que aparece en la terminal al ejecutar <code>npm start</code> (o <code>npm run dev</code>),
 o ejecuta <code>npm run url</code> para volver a verlo.</p></main></body></html>`;

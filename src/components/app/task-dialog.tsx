@@ -15,7 +15,7 @@ import { errorMessage } from "./common";
 import { useLauncher } from "./launcher";
 
 export const STATUSES = [
-  { key: "backlog", label: "Backlog", color: "bg-[#6e7681]" },
+  { key: "backlog", label: "Backlog", color: "bg-muted-foreground" },
   { key: "todo", label: "To do", color: "bg-primary" },
   { key: "in_progress", label: "En curso", color: "bg-warning" },
   { key: "review", label: "Revisión", color: "bg-purple" },
@@ -25,7 +25,7 @@ export type Status = (typeof STATUSES)[number]["key"];
 
 export const PRIORITIES = [
   { key: "low", label: "Baja", className: "text-muted-foreground" },
-  { key: "medium", label: "Media", className: "text-[#58a6ff]" },
+  { key: "medium", label: "Media", className: "text-link" },
   { key: "high", label: "Alta", className: "text-warning" },
   { key: "urgent", label: "Urgente", className: "text-destructive" },
 ] as const;
