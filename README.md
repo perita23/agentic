@@ -1,5 +1,7 @@
 # ◆ Agentic Console
 
+[![CI](https://github.com/perita23/agentic/actions/workflows/ci.yml/badge.svg)](https://github.com/perita23/agentic/actions/workflows/ci.yml)
+
 Consola **web local** para gestionar Claude Code en tu máquina, con estética oscura tipo GitHub / Cursor.
 
 - **Sesiones** — todas las conversaciones de `~/.claude`, estado en vivo (trabajando / esperando), visor de transcripciones con tokens y herramientas, comando para reanudar.
@@ -79,11 +81,13 @@ Next.js 16 (App Router, Route Handlers en runtime Node, `proxy.ts`) · React 19 
 npm run check
 ```
 
-(typecheck + lint + 47 tests unitarios/integración), y el smoke test E2E en Chromium sobre la build de producción:
+(typecheck + lint + tests unitarios/integración), y el smoke test E2E en Chromium sobre la build de producción:
 
 ```bash
 npm run build && npm run smoke
 ```
+
+Ambos se ejecutan en GitHub Actions en cada PR y en cada push a `main` (`.github/workflows/ci.yml`), junto con `npm audit` de dependencias de producción; las capturas del smoke test quedan como artefacto.
 
 ## Documentación
 
