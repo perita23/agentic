@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeftIcon, BotIcon, CornerDownLeftIcon, ExternalLinkIcon, PlayIcon, SquareIcon, TerminalIcon, Trash2Icon, WrenchIcon } from "lucide-react";
+import { ArrowLeftIcon, BotIcon, FileDiffIcon, CornerDownLeftIcon, ExternalLinkIcon, PlayIcon, SquareIcon, TerminalIcon, Trash2Icon, WrenchIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CopyButton, errorMessage, StatusDot } from "@/components/app/common";
+import { RunDiffView } from "@/components/app/diff-view";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLauncher } from "@/components/app/launcher";
 import { RUN_STATUS_LABEL, RUN_STATUS_VARIANT } from "@/components/app/run-row";
 import { api, fetcher, refresh, useApi, type Run, type RunLog } from "@/lib/api";
@@ -282,7 +284,25 @@ export default function RunPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-        <div className="min-w-0">{run.mode === "tmux" ? <TmuxConsole run={run} /> : <HeadlessLog run={run} />}</div>
+        <div className="min-w-0">
+          <Tabs defaultValue="output">
+            <TabsList>
+              <TabsTrigger value="output">
+                <TerminalIcon /> Salida
+              </TabsTrigger>
+              <TabsTrigger value="diff">
+                <FileDiffIcon /> Cambios
+              </TabsTrigger>
+            </TabsList>
+            {/* forceMount keeps the live log polling while the diff tab is open */}
+            <TabsContent value="output" forceMount className="data-[state=inactive]:hidden">
+              {run.mode === "tmux" ? <TmuxConsole run={run} /> : <HeadlessLog run={run} />}
+            </TabsContent>
+            <TabsContent value="diff">
+              <RunDiffView runId={run.id} live={run.status === "running"} />
+            </TabsContent>
+          </Tabs>
+        </div>
         <aside className="flex flex-col gap-4">
           <Card>
             <CardHeader>

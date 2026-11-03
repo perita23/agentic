@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
+import { git, SAFE_DIFF } from "./git";
 import type { JsonStore } from "./store";
 import { absPath, existingDir, HttpError, MODEL_RE, nowIso, parse, PERMISSION_MODES, text, UUID_RE, AGENT_NAME_RE } from "./util";
 
@@ -34,6 +35,49 @@ export interface Run {
   startedAt: string;
   endedAt: string | null;
   logBytes: number;
+  /** Repository state captured right before launch, used to show what the run changed. */
+  git?: GitBaseline | null;
+}
+
+export interface GitBaseline {
+  head: string;
+  branch: string | null;
+  preDirty: string[];
+  preUntracked: string[];
+}
+
+export interface RunDiff {
+  available: boolean;
+  reason?: string;
+  baseline?: GitBaseline;
+  commits: { hash: string; subject: string }[];
+  files: { file: string; status: string; additions: number | null; deletions: number | null; preExisting: boolean }[];
+  newFiles: { file: string; content: string | null }[];
+  patch: string;
+  truncated: boolean;
+}
+
+const MAX_PATCH = 512 * 1024;
+const MAX_LIST = 2000;
+
+const lines = (s: string | null) => (s ?? "").split("\n").filter(Boolean);
+
+/** Capture HEAD, branch and pre-existing changes without modifying the repository. */
+export async function captureBaseline(cwd: string): Promise<GitBaseline | null> {
+  const head = (await git(cwd, ["rev-parse", "--verify", "HEAD"]))?.trim();
+  if (!head) return null;
+  const [branch, status, untracked] = await Promise.all([
+    git(cwd, ["rev-parse", "--abbrev-ref", "HEAD"]),
+    git(cwd, ["status", "--porcelain=v1", "-z", "--untracked-files=no"]),
+    git(cwd, ["ls-files", "-z", "--others", "--exclude-standard"]),
+  ]);
+  const z = (s: string | null) => (s ?? "").split("\0").filter(Boolean);
+  return {
+    head,
+    branch: branch?.trim() || null,
+    preDirty: z(status).map((l) => l.slice(3)).slice(0, MAX_LIST),
+    preUntracked: z(untracked).slice(0, MAX_LIST),
+  };
 }
 
 export const runCreateSchema = z
@@ -172,6 +216,7 @@ export class RunManager {
       logBytes: 0,
     };
     const args = buildClaudeArgs(input);
+    run.git = await captureBaseline(cwd);
 
     if (input.mode === "tmux") {
       if (!(await hasTmux())) throw new HttpError(400, "tmux no está instalado");
@@ -381,6 +426,87 @@ export class RunManager {
     // -l sends the string literally (no key-name interpretation).
     await execFileP("tmux", ["send-keys", "-t", run.tmuxSession, "-l", "--", input], { timeout: 5000 });
     await execFileP("tmux", ["send-keys", "-t", run.tmuxSession, "Enter"], { timeout: 5000 });
+  }
+
+  /** What changed in the repository since the run started. */
+  async diff(id: string): Promise<RunDiff> {
+    const run = this.get(id);
+    const empty = { commits: [], files: [], newFiles: [], patch: "", truncated: false };
+    if (!run.git) return { available: false, reason: "El proyecto no era un repositorio git al lanzar la ejecución.", ...empty };
+    const cwd = run.projectPath;
+    const base = run.git.head;
+    if (!/^[0-9a-f]{40,64}$/.test(base)) return { available: false, reason: "Línea base inválida.", ...empty };
+    if ((await git(cwd, ["cat-file", "-e", `${base}^{commit}`])) === null)
+      return { available: false, reason: "El commit base ya no existe en el repositorio.", ...empty };
+
+    const [numstat, nameStatus, log, untracked, patchRaw] = await Promise.all([
+      git(cwd, ["diff", ...SAFE_DIFF, "--numstat", "-z", base, "--"]),
+      git(cwd, ["diff", ...SAFE_DIFF, "--name-status", "-z", base, "--"]),
+      git(cwd, ["log", "--format=%h%x1f%s", `${base}..HEAD`, "-n", "100"]),
+      git(cwd, ["ls-files", "-z", "--others", "--exclude-standard"]),
+      git(cwd, ["diff", ...SAFE_DIFF, base, "--"], { maxBuffer: 8 * 1024 * 1024 }),
+    ]);
+
+    const statusOf = new Map<string, string>();
+    const ns = (nameStatus ?? "").split("\0").filter(Boolean);
+    for (let i = 0; i < ns.length; ) {
+      const st = ns[i++];
+      if (st.startsWith("R") || st.startsWith("C")) {
+        i++; // old path
+        statusOf.set(ns[i++], st[0]);
+      } else statusOf.set(ns[i++], st);
+    }
+    const pre = new Set(run.git.preDirty);
+    const files: RunDiff["files"] = [];
+    const nz = (numstat ?? "").split("\0");
+    for (let i = 0; i < nz.length; i++) {
+      const rec = nz[i];
+      if (!rec) continue;
+      const [a, d, p] = rec.split("\t");
+      let file = p;
+      if (p === "") {
+        // rename: "a\td\t" followed by old\0new\0
+        i += 1;
+        file = nz[++i];
+      }
+      if (!file) continue;
+      files.push({
+        file,
+        status: statusOf.get(file) ?? "M",
+        additions: a === "-" ? null : Number(a),
+        deletions: d === "-" ? null : Number(d),
+        preExisting: pre.has(file),
+      });
+    }
+
+    const preUntracked = new Set(run.git.preUntracked);
+    const added = (untracked ?? "").split("\0").filter((f) => f && !preUntracked.has(f)).slice(0, 200);
+    const newFiles = added.map((file) => {
+      const full = path.join(cwd, file);
+      let content: string | null = null;
+      try {
+        const st = fs.lstatSync(full);
+        if (st.isFile() && st.size <= 64 * 1024) {
+          const buf = fs.readFileSync(full);
+          if (!buf.includes(0)) content = buf.toString("utf8");
+        }
+      } catch {}
+      return { file, content };
+    });
+
+    const patch = patchRaw ?? "";
+    return {
+      available: true,
+      baseline: run.git,
+      commits: lines(log).map((l) => {
+        const [hash, subject] = l.split("\x1f");
+        return { hash, subject };
+      }),
+      files: files.slice(0, MAX_LIST),
+      newFiles,
+      patch: patch.length > MAX_PATCH ? patch.slice(0, MAX_PATCH) : patch,
+      truncated: patch.length > MAX_PATCH,
+    };
   }
 
   /** Mark tmux runs whose session has disappeared as completed. */

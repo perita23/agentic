@@ -89,6 +89,7 @@ export interface Overview {
 }
 
 export interface SystemInfo {
+  version: string;
   dataDir: string;
   claudeHome: string;
   claudeBin: string;
