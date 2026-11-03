@@ -227,6 +227,19 @@ try {
   await page.waitForTimeout(600);
   await shot("01-dashboard");
 
+  // macOS app: what the Electron preload does. The brand must clear the traffic
+  // lights (≈ 18–70px) and the top bars must drag the window, except controls.
+  const chrome = await page.evaluate(() => {
+    document.documentElement.dataset.desktop = "mac";
+    const brand = document.querySelector("aside a[href='/']").getBoundingClientRect();
+    const bar = getComputedStyle(document.querySelector("header.app-drag"));
+    const btn = getComputedStyle(document.querySelector("header.app-drag button"));
+    return { brandLeft: brand.left, bar: bar.getPropertyValue("app-region") || bar.webkitAppRegion, btn: btn.getPropertyValue("app-region") || btn.webkitAppRegion };
+  });
+  check(chrome.brandLeft >= 80 && chrome.bar === "drag" && chrome.btn === "no-drag", `macOS window chrome: brand clears traffic lights, top bar drags (${JSON.stringify(chrome)})`);
+  await shot("01b-dashboard-macos");
+  await page.evaluate(() => delete document.documentElement.dataset.desktop);
+
   await page.goto(`${base}/sessions`);
   await page.getByText("Añade modo oscuro al dashboard").first().click();
   await page.getByText("Claro, voy a revisar los estilos.").waitFor();
