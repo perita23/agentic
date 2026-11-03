@@ -38,7 +38,9 @@ export function RunNotifier() {
       (r.status === "completed" ? toast.success : toast.error)(title, { description: body, action: { label: "Ver", onClick: open } });
       if (notificationsEnabled() && document.visibilityState !== "visible") {
         try {
-          const n = new Notification(`Agentic · ${title}`, { body, tag: r.id });
+          // The system notification never carries the prompt: it is shown on the lock
+          // screen and kept in Notification Center.
+          const n = new Notification(`Agentic · ${title}`, { body: baseName(r.projectPath), tag: r.id, silent: false });
           n.onclick = () => {
             window.focus();
             open();

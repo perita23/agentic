@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { dataKeys, isSealed, seal, unseal } from "./seal";
 
 /**
  * Tiny JSON document store: one file per collection under `dir`.
@@ -10,7 +11,14 @@ import path from "node:path";
 export class JsonStore {
   private cache = new Map<string, unknown>();
 
-  constructor(public readonly dir: string) {
+  /**
+   * @param sealed collections encrypted at rest (credentials). Plain files from
+   * older versions are still read and get sealed on their next write.
+   */
+  constructor(
+    public readonly dir: string,
+    private readonly sealed: ReadonlySet<string> = new Set(),
+  ) {
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   }
 
@@ -19,12 +27,23 @@ export class JsonStore {
     return path.join(this.dir, `${name}.json`);
   }
 
+  /** Re-write sealed collections still stored in clear by older versions. */
+  sealExisting() {
+    for (const name of this.sealed) {
+      try {
+        const raw = JSON.parse(fs.readFileSync(this.file(name), "utf8"));
+        if (!isSealed(raw)) this.write(name, raw);
+      } catch {}
+    }
+  }
+
   read<T>(name: string, fallback: T): T {
     if (this.cache.has(name)) return this.cache.get(name) as T;
     let value = fallback;
     const f = this.file(name);
     try {
-      value = JSON.parse(fs.readFileSync(f, "utf8")) as T;
+      const raw = JSON.parse(fs.readFileSync(f, "utf8"));
+      value = isSealed(raw) ? unseal<T>(raw, dataKeys(this.dir)) : (raw as T);
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== "ENOENT") {
         // Corrupt file: keep a copy for the user and start from the fallback.
@@ -43,7 +62,7 @@ export class JsonStore {
     const tmp = `${f}.${process.pid}.${Date.now()}.tmp`;
     const fd = fs.openSync(tmp, "w", 0o600);
     try {
-      fs.writeFileSync(fd, JSON.stringify(value, null, 2));
+      fs.writeFileSync(fd, JSON.stringify(this.sealed.has(name) ? seal(value, dataKeys(this.dir)[0]) : value, null, 2));
       fs.fsyncSync(fd);
     } finally {
       fs.closeSync(fd);

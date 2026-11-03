@@ -73,13 +73,49 @@ function verifySha512(filePath, expectedBase64) {
 }
 
 /** GitHub token configured in Agentic (needed only for private repositories). */
-function githubToken(dataDir) {
+function githubToken(dataDir, dataKey) {
   try {
-    const cfg = JSON.parse(fs.readFileSync(path.join(dataDir, "integrations.json"), "utf8"));
+    let cfg = JSON.parse(fs.readFileSync(path.join(dataDir, "integrations.json"), "utf8"));
+    // Encrypted at rest since v0.16 (AES-256-GCM, key from the Keychain or data.key).
+    if (cfg && cfg.format === "agentic-sealed-v1") cfg = unseal(cfg, [dataKey, readKeyFile(dataDir)].filter(Boolean));
     const t = cfg?.github?.token;
     return typeof t === "string" && t ? t : null;
   } catch {
     return null;
+  }
+}
+
+function readKeyFile(dataDir) {
+  try {
+    const k = fs.readFileSync(path.join(dataDir, "data.key"), "utf8").trim();
+    return /^[0-9a-f]{64}$/.test(k) ? k : null;
+  } catch {
+    return null;
+  }
+}
+
+function unseal(file, hexKeys) {
+  for (const hex of hexKeys) {
+    try {
+      const d = crypto.createDecipheriv("aes-256-gcm", Buffer.from(hex, "hex"), Buffer.from(file.iv, "base64"));
+      d.setAuthTag(Buffer.from(file.tag, "base64"));
+      return JSON.parse(Buffer.concat([d.update(Buffer.from(file.data, "base64")), d.final()]).toString("utf8"));
+    } catch {}
+  }
+  return null;
+}
+
+/**
+ * Release signature: latest-mac.yml (which pins the SHA-512 of every zip) is
+ * signed with the project's Ed25519 key in CI. Builds that ship the public key
+ * refuse updates without a valid signature, so a compromised release page
+ * cannot push a different app.
+ */
+function verifyManifestSignature(manifest, signatureB64, publicKeyPem) {
+  try {
+    return crypto.verify(null, Buffer.from(manifest, "utf8"), publicKeyPem, Buffer.from(String(signatureB64).trim(), "base64"));
+  } catch {
+    return false;
   }
 }
 
@@ -94,11 +130,11 @@ async function fetchChecked(url, init = {}) {
 }
 
 /** Locate the latest release's manifest and asset URLs (public releases repo first). */
-async function latestRelease(dataDir) {
+async function latestRelease(dataDir, dataKey) {
   let lastError;
   for (const source of SOURCES) {
     try {
-      return await releaseFrom(source, dataDir);
+      return await releaseFrom(source, dataDir, dataKey);
     } catch (e) {
       lastError = e;
       // Fall through only when the repository or its release (or manifest) is missing.
@@ -108,8 +144,8 @@ async function latestRelease(dataDir) {
   throw lastError;
 }
 
-async function releaseFrom({ repo, auth }, dataDir) {
-  const token = auth ? githubToken(dataDir) : null;
+async function releaseFrom({ repo, auth }, dataDir, dataKey) {
+  const token = auth ? githubToken(dataDir, dataKey) : null;
   const headers = { "user-agent": "agentic-desktop", accept: "application/vnd.github+json", ...(token ? { authorization: `Bearer ${token}` } : {}) };
   const res = await fetchChecked(`https://api.github.com/repos/${OWNER}/${repo}/releases/latest`, { headers });
   const rel = await res.json();
@@ -125,9 +161,18 @@ async function releaseFrom({ repo, auth }, dataDir) {
 }
 
 /** Check for an update; resolves null when up to date. */
-async function checkForUpdate({ currentVersion, arch, dataDir }) {
-  const rel = await latestRelease(dataDir);
+async function checkForUpdate({ currentVersion, arch, dataDir, dataKey, publicKey }) {
+  const rel = await latestRelease(dataDir, dataKey);
   const manifest = await (await rel.download(MANIFEST)).text();
+  if (publicKey) {
+    let sig;
+    try {
+      sig = await (await rel.download(`${MANIFEST}.sig`)).text();
+    } catch {
+      throw new Error("La actualización no está firmada; no se instalará.");
+    }
+    if (!verifyManifestSignature(manifest, sig, publicKey)) throw new Error("La firma de la actualización no es válida; no se instalará.");
+  }
   const asset = pickAsset(manifest, arch);
   if (compareVersions(asset.version, currentVersion) <= 0) return null;
   return { ...asset, tag: rel.tag, repo: rel.repo, download: () => rel.download(asset.file) };
@@ -186,4 +231,4 @@ async function installAndRelaunch({ dir, file }, appBundlePath, pid) {
   spawn("/bin/sh", [script, String(pid), newApp, appBundlePath, dir], { detached: true, stdio: "ignore" }).unref();
 }
 
-module.exports = { compareVersions, pickAsset, verifySha512, checkForUpdate, downloadUpdate, installAndRelaunch, OWNER, REPO, PUBLIC_REPO };
+module.exports = { compareVersions, pickAsset, verifySha512, verifyManifestSignature, checkForUpdate, downloadUpdate, installAndRelaunch, OWNER, REPO, PUBLIC_REPO };

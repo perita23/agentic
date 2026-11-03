@@ -9,7 +9,7 @@ import { tmpDir } from "./helpers";
 const require = createRequire(import.meta.url);
 const { createDesktopSession } = require("../desktop/lib/session.cjs");
 const { mergePaths, pickPort, waitForPort } = require("../desktop/lib/env.cjs");
-const { checkForUpdate, compareVersions, pickAsset, verifySha512 } = require("../desktop/lib/updater.cjs");
+const { checkForUpdate, compareVersions, pickAsset, verifyManifestSignature, verifySha512 } = require("../desktop/lib/updater.cjs");
 
 describe("desktop session", () => {
   it("creates a session the server accepts, storing only its hash", () => {
@@ -179,5 +179,43 @@ describe("desktop app lock", () => {
     expect(validateSession(d, sid)?.method).toBe("desktop");
     expect(fs.readFileSync(path.join(d, "audit.log"), "utf8")).toContain("desktop-password");
     expect(() => createDesktopSession(d, { touchId: false })).toThrow(/obligatorio/);
+  });
+});
+
+describe("signed updates", () => {
+  const { publicKey, privateKey } = crypto.generateKeyPairSync("ed25519");
+  const pub = publicKey.export({ type: "spki", format: "pem" }) as string;
+  const manifest = "version: 0.99.0\nfiles:\n  - url: Agentic-0.99.0-arm64-mac.zip\n    sha512: abc\n    size: 10\npath: Agentic-0.99.0-arm64-mac.zip\nsha512: abc\n";
+  const sig = crypto.sign(null, Buffer.from(manifest), privateKey).toString("base64");
+  afterEach(() => vi.unstubAllGlobals());
+
+  function stub(withSig: string | null) {
+    const assets = [{ name: "latest-mac.yml", url: "https://api.github.com/repos/perita23/agentic-releases/releases/assets/1" }];
+    if (withSig !== null) assets.push({ name: "latest-mac.yml.sig", url: "https://api.github.com/repos/perita23/agentic-releases/releases/assets/2" });
+    vi.stubGlobal("fetch", async (u: URL) => {
+      const url = String(u);
+      if (url.endsWith("/releases/latest")) return Response.json({ tag_name: "v0.99.0", assets });
+      if (url.endsWith("/assets/1")) return new Response(manifest);
+      if (url.endsWith("/assets/2")) return new Response(withSig ?? "");
+      return new Response("", { status: 404 });
+    });
+  }
+
+  it("verifies Ed25519 signatures of the manifest", () => {
+    expect(verifyManifestSignature(manifest, sig, pub)).toBe(true);
+    expect(verifyManifestSignature(manifest.replace("abc", "evil"), sig, pub)).toBe(false);
+    expect(verifyManifestSignature(manifest, "garbage", pub)).toBe(false);
+  });
+
+  it("refuses unsigned or tampered updates when the app ships a public key", async () => {
+    const opts = { currentVersion: "0.16.0", arch: "arm64", dataDir: tmpDir(), publicKey: pub };
+    stub(sig);
+    expect((await checkForUpdate(opts)).version).toBe("0.99.0");
+    stub(null);
+    await expect(checkForUpdate(opts)).rejects.toThrow(/no está firmada/);
+    stub(crypto.sign(null, Buffer.from("otro"), privateKey).toString("base64"));
+    await expect(checkForUpdate(opts)).rejects.toThrow(/no es válida/);
+    stub(null);
+    expect((await checkForUpdate({ ...opts, publicKey: null })).version).toBe("0.99.0"); // unsigned builds keep working
   });
 });
