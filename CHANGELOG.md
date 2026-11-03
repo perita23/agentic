@@ -3,6 +3,21 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.9.0] - 2026-11-03
+
+### Añadido
+- **Inicio de sesión con Touch ID** (passkeys WebAuthn, autenticador de plataforma con verificación de usuario obligatoria). Página `/login` con «Entrar con Touch ID».
+- **Exigir Touch ID**: con la opción activa, el enlace con token y el token Bearer dejan de dar acceso y se cierran las sesiones abiertas con token. Recuperación local con `npm run reset-auth`.
+- **Sesiones** gestionables en Ajustes: listar, revocar, «cerrar las demás» y cerrar sesión.
+- **Registro de auditoría** (`~/.agentic/audit.log`, visible en Ajustes): inicios de sesión, intentos fallidos, cambios de passkeys y sesiones, y toda acción que modifica algo (método y ruta, nunca contenidos ni secretos).
+
+### Seguridad
+- La cookie ya no contiene el token maestro: sesiones de servidor con id aleatorio de 256 bits del que sólo se guarda el SHA-256; caducan a los 30 días o tras 7 sin uso. La cookie antigua deja de valer.
+- Límite de intentos fallidos en `/auth` y en el login con passkey.
+- Retos WebAuthn de un solo uso con caducidad de 5 minutos, ligados a cookie HttpOnly.
+- Al arrancar se corrigen permisos laxos en `~/.agentic` (directorios 0700, ficheros 0600).
+- La URL de acceso pasa a `http://localhost:PUERTO` (WebAuthn no admite IPs).
+
 ## [0.8.0] - 2026-11-03
 
 ### Añadido

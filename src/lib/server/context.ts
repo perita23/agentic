@@ -1,4 +1,5 @@
 import { AgentManager } from "./agents";
+import { hardenDataDir } from "./audit";
 import { getConfig, type Config } from "./config";
 import { queueMessage, runMessage } from "./integrations/messages";
 import { ProjectService } from "./projects";
@@ -31,6 +32,7 @@ const g = globalThis as unknown as { __agentic?: Context };
 
 export function createContext(config: Config): Context {
   const store = new JsonStore(config.dataDir);
+  hardenDataDir(config.dataDir);
   const sessions = new SessionIndex(config.claudeHome);
   const tasks = new TaskService(store);
   const integrations = new IntegrationService(store, tasks);

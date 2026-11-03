@@ -9,7 +9,13 @@ hablar con `127.0.0.1`. Este documento resume el modelo de amenazas y las defens
 | Amenaza | Defensa | Test |
 |---------|---------|------|
 | Otra máquina de la red accede al servidor | Bind a `127.0.0.1`; el launcher se niega a otra interfaz sin `AGENTIC_ALLOW_REMOTE=1` | — |
-| Otro usuario/proceso local o web maliciosa sin credenciales | Token aleatorio de 256 bits (`~/.agentic/token`, modo 0600); cookie `HttpOnly; SameSite=Strict`; comparación en tiempo constante | `security.test.ts`, `api.test.ts`, smoke |
+| Otro usuario/proceso local o web maliciosa sin credenciales | Token aleatorio de 256 bits (`~/.agentic/token`, 0600) que sólo abre una **sesión de servidor**; la cookie (`HttpOnly; SameSite=Strict`) lleva un id aleatorio de 256 bits del que sólo se guarda el SHA-256; caducidad 30 días / 7 de inactividad; comparación en tiempo constante | `security.test.ts`, `auth.test.ts`, smoke |
+| Robo del token (historial de terminal o navegador) | **Touch ID / passkeys** (WebAuthn, plataforma, verificación de usuario obligatoria) y opción **exigir Touch ID**, que anula el token (URL y Bearer) y cierra las sesiones abiertas con él; sólo activable desde una sesión iniciada con passkey (no puedes bloquearte); recuperación local `npm run reset-auth` | `auth.test.ts`, smoke (autenticador virtual) |
+| Fuerza bruta en el login | Límite de 10 fallos/minuto en `/auth` y en el login con passkey; retos WebAuthn de un solo uso (5 min) en cookie HttpOnly | `auth.test.ts` |
+| Robo de cookie | Revocación de sesiones desde Ajustes, «cerrar las demás», logout real (borra la sesión del servidor) | `auth.test.ts`, smoke |
+| Permisos laxos en los datos | Al arrancar se corrigen `~/.agentic` y sus ficheros a 0700/0600 (sólo los del propio usuario, sin seguir symlinks) | `auth.test.ts` |
+| Trazabilidad | Registro de auditoría en `~/.agentic/audit.log` (0600, rotación a 5 MB): logins, fallos, passkeys, sesiones y toda mutación de la API (método + ruta, nunca cuerpos ni secretos) | `auth.test.ts`, smoke |
+| Redirección abierta tras el login | `next` sólo acepta rutas internas (`/…`, no `//` ni `/\`) | — |
 | **DNS rebinding** (dominio atacante que resuelve a 127.0.0.1) | Allow-list del header `Host` (sólo `127.0.0.1`, `localhost`, `[::1]`) en `proxy.ts`, en `/auth` y en cada Route Handler | ídem |
 | **CSRF** desde otra web | Mutaciones exigen `Content-Type: application/json` (no enviable por formularios sin preflight CORS), `Origin` propio si existe y `Sec-Fetch-Site` same-origin; además cookie `SameSite=Strict` | ídem |
 | **XSS** con datos de transcripciones/tareas | React escapa todo el texto; nunca se usa `dangerouslySetInnerHTML`; CSP con nonce por petición y `strict-dynamic`, sin `unsafe-eval` en producción, `object-src 'none'`, `base-uri 'none'`, `frame-ancestors 'none'` | smoke (payload `<img onerror>`) |

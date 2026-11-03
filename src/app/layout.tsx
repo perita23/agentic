@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { AppShell } from "@/components/app/shell";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
@@ -21,7 +20,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="es" className={`dark ${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}>
       <body className="min-h-full">
         <TooltipProvider>
-          <AppShell>{children}</AppShell>
+          {children}
           <Toaster />
         </TooltipProvider>
       </body>
