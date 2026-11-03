@@ -188,7 +188,7 @@ async function doCheck(interactive) {
     cancelId: 2,
   });
   if (response === 1) {
-    shell.openExternal(`https://github.com/${updater.OWNER}/${updater.REPO}/releases/tag/${encodeURIComponent(update.tag)}`);
+    shell.openExternal(`https://github.com/${updater.OWNER}/${update.repo}/releases/tag/${encodeURIComponent(update.tag)}`);
     return "available";
   }
   if (response !== 0) {

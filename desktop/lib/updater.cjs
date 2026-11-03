@@ -5,8 +5,9 @@
 //   2. pick the zip for this CPU architecture,
 //   3. download it over https and verify its SHA-512 against the manifest,
 //   4. unpack it with `ditto` and swap the .app bundle after we quit.
-// Private repositories work through the GitHub REST API with the token the user
-// already configured in Agentic (Integraciones → GitHub).
+// Builds are published to a public releases repository (no credentials needed).
+// Until it exists, the source repository is used; being private, that goes through
+// the GitHub REST API with the token configured in Agentic (Integraciones → GitHub).
 "use strict";
 
 const crypto = require("node:crypto");
@@ -18,6 +19,12 @@ const yaml = require("js-yaml");
 
 const OWNER = "perita23";
 const REPO = "agentic";
+const PUBLIC_REPO = "agentic-releases";
+// Tried in order; the token is only ever sent to the private source repository.
+const SOURCES = [
+  { repo: PUBLIC_REPO, auth: false },
+  { repo: REPO, auth: true },
+];
 const MANIFEST = "latest-mac.yml";
 
 /** Compare dotted versions ("0.10.0" > "0.9.3"); pre-release tags sort before releases. */
@@ -82,16 +89,31 @@ async function fetchChecked(url, init = {}) {
   if (u.protocol !== "https:" || !/(^|\.)github\.com$|(^|\.)githubusercontent\.com$/.test(u.hostname)) throw new Error(`Origen de actualización no permitido: ${u.hostname}`);
   const res = await fetch(u, { ...init, redirect: "manual" });
   if (res.status >= 300 && res.status < 400 && res.headers.get("location")) return fetchChecked(new URL(res.headers.get("location"), u).toString(), { headers: { "user-agent": "agentic-desktop" } });
-  if (!res.ok) throw new Error(`GitHub respondió ${res.status}`);
+  if (!res.ok) throw Object.assign(new Error(`GitHub respondió ${res.status}`), { status: res.status });
   return res;
 }
 
-/** Locate the latest release's manifest and asset URLs (public or private repo). */
+/** Locate the latest release's manifest and asset URLs (public releases repo first). */
 async function latestRelease(dataDir) {
-  const token = githubToken(dataDir);
+  let lastError;
+  for (const source of SOURCES) {
+    try {
+      return await releaseFrom(source, dataDir);
+    } catch (e) {
+      lastError = e;
+      // Fall through only when the repository or its release (or manifest) is missing.
+      if (e.status !== 404 && !e.missingAsset) throw e;
+    }
+  }
+  throw lastError;
+}
+
+async function releaseFrom({ repo, auth }, dataDir) {
+  const token = auth ? githubToken(dataDir) : null;
   const headers = { "user-agent": "agentic-desktop", accept: "application/vnd.github+json", ...(token ? { authorization: `Bearer ${token}` } : {}) };
-  const res = await fetchChecked(`https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`, { headers });
+  const res = await fetchChecked(`https://api.github.com/repos/${OWNER}/${repo}/releases/latest`, { headers });
   const rel = await res.json();
+  if (!(rel.assets || []).some((a) => a.name === MANIFEST)) throw Object.assign(new Error(`La release ${rel.tag_name} de ${repo} no contiene ${MANIFEST}`), { missingAsset: true });
   const assets = new Map((rel.assets || []).map((a) => [a.name, a]));
   const download = async (name) => {
     const a = assets.get(name);
@@ -99,7 +121,7 @@ async function latestRelease(dataDir) {
     // The API asset URL works for private repos with the token; it redirects to GitHub's CDN.
     return fetchChecked(a.url, { headers: { ...headers, accept: "application/octet-stream" } });
   };
-  return { tag: rel.tag_name, download };
+  return { tag: rel.tag_name, repo, download };
 }
 
 /** Check for an update; resolves null when up to date. */
@@ -108,7 +130,7 @@ async function checkForUpdate({ currentVersion, arch, dataDir }) {
   const manifest = await (await rel.download(MANIFEST)).text();
   const asset = pickAsset(manifest, arch);
   if (compareVersions(asset.version, currentVersion) <= 0) return null;
-  return { ...asset, tag: rel.tag, download: () => rel.download(asset.file) };
+  return { ...asset, tag: rel.tag, repo: rel.repo, download: () => rel.download(asset.file) };
 }
 
 /** Stream the zip to a temp dir, reporting progress, then verify its hash. */
@@ -164,4 +186,4 @@ async function installAndRelaunch({ dir, file }, appBundlePath, pid) {
   spawn("/bin/sh", [script, String(pid), newApp, appBundlePath, dir], { detached: true, stdio: "ignore" }).unref();
 }
 
-module.exports = { compareVersions, pickAsset, verifySha512, checkForUpdate, downloadUpdate, installAndRelaunch, OWNER, REPO };
+module.exports = { compareVersions, pickAsset, verifySha512, checkForUpdate, downloadUpdate, installAndRelaunch, OWNER, REPO, PUBLIC_REPO };

@@ -114,5 +114,37 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.release.outputs.tag }}
         run: |
+          set -euo pipefail
           cd desktop/dist
+          # Stable names so .../releases/latest/download/Agentic-<arch>.dmg always
+          # points at the newest build (used by the download page).
+          arm=$(ls *.dmg | grep arm64 | head -n1)
+          x64=$(ls *.dmg | grep -v arm64 | head -n1)
+          cp "$arm" Agentic-arm64.dmg
+          cp "$x64" Agentic-x64.dmg
           gh release upload "$TAG" *.dmg *.zip latest-mac.yml --repo "$GITHUB_REPOSITORY" --clobber
+
+      # The source repository is private, so its release assets need a GitHub
+      # login. Mirror the release to a public repository for the download page
+      # and for in-app updates. Needs the RELEASES_TOKEN secret (fine-grained
+      # token with Contents: read and write on that repository only).
+      - name: Publish to the public releases repository
+        env:
+          RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          SOURCE_TOKEN: ${{ github.token }}
+          RELEASES_REPO: ${{ vars.RELEASES_REPO || 'perita23/agentic-releases' }}
+          TAG: ${{ needs.release.outputs.tag }}
+          LATEST: ${{ !inputs.ref }}
+        run: |
+          set -euo pipefail
+          if [ -z "$RELEASES_TOKEN" ]; then
+            echo "::notice::RELEASES_TOKEN is not set; skipping the public releases repository."
+            exit 0
+          fi
+          cd desktop/dist
+          GH_TOKEN="$SOURCE_TOKEN" gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > notes.md
+          export GH_TOKEN="$RELEASES_TOKEN"
+          if ! gh release view "$TAG" --repo "$RELEASES_REPO" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$RELEASES_REPO" --title "Agentic $TAG" --notes-file notes.md --latest="$LATEST"
+          fi
+          gh release upload "$TAG" *.dmg *.zip latest-mac.yml --repo "$RELEASES_REPO" --clobber

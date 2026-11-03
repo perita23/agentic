@@ -2,14 +2,14 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { readAuth, validateSession } from "@/lib/server/auth";
 import { tmpDir } from "./helpers";
 
 const require = createRequire(import.meta.url);
 const { createDesktopSession } = require("../desktop/lib/session.cjs");
 const { mergePaths, pickPort, waitForPort } = require("../desktop/lib/env.cjs");
-const { compareVersions, pickAsset, verifySha512 } = require("../desktop/lib/updater.cjs");
+const { checkForUpdate, compareVersions, pickAsset, verifySha512 } = require("../desktop/lib/updater.cjs");
 
 describe("desktop session", () => {
   it("creates a session the server accepts, storing only its hash", () => {
@@ -90,5 +90,44 @@ releaseDate: '2026-11-03T10:00:00.000Z'
     expect(await verifySha512(f, good)).toBe(true);
     expect(await verifySha512(f, crypto.createHash("sha512").update("otro").digest("base64"))).toBe(false);
     expect(await verifySha512(f, "short")).toBe(false);
+  });
+});
+
+describe("update sources", () => {
+  const manifest = "version: 0.11.0\nfiles:\n  - url: Agentic-0.11.0-arm64-mac.zip\n    sha512: abc\n    size: 10\npath: Agentic-0.11.0-arm64-mac.zip\nsha512: abc\n";
+  const release = (repo: string) => ({ tag_name: "v0.11.0", assets: [{ name: "latest-mac.yml", url: `https://api.github.com/repos/perita23/${repo}/releases/assets/1` }] });
+  afterEach(() => vi.unstubAllGlobals());
+
+  function stub(publicExists: boolean) {
+    const calls: { url: string; auth: string | null }[] = [];
+    vi.stubGlobal("fetch", async (u: URL, init: { headers?: Record<string, string> }) => {
+      const url = String(u);
+      calls.push({ url, auth: init?.headers?.authorization ?? null });
+      if (url.endsWith("/agentic-releases/releases/latest")) return publicExists ? Response.json(release("agentic-releases")) : new Response("", { status: 404 });
+      if (url.endsWith("/agentic/releases/latest")) return Response.json(release("agentic"));
+      if (url.includes("/releases/assets/")) return new Response(manifest);
+      return new Response("", { status: 500 });
+    });
+    return calls;
+  }
+
+  it("uses the public releases repository without sending the token", async () => {
+    const dir = tmpDir();
+    fs.writeFileSync(path.join(dir, "integrations.json"), JSON.stringify({ github: { token: "secret" } }));
+    const calls = stub(true);
+    const u = await checkForUpdate({ currentVersion: "0.10.0", arch: "arm64", dataDir: dir });
+    expect(u.repo).toBe("agentic-releases");
+    expect(calls.every((c) => c.auth === null)).toBe(true);
+    expect(calls.some((c) => c.url.includes("/agentic/"))).toBe(false);
+  });
+
+  it("falls back to the private repository with the token when the public one is missing", async () => {
+    const dir = tmpDir();
+    fs.writeFileSync(path.join(dir, "integrations.json"), JSON.stringify({ github: { token: "secret" } }));
+    const calls = stub(false);
+    const u = await checkForUpdate({ currentVersion: "0.10.0", arch: "arm64", dataDir: dir });
+    expect(u.repo).toBe("agentic");
+    expect(calls.find((c) => c.url.includes("/agentic-releases/"))?.auth).toBeNull();
+    expect(calls.find((c) => c.url.endsWith("/agentic/releases/latest"))?.auth).toBe("Bearer secret");
   });
 });

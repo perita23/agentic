@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agentic — consola local para Claude Code</title>
+    <meta
+      name="description"
+      content="Gestiona sesiones, agentes, tareas, pull requests, Jira y Slack de Claude Code desde una app local para macOS."
+    />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src https://api.github.com; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      property="og:title"
+      content="Agentic — consola local para Claude Code"
+    />
+    <meta
+      property="og:description"
+      content="Sesiones, agentes, tareas, PRs, Jira y Slack. Todo en tu Mac."
+    />
+    <meta property="og:image" content="assets/dashboard.webp" />
+    <link rel="icon" href="favicon.png" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="nav">
+      <a class="brand" href="#">
+        <img src="assets/icon.png" alt="" width="28" height="28" />
+        <span>Agentic</span>
+      </a>
+      <nav>
+        <a href="#funciones">Funciones</a>
+        <a href="#seguridad">Seguridad</a>
+        <a href="#instalar">Instalar</a>
+        <a class="gh" href="https://github.com/perita23/agentic-releases"
+          >GitHub</a
+        >
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow">
+          <span class="dot"></span> Todo se ejecuta en tu máquina
+        </p>
+        <h1>La consola local para <span class="grad">Claude Code</span></h1>
+        <p class="lead">
+          Sesiones en vivo, agentes, tareas autónomas, pull requests de GitHub y
+          Bitbucket, Jira y Slack en una sola app para macOS, con Touch ID y un
+          asistente de IA local.
+        </p>
+        <div class="cta">
+          <a
+            id="dl-primary"
+            class="btn primary"
+            href="https://github.com/perita23/agentic-releases/releases/latest/download/Agentic-arm64.dmg"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.71-3.18-1.73-1.35-.14-2.64.8-3.33.8-.69 0-1.74-.78-2.86-.76-1.47.02-2.83.86-3.59 2.17-1.53 2.66-.39 6.6 1.1 8.76.73 1.05 1.6 2.24 2.73 2.2 1.1-.05 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.07 2.65-2.13.84-1.22 1.18-2.4 1.2-2.46-.03-.01-2.3-.88-2.3-3.52ZM14.2 6.13c.6-.74 1.01-1.75.9-2.77-.87.04-1.93.58-2.55 1.31-.56.65-1.05 1.69-.92 2.69.97.07 1.96-.49 2.57-1.23Z"
+              />
+            </svg>
+            <span id="dl-primary-label"
+              >Descargar para Mac (Apple Silicon)</span
+            >
+          </a>
+          <a
+            id="dl-secondary"
+            class="btn"
+            href="https://github.com/perita23/agentic-releases/releases/latest/download/Agentic-x64.dmg"
+            >Mac con Intel</a
+          >
+        </div>
+        <p class="meta" id="release-meta">
+          macOS 13 o superior · Apple Silicon e Intel · se actualiza sola
+        </p>
+        <figure class="shot hero-shot">
+          <img
+            src="assets/dashboard.webp"
+            alt="Dashboard de Agentic con procesos de Claude Code en vivo, tareas y sesiones recientes"
+            width="1600"
+            height="1000"
+          />
+        </figure>
+      </section>
+
+      <section id="funciones" class="features">
+        <h2>Todo tu trabajo con Claude Code, en un sitio</h2>
+        <div class="grid">
+          <article>
+            <h3>Sesiones en vivo</h3>
+            <p>
+              Todas tus conversaciones de <code>~/.claude</code>, su estado en
+              tiempo real, transcripciones, tokens y búsqueda de texto completo.
+            </p>
+          </article>
+          <article>
+            <h3>Lanza y controla</h3>
+            <p>
+              Ejecuciones en segundo plano con log en directo o sesiones
+              interactivas en tmux, con el diff de lo que cambió Claude.
+            </p>
+          </article>
+          <article>
+            <h3>Tareas autónomas</h3>
+            <p>
+              Kanban con plantillas y una cola que ejecuta tus tareas una a una,
+              con límites, presupuesto y parada ante fallos.
+            </p>
+          </article>
+          <article>
+            <h3>Pull requests</h3>
+            <p>
+              GitHub y Bitbucket en una bandeja: diff, checks, reviews,
+              comentar, aprobar y mergear sin salir de la app.
+            </p>
+          </article>
+          <article>
+            <h3>Jira y Slack</h3>
+            <p>
+              Busca, comenta y mueve incidencias; lee y responde canales e
+              hilos; convierte mensajes en tareas.
+            </p>
+          </article>
+          <article>
+            <h3>IA local y voz</h3>
+            <p>
+              Ollama para resumir sesiones y redactar PRs, y dictado por voz con
+              Whisper, todo en tu Mac.
+            </p>
+          </article>
+        </div>
+        <div class="gallery">
+          <figure class="shot">
+            <img
+              loading="lazy"
+              src="assets/pull-request.webp"
+              alt="Revisión de una pull request con diff y acciones"
+              width="1600"
+              height="1000"
+            />
+            <figcaption>Revisa y mergea PRs</figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              loading="lazy"
+              src="assets/tasks.webp"
+              alt="Tablero Kanban de tareas"
+              width="1600"
+              height="1000"
+            />
+            <figcaption>Kanban con cola autónoma</figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              loading="lazy"
+              src="assets/jira.webp"
+              alt="Incidencias de Jira con panel de detalle"
+              width="1600"
+              height="1000"
+            />
+            <figcaption>Jira integrado</figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              loading="lazy"
+              src="assets/run-diff.webp"
+              alt="Diff de los cambios que hizo una ejecución de Claude"
+              width="1600"
+              height="1000"
+            />
+            <figcaption>Qué cambió Claude</figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              loading="lazy"
+              src="assets/messages.webp"
+              alt="Canales y mensajes de Slack"
+              width="1600"
+              height="1000"
+            />
+            <figcaption>Slack sin cambiar de app</figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              loading="lazy"
+              src="assets/analytics.webp"
+              alt="Analítica de tokens por día"
+              width="1600"
+              height="1000"
+            />
+            <figcaption>Analítica de uso</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section id="seguridad" class="security">
+        <h2>Local y blindada</h2>
+        <ul>
+          <li>
+            <strong>Nada sale de tu Mac</strong> salvo las llamadas a los
+            servicios que conectes. Sin cuentas ni telemetría.
+          </li>
+          <li>
+            <strong>Touch ID</strong> para abrir la app y, si quieres,
+            obligatorio para cualquier acceso.
+          </li>
+          <li>
+            <strong>Credenciales locales</strong> (permisos 0600) que nunca
+            llegan al navegador.
+          </li>
+          <li>
+            <strong>Actualizaciones verificadas</strong> con SHA-512 y firma del
+            bundle antes de instalarse.
+          </li>
+          <li>
+            <strong>Registro de auditoría</strong> de inicios de sesión y de
+            cada acción que cambia algo.
+          </li>
+        </ul>
+      </section>
+
+      <section id="instalar" class="install">
+        <h2>Instalar</h2>
+        <ol>
+          <li>
+            Descarga el <code>.dmg</code> para tu Mac y arrastra
+            <strong>Agentic</strong> a <em>Aplicaciones</em>.
+          </li>
+          <li>
+            La primera vez, haz <strong>clic derecho → Abrir</strong> (la app
+            aún no está notarizada por Apple). O en Terminal:
+            <code
+              >xattr -dr com.apple.quarantine /Applications/Agentic.app</code
+            >
+          </li>
+          <li>
+            Necesitas
+            <a href="https://code.claude.com">Claude Code</a> instalado (<code
+              >claude</code
+            >
+            en tu terminal).
+          </li>
+          <li>
+            Las siguientes versiones se instalan solas desde la propia app.
+          </li>
+        </ol>
+      </section>
+    </main>
+
+    <footer>
+      <span>Agentic · MIT</span>
+      <a href="https://github.com/perita23/agentic-releases/releases"
+        >Todas las versiones</a
+      >
+    </footer>
+  </body>
+</html>

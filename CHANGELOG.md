@@ -3,6 +3,16 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.10.1] - 2026-11-03
+
+### Añadido
+- **Página de descarga** (`site/`, estática y sin dependencias) con botones para Apple Silicon e Intel, capturas, funciones e instrucciones. Se publica en GitHub Pages del repositorio público [`agentic-releases`](https://perita23.github.io/agentic-releases/).
+- Las releases suben también `Agentic-arm64.dmg` y `Agentic-x64.dmg` con nombre fijo, así `releases/latest/download/...` siempre apunta a la última versión.
+- Las releases se replican en el repositorio público `perita23/agentic-releases` (secret `RELEASES_TOKEN`), para descargar sin iniciar sesión en GitHub.
+
+### Cambiado
+- La app de macOS busca actualizaciones primero en `agentic-releases` **sin enviar ningún token**; sólo si no existe recurre al repositorio privado con el token de Integraciones.
+
 ## [0.10.0] - 2026-11-03
 
 ### Añadido
