@@ -50,6 +50,7 @@ function serverEntry() {
 async function startServer() {
   const port = await pickPort(Number(process.env.PORT) || 4317);
   const entry = serverEntry();
+  console.log(`[agentic] starting server ${entry} on port ${port}`);
   if (!fs.existsSync(entry)) throw new Error(`No se encuentra el servidor de Agentic (${entry}). Ejecuta «npm run desktop:prepare».`);
   server = fork(entry, [], {
     cwd: path.dirname(entry),
@@ -66,6 +67,7 @@ async function startServer() {
     stdio: ["ignore", "inherit", "inherit", "ipc"],
   });
   server.on("exit", (code) => {
+    console.error(`[agentic] server exited with code ${code}`);
     if (!app.isQuitting) {
       dialog.showErrorBox("Agentic", `El servidor local se ha detenido (código ${code}).`);
       app.quit();
@@ -274,6 +276,7 @@ app.whenReady().then(async () => {
     win.webContents.once("did-finish-load", () => checkOnEntry());
     app.on("browser-window-focus", () => checkOnEntry());
   } catch (e) {
+    console.error("[agentic] startup failed:", e);
     dialog.showErrorBox("Agentic", e && e.message ? e.message : String(e));
     app.exit(1);
   }
