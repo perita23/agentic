@@ -73,11 +73,11 @@ export interface TokenCounts {
   cacheWrite: number;
 }
 
+type DayUsage = TokenCounts & { messages: number; models: Record<string, number>; tools: Record<string, number> };
+
 interface FileUsage {
   cwd: string | null;
-  byDay: Record<string, TokenCounts & { messages: number }>;
-  byModel: Record<string, number>;
-  tools: Record<string, number>;
+  byDay: Record<string, DayUsage>;
 }
 
 export interface Analytics {
@@ -283,7 +283,8 @@ export class SessionIndex {
   private async fileUsage(file: string, st: fs.Stats): Promise<FileUsage> {
     const hit = this.usageCache.get(file);
     if (hit && hit.mtimeMs === st.mtimeMs && hit.size === st.size) return hit.usage;
-    const u: FileUsage = { cwd: null, byDay: {}, byModel: {}, tools: {} };
+    const u: FileUsage = { cwd: null, byDay: {} };
+    const dayOf = (day: string) => (u.byDay[day] ??= { ...zero(), messages: 0, models: {}, tools: {} });
     const fallbackDay = new Date(st.mtimeMs).toISOString().slice(0, 10);
     const rl = readline.createInterface({ input: fs.createReadStream(file, "utf8"), crlfDelay: Infinity });
     for await (const line of rl) {
@@ -299,7 +300,7 @@ export class SessionIndex {
       const day = typeof o.timestamp === "string" && /^\d{4}-\d{2}-\d{2}/.test(o.timestamp) ? o.timestamp.slice(0, 10) : fallbackDay;
       if (o.type === "assistant" && o.message) {
         const us = o.message.usage || {};
-        const d = (u.byDay[day] ??= { ...zero(), messages: 0 });
+        const d = dayOf(day);
         const t = {
           input: Number(us.input_tokens) || 0,
           output: Number(us.output_tokens) || 0,
@@ -312,11 +313,11 @@ export class SessionIndex {
         d.cacheWrite += t.cacheWrite;
         d.messages++;
         const model = strOrNull(o.message.model);
-        if (model && model !== "<synthetic>") u.byModel[model] = (u.byModel[model] || 0) + tokenTotal(t);
+        if (model && model !== "<synthetic>") d.models[model] = (d.models[model] || 0) + tokenTotal(t);
         if (Array.isArray(o.message.content))
-          for (const b of o.message.content as Block[]) if (b?.type === "tool_use" && typeof b.name === "string") u.tools[b.name] = (u.tools[b.name] || 0) + 1;
+          for (const b of o.message.content as Block[]) if (b?.type === "tool_use" && typeof b.name === "string") d.tools[b.name] = (d.tools[b.name] || 0) + 1;
       } else if (isHumanPrompt(o)) {
-        (u.byDay[day] ??= { ...zero(), messages: 0 }).messages++;
+        dayOf(day).messages++;
       }
     }
     this.usageCache.set(file, { mtimeMs: st.mtimeMs, size: st.size, usage: u });
@@ -363,6 +364,8 @@ export class SessionIndex {
         bucket.messages += t.messages;
         bucket.sessions.add(id);
         tokens += tokenTotal(t);
+        for (const [m, n] of Object.entries(t.models)) models[m] = (models[m] || 0) + n;
+        for (const [name, n] of Object.entries(t.tools)) tools[name] = (tools[name] || 0) + n;
         totals.input += t.input;
         totals.output += t.output;
         totals.cacheRead += t.cacheRead;
@@ -376,9 +379,6 @@ export class SessionIndex {
       p.tokens += tokens;
       p.sessions++;
       projects.set(key, p);
-      // Model / tool breakdowns are per file (not per day): good enough for a 1–90 day window.
-      for (const [m, n] of Object.entries(u.byModel)) models[m] = (models[m] || 0) + n;
-      for (const [t, n] of Object.entries(u.tools)) tools[t] = (tools[t] || 0) + n;
     }
 
     return {

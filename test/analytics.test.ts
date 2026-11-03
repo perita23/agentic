@@ -51,6 +51,20 @@ describe("SessionIndex.analytics", () => {
     ].sort((x, y) => y.count - x.count));
   });
 
+  it("only counts models and tools used inside the window", async () => {
+    const h = home();
+    // A long session: an old turn with another model/tool, then a turn today.
+    const dir = path.join(h, "projects", "-p-d");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "dddddddd-0000-4000-8000-000000000004.jsonl"),
+      jsonl([assistant(longAgo, "old-model", 500, 500, "Bash"), assistant(today, "model-x", 1, 1)]),
+    );
+    const a = await new SessionIndex(h).analytics(7);
+    expect(a.byModel.some((m) => m.model === "old-model")).toBe(false);
+    expect(a.tools.some((t) => t.name === "Bash")).toBe(false);
+  });
+
   it("filters by project and refreshes when a transcript grows", async () => {
     const h = home();
     const idx = new SessionIndex(h);
