@@ -29,6 +29,7 @@ import { cn, shortPath } from "@/lib/utils";
 import { Kbd, StatusDot } from "./common";
 import { LauncherProvider, useLauncher } from "./launcher";
 import { RunNotifier } from "./run-notifier";
+import { WhatsNew } from "./whats-new";
 import { BrandMark } from "@/components/app/brand-mark";
 
 const NAV = [
@@ -239,6 +240,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
       </div>
       <CommandPalette open={paletteOpen} setOpen={setPaletteOpen} />
       <RunNotifier />
+      <WhatsNew />
     </div>
   );
 }

@@ -3,6 +3,18 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.15.0] - 2026-11-03
+
+### Añadido
+- **Novedades al actualizar**: la primera vez que abres Agentic después de una actualización ves qué ha cambiado (todas las versiones desde la última que viste).
+
+### Seguridad
+- Las direcciones de los repositorios ya no muestran credenciales: si un remoto lleva un token dentro (`https://usuario:token@…`), Agentic lo oculta.
+
+### Corregido
+- En la ficha de un proyecto, las direcciones largas ya no se salen de su tarjeta.
+- Las listas largas (commits, ficheros, scripts, sesiones y ejecuciones del dashboard) tienen su propio scroll y no estiran la página.
+
 ## [0.14.2] - 2026-11-03
 
 ### Corregido

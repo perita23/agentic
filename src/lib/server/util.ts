@@ -28,6 +28,11 @@ export function parse<T extends z.ZodType>(schema: T, data: unknown): z.infer<T>
 }
 
 /** A safe single-line/multi-line text field: bounded, no NUL bytes. */
+/** Drop credentials embedded in URLs (https://user:token@host/…) before showing them. */
+export function redactUrl(s: string): string {
+  return s.replace(/\b([a-z][\w+.-]*:\/\/)[^\s/@]+@/gi, "$1");
+}
+
 export const text = (max: number) =>
   z
     .string()

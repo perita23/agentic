@@ -5,7 +5,7 @@ import { z } from "zod";
 import { git } from "./git";
 import type { SessionIndex } from "./sessions";
 import type { JsonStore } from "./store";
-import { absPath, existingDir, HttpError, nowIso, parse, text } from "./util";
+import { absPath, existingDir, HttpError, nowIso, parse, text, redactUrl } from "./util";
 
 export interface StoredProject {
   id: string;
@@ -232,7 +232,7 @@ export class ProjectService {
         lastCommit: hash ? { hash, subject, author, date } : null,
         changes: changes.length,
         changedFiles: changes.slice(0, 50).map((l) => ({ status: l.slice(0, 2).trim(), file: l.slice(3) })),
-        remotes: [...new Set((remotes || "").split("\n").filter(Boolean).map((l) => l.split(/\s+/).slice(0, 2).join(" ")))],
+        remotes: [...new Set((remotes || "").split("\n").filter(Boolean).map((l) => redactUrl(l.split(/\s+/).slice(0, 2).join(" "))))],
         commitCount: Number((count || "").trim()) || 0,
         recentCommits: (recent || "")
           .split("\n")

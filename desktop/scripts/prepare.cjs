@@ -10,6 +10,8 @@ if (!fs.existsSync(path.join(standalone, "server.js"))) {
   console.error("Falta .next/standalone. Ejecuta primero: AGENTIC_STANDALONE=1 npm run build");
   process.exit(1);
 }
+// Release notes shown in the app after an update ("Novedades").
+fs.copyFileSync(path.join(root, "CHANGELOG.md"), path.join(standalone, "CHANGELOG.md"));
 // Next does not copy these into the standalone output.
 fs.cpSync(path.join(root, ".next", "static"), path.join(standalone, ".next", "static"), { recursive: true });
 if (fs.existsSync(path.join(root, "public"))) fs.cpSync(path.join(root, "public"), path.join(standalone, "public"), { recursive: true });

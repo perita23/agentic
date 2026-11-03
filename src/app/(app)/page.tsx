@@ -66,7 +66,7 @@ export default function DashboardPage() {
             ) : data.activeProcesses.length === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-muted-foreground">No hay ninguna sesión de Claude Code abierta ahora mismo.</p>
             ) : (
-              <div className="divide-y border-y">
+              <div className="scroll-area divide-y border-y">
                 {data.activeProcesses.map((p) => (
                   <Link key={p.pid} href={p.sessionId ? `/sessions/${p.sessionId}` : "/sessions"} className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/60">
                     <StatusDot status={p.status} />
@@ -132,7 +132,7 @@ export default function DashboardPage() {
                 <EmptyState icon={MessagesSquareIcon} title="Sin sesiones todavía" description="Cuando uses Claude Code en esta máquina aparecerán aquí." />
               </div>
             ) : (
-              <div className="divide-y border-y">{data?.recentSessions.map((s) => <SessionRow key={s.id} s={s} />)}</div>
+              <div className="scroll-area divide-y border-y">{data?.recentSessions.map((s) => <SessionRow key={s.id} s={s} />)}</div>
             )}
           </CardContent>
         </Card>
@@ -160,7 +160,7 @@ export default function DashboardPage() {
                 />
               </div>
             ) : (
-              <div className="divide-y border-y">{data?.recentRuns.map((r) => <RunRow key={r.id} r={r} />)}</div>
+              <div className="scroll-area divide-y border-y">{data?.recentRuns.map((r) => <RunRow key={r.id} r={r} />)}</div>
             )}
           </CardContent>
         </Card>
