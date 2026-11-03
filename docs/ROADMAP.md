@@ -52,3 +52,18 @@ Cada fase termina con tests en verde. El estado de cada tarea vive en [`KANBAN.m
 - Programación de tareas (cron) y colas de ejecución.
 - Comparar diffs git por ejecución.
 - Empaquetado como app de escritorio (Tauri/Electron).
+
+## Fase 5 — Roadmap autónomo (desde v0.17)
+
+Criterio: lo que más tiempo ahorra a quien trabaja a diario con Claude Code, sin salir de lo local.
+
+| Versión | Feature | Por qué |
+| --- | --- | --- |
+| v0.17 | **Chat** con Claude sin proyecto, con historial (buscar, fijar, borrar) | Preguntas rápidas sin abrir un terminal ni elegir carpeta. |
+| v0.18 | **Login nuevo** a pantalla completa + distintivo «Diseñada según OWASP ASVS / Electron» | Primera impresión y confianza. |
+| v0.19 | **Servidores MCP**: ver, añadir, activar y quitar los MCP de Claude Code (usuario y proyecto) | Hoy exige editar JSON a mano. |
+| v0.20 | **Permisos de Claude Code**: editor visual de `settings.json` (allow/deny, modo por defecto) | Menos interrupciones y menos riesgo. |
+| v0.21 | **Tareas en worktrees aislados**: cada ejecución de la cola en su propio `git worktree` y rama | Paralelizar sin pisarse; revisar y mergear como una PR. |
+| v0.22 | **Programar tareas** (una vez o recurrentes) | Rutinas nocturnas: dependencias, informes, limpiezas. |
+| v0.23 | **Presupuesto y alertas** de gasto/tokens por día y proyecto | Control de costes. |
+| v0.24 | **Copia de seguridad, exportar y borrar** los datos de Agentic | Portabilidad y control de los datos. |

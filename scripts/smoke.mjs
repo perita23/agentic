@@ -340,6 +340,18 @@ try {
   const qtAfter = await (await fetch(base + `/api/tasks/${qt.id}`, { headers: { authorization: `Bearer ${token}` } })).json();
   check(qtAfter.status === "review" && qtAfter.runIds.length === 1, "task queue runs To do tasks and moves them to review");
 
+  // Chat with Claude outside any project; the conversation lands in the history.
+  await page.goto(`${base}/chat`);
+  await page.getByText("¿En qué te ayudo?").waitFor();
+  await shot("05a-chat-empty");
+  await page.getByLabel("Mensaje para Claude").fill("Hola Claude, ¿me explicas los closures?");
+  await page.keyboard.press("Enter");
+  await page.getByRole("navigation", { name: "Historial de chats" }).getByText("Hola Claude, ¿me explicas los closures?").waitFor();
+  const chats = await (await fetch(base + "/api/chats", { headers: { authorization: `Bearer ${token}` } })).json();
+  const chatRun = (await (await fetch(base + "/api/runs", { headers: { authorization: `Bearer ${token}` } })).json()).runs.find((r) => r.prompt.startsWith("Hola Claude"));
+  check(chats.chats.length === 1 && chatRun && chatRun.projectPath.endsWith("/chat"), "chat starts a Claude conversation outside any project and keeps it in the history");
+  await shot("05b-chat");
+
   // Agents
   await page.goto(`${base}/agents`);
   await page.getByRole("button", { name: "Nuevo agente" }).first().click();

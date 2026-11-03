@@ -6,6 +6,7 @@ import { ProjectService } from "./projects";
 import { JiraService } from "./integrations/jira";
 import { OAuthService } from "./integrations/oauth";
 import { Installer } from "./install";
+import { ChatService, chatDir } from "./chats";
 import { PullService } from "./integrations/pulls";
 import { IntegrationService } from "./integrations/service";
 import { TaskQueue } from "./queue";
@@ -29,6 +30,7 @@ export interface Context {
   pulls: PullService;
   jira: JiraService;
   installer: Installer;
+  chats: ChatService;
   oauth: OAuthService;
 }
 
@@ -58,7 +60,8 @@ export function createContext(config: Config): Context {
     const ok = st.processed.filter((p) => p.status === "completed").length;
     void integrations.notify("queueFinished", queueMessage(st), ok < st.processed.length);
   });
-  const projects = new ProjectService(store, sessions);
+  // The neutral chat folder is not a project.
+  const projects = new ProjectService(store, sessions, [chatDir(config.dataDir)]);
   return {
     config,
     token: loadOrCreateToken(config.dataDir),
@@ -71,6 +74,7 @@ export function createContext(config: Config): Context {
     pulls: new PullService(integrations, projects),
     jira: new JiraService(integrations, tasks),
     installer: new Installer(),
+    chats: new ChatService(store, runs, sessions, config.dataDir),
     oauth: new OAuthService(store, integrations),
     queue,
     integrations,

@@ -20,8 +20,7 @@ import {
   SearchIcon,
   SettingsIcon,
   TicketIcon,
-  TerminalSquareIcon,
-} from "lucide-react";
+  TerminalSquareIcon, SparklesIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { useApi, type Overview, type ProjectListItem, type SessionSummary } from "@/lib/api";
@@ -34,6 +33,7 @@ import { BrandMark } from "@/components/app/brand-mark";
 
 const NAV = [
   { href: "/", label: "Dashboard", icon: LayoutDashboardIcon },
+  { href: "/chat", label: "Chat", icon: SparklesIcon },
   { href: "/sessions", label: "Sesiones", icon: MessagesSquareIcon, badge: "sessions" as const },
   { href: "/runs", label: "Ejecuciones", icon: TerminalSquareIcon, badge: "runs" as const },
   { href: "/tasks", label: "Tareas", icon: KanbanSquareIcon },
@@ -192,11 +192,11 @@ function Topbar({ onSearch }: { onSearch: () => void }) {
       </div>
       <button
         onClick={onSearch}
-        className="flex h-8 w-full max-w-md cursor-pointer items-center gap-2 rounded-md border bg-inset px-3 text-sm text-muted-foreground transition-colors hover:border-border-strong"
+        className="flex h-8 w-full min-w-0 max-w-md cursor-pointer items-center gap-2 rounded-md border bg-inset px-3 text-sm text-muted-foreground transition-colors hover:border-border-strong"
       >
         <SearchIcon className="size-4" />
-        <span className="flex-1 text-left">Buscar o ejecutar un comando…</span>
-        <Kbd>Ctrl K</Kbd>
+        <span className="flex-1 truncate text-left">Buscar o ejecutar un comando…</span>
+        <Kbd className="hidden sm:inline-flex">Ctrl K</Kbd>
       </button>
       <div className="ml-auto flex items-center gap-2">
         <Button onClick={() => launcher.open()} size="sm">
