@@ -29,6 +29,7 @@ import { cn, shortPath } from "@/lib/utils";
 import { Kbd, StatusDot } from "./common";
 import { LauncherProvider, useLauncher } from "./launcher";
 import { RunNotifier } from "./run-notifier";
+import { WhatsNew } from "./whats-new";
 import { BrandMark } from "@/components/app/brand-mark";
 
 const NAV = [
@@ -101,7 +102,7 @@ function Sidebar({ overview }: { overview?: Overview }) {
       </nav>
       <div className="border-t p-3 text-[11px] text-muted-foreground">
         <div className="flex items-center gap-1.5">
-          <span className="size-1.5 rounded-full bg-success" /> Todo se ejecuta en tu máquina
+          <span className="size-1.5 rounded-full bg-success" /> Todo se ejecuta en tu dispositivo
           <span className="ml-auto font-mono">v{process.env.NEXT_PUBLIC_APP_VERSION}</span>
         </div>
       </div>
@@ -239,6 +240,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
       </div>
       <CommandPalette open={paletteOpen} setOpen={setPaletteOpen} />
       <RunNotifier />
+      <WhatsNew />
     </div>
   );
 }

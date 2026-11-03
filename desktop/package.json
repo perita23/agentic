@@ -1,11 +1,12 @@
 {
   "name": "agentic-desktop",
   "private": true,
-  "version": "0.14.2",
+  "version": "0.16.0",
   "description": "Agentic Console para macOS",
   "main": "main.cjs",
   "license": "MIT",
   "devDependencies": {
+    "@electron/fuses": "1.8.0",
     "electron": "^45.2.1",
     "electron-builder": "^26.18.0"
   },
@@ -14,6 +15,6 @@
     "dist": "electron-builder --mac --config electron-builder.config.cjs --publish never"
   },
   "dependencies": {
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^5.5.0"
   }
 }

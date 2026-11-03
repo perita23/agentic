@@ -35,7 +35,9 @@ export interface Context {
 const g = globalThis as unknown as { __agentic?: Context };
 
 export function createContext(config: Config): Context {
-  const store = new JsonStore(config.dataDir);
+  // Credentials (integration tokens, OAuth secrets) are encrypted at rest.
+  const store = new JsonStore(config.dataDir, new Set(["integrations", "oauth-apps"]));
+  store.sealExisting();
   hardenDataDir(config.dataDir);
   const sessions = new SessionIndex(config.claudeHome);
   const tasks = new TaskService(store);

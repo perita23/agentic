@@ -62,3 +62,5 @@ jobs:
 
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
+      - name: Audit desktop app dependencies
+        run: npm audit --prefix desktop --audit-level=high

@@ -224,6 +224,14 @@ try {
 
   await page.goto(`${base}/auth?token=${token}`);
   await page.getByRole("heading", { name: "Dashboard" }).waitFor();
+  // After an update the release notes show up once.
+  await page.getByText(/Novedades de la v/).waitFor();
+  await shot("00-whats-new");
+  await page.getByRole("button", { name: "Entendido" }).click();
+  await page.reload();
+  await page.getByRole("heading", { name: "Dashboard" }).waitFor();
+  await page.waitForTimeout(500);
+  check(!(await page.getByText(/Novedades de la v/).isVisible()), "release notes appear once after an update, then stay dismissed");
   await page.getByText("Procesos de Claude Code en vivo").waitFor();
   await page.getByText("demo-app").first().waitFor();
   check(true, "dashboard renders with live process");

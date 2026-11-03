@@ -68,3 +68,48 @@ Las alertas moderadas restantes (`minimatch`) están sólo en la cadena de ESLin
 ## Identidad de la app de Mac sin Developer ID
 
 Sin certificado de Apple, la app se firma ad-hoc y su requisito designado sería el hash exacto del código, distinto en cada versión, con lo que macOS (TCC) olvidaba los permisos de carpetas en cada actualización. El bundle se firma con el requisito explícito `designated => identifier "dev.agentic.console"`, así los permisos se mantienen. Contrapartida: otro binario ad-hoc con el mismo identificador cumpliría ese requisito; con un Developer ID (`CSC_LINK`) el requisito vuelve a incluir el certificado.
+
+## Estándares de referencia y estado (v0.16)
+
+Agentic es una app local (servidor en `127.0.0.1` + ventana Electron) que controla Claude Code y guarda credenciales de terceros, así que se revisa contra:
+
+- **OWASP ASVS 5.0** (nivel 1 completo y lo aplicable de nivel 2) y **OWASP Top 10 (2021)** para la parte web.
+- **Lista de seguridad oficial de Electron** (incluidos los *fuses*).
+- **Cadena de suministro**: dependencias auditadas, actualizaciones firmadas, sumas SHA-256 y SBOM.
+
+### OWASP Top 10 / ASVS
+
+| Área | Medidas |
+| --- | --- |
+| A01 Control de acceso | Sesión obligatoria en cada página y API (proxy + cada ruta); Host allow-list contra DNS rebinding; rutas públicas mínimas (login, retorno OAuth con `state` de un uso). |
+| A02 Criptografía | Sesiones de 256 bits (sólo se guarda el SHA-256); contraseña de la app con scrypt; **credenciales de integraciones y apps OAuth cifradas en disco (AES-256-GCM) con clave en el Llavero de macOS**; comparaciones en tiempo constante. |
+| A03 Inyección | Validación con zod en servidor; procesos sin shell y prompt tras `--`; git con filtros/hooks/fsmonitor neutralizados; React sin HTML crudo; Markdown de las notas renderizado como texto. |
+| A04 Diseño inseguro | Cola sin `bypassPermissions`; instalador sólo con recetas fijas; límites de tamaño, tiempo y concurrencia. |
+| A05 Configuración | CSP con nonce y sin `unsafe-eval`; `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, COOP/CORP `same-origin`, `Permissions-Policy`; respuestas de API `no-store`; ficheros de `~/.agentic` 0600 y carpeta 0700. |
+| A06 Componentes vulnerables | `npm audit` (web y app de escritorio) en cada CI; Dependabot semanal para npm y Actions. |
+| A07 Autenticación | Touch ID/passkeys (WebAuthn con verificación de usuario), contraseña de la app ≥ 8 con espera exponencial, límites de intentos, caducidad de sesiones (30 días / 7 sin uso), revocación. |
+| A08 Integridad | Actualizaciones con SHA-512 + firma del bundle y, si se configura, **firma Ed25519 del manifiesto**; `SHA256SUMS.txt` y SBOM CycloneDX en cada release. |
+| A09 Registro | Auditoría de inicios de sesión y de toda acción que cambia algo (método y ruta, nunca contenidos ni secretos), rotada. |
+| A10 SSRF | Cliente de integraciones sólo https, origen fijo, redirecciones sólo al mismo origen, límite de tamaño y tiempo. |
+| Fugas de datos | Secretos nunca devueltos al navegador; URLs de remotos sin credenciales; las notificaciones del sistema no incluyen el prompt; sin telemetría. |
+
+### Lista de seguridad de Electron
+
+| Recomendación | Estado |
+| --- | --- |
+| Sólo contenido local (servidor propio en localhost) | ✅ |
+| `contextIsolation`, `sandbox`, sin `nodeIntegration`, `webSecurity` | ✅ |
+| CSP | ✅ (servidor y ventana de desbloqueo) |
+| Sin `allowRunningInsecureContent` ni funciones experimentales | ✅ |
+| Gestor de permisos (sólo notificaciones, portapapeles y micrófono para el dictado, sólo el origen propio) | ✅ |
+| Navegación y ventanas nuevas bloqueadas; enlaces externos sólo http(s) al navegador | ✅ |
+| `<webview>` bloqueado en cualquier `webContents` | ✅ |
+| IPC: se valida el remitente de cada mensaje; preload mínimo con `contextBridge` | ✅ |
+| DevTools desactivadas en las versiones publicadas | ✅ |
+| **Fuses**: `RunAsNode`, `NODE_OPTIONS` e `--inspect` desactivados; código sólo desde el asar con integridad verificada; cookies cifradas | ✅ (el servidor corre en un `utilityProcess`) |
+| Electron actualizado | ✅ (Dependabot) |
+
+### Pendiente por decisión del propietario
+
+- **Firmar las actualizaciones con Ed25519**: ejecuta `node scripts/update-keygen.mjs` en tu Mac y guarda la clave privada como secret `AGENTIC_UPDATE_PRIVATE_KEY` y la pública como variable `AGENTIC_UPDATE_PUBLIC_KEY`. A partir de ahí la app sólo instala actualizaciones firmadas.
+- **Developer ID de Apple + notarización** (de pago): sustituiría la firma ad-hoc y quitaría el aviso de Gatekeeper.

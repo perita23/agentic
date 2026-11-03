@@ -113,8 +113,8 @@ function ProjectView() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="grid gap-4 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
+        <TabsContent value="overview" className="grid items-start gap-4 lg:grid-cols-3">
+          <Card className="min-w-0 lg:col-span-2">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <GitCommitHorizontalIcon className="size-4" /> Git
@@ -126,15 +126,15 @@ function ProjectView() {
                 <p className="text-muted-foreground">No es un repositorio git.</p>
               ) : (
                 <>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex min-w-0 flex-wrap gap-2">
                     <Badge variant={data.git.changes ? "yellow" : "green"}>{data.git.changes ? `${data.git.changes} cambios sin commitear` : "árbol limpio"}</Badge>
                     {data.git.remotes.map((r) => (
-                      <Badge key={r} className="font-mono">
+                      <Badge key={r} className="block max-w-full min-w-0 truncate font-mono" title={r}>
                         {r}
                       </Badge>
                     ))}
                   </div>
-                  <div className="divide-y rounded-md border">
+                  <div className="scroll-area divide-y rounded-md border">
                     {data.git.recentCommits.map((c) => (
                       <div key={c.hash} className="flex items-center gap-3 px-3 py-2">
                         <span className="font-mono text-xs text-link">{c.hash}</span>
@@ -147,7 +147,7 @@ function ProjectView() {
                   {data.git.changedFiles.length > 0 && (
                     <details className="text-xs">
                       <summary className="cursor-pointer text-muted-foreground">Ficheros modificados</summary>
-                      <ul className="mt-2 space-y-0.5 font-mono">
+                      <ul className="scroll-area mt-2 space-y-0.5 font-mono">
                         {data.git.changedFiles.map((f) => (
                           <li key={f.file}>
                             <span className="inline-block w-6 text-warning">{f.status}</span> {f.file}
@@ -160,7 +160,7 @@ function ProjectView() {
               )}
             </CardContent>
           </Card>
-          <div className="flex flex-col gap-4">
+          <div className="flex min-w-0 flex-col gap-4">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -168,7 +168,7 @@ function ProjectView() {
                 </CardTitle>
                 {data.package?.dependencies != null && <span className="text-xs text-muted-foreground">{data.package.dependencies} deps</span>}
               </CardHeader>
-              <CardContent className="flex flex-col gap-1.5">
+              <CardContent className="scroll-area flex flex-col gap-1.5">
                 {Object.keys(data.scripts).length === 0 && <span className="text-xs text-muted-foreground">Sin scripts de npm.</span>}
                 {Object.entries(data.scripts).map(([k, v]) => (
                   <div key={k} className="flex items-center gap-2 text-xs">
@@ -184,7 +184,7 @@ function ProjectView() {
               <CardHeader>
                 <CardTitle>Ficheros</CardTitle>
               </CardHeader>
-              <CardContent className="flex flex-wrap gap-1">
+              <CardContent className="scroll-area flex flex-wrap content-start gap-1">
                 {data.files.map((f) => (
                   <Badge key={f} className="font-mono">
                     {f}

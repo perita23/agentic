@@ -14,7 +14,7 @@ module.exports = {
   productName: "Agentic",
   copyright: "MIT",
   directories: { output: "dist", buildResources: "build" },
-  files: ["main.cjs", "preload.cjs", "lock.html", "lock.js", "lock-preload.cjs", "lib/**/*", "package.json"],
+  files: ["main.cjs", "preload.cjs", "server-entry.cjs", "lock.html", "lock.js", "lock-preload.cjs", "update-key.pem", "lib/**/*", "package.json"],
   // The Next.js standalone server (incl. its .next folder) runs with Electron's Node.
   extraResources: [{ from: "../.next/standalone", to: "app-server", filter: ["**/*", ".next/**/*", "**/.next/**/*"] }],
   asar: true,

@@ -12,6 +12,7 @@ import { RunRow } from "@/components/app/run-row";
 import { SessionRow } from "@/components/app/session-row";
 import { useApi, type Overview } from "@/lib/api";
 import { baseName, shortPath } from "@/lib/utils";
+import { useDeviceName } from "@/lib/use-device";
 
 const COLUMNS = [
   { key: "backlog", label: "Backlog", color: "bg-muted-foreground" },
@@ -23,6 +24,7 @@ const COLUMNS = [
 
 export default function DashboardPage() {
   const { data, error } = useApi<Overview>("/api/overview", { refreshInterval: 5000 });
+  const device = useDeviceName();
   const launcher = useLauncher();
   const c = data?.counts;
   const totalTasks = c?.tasks || 0;
@@ -32,7 +34,7 @@ export default function DashboardPage() {
       <PageHeader
         icon={LayoutDashboardIcon}
         title="Dashboard"
-        description="Visión general de tu actividad con Claude Code en esta máquina."
+        description={`Visión general de tu actividad con Claude Code en ${device}.`}
       />
       {error && <p className="text-sm text-destructive">Error cargando datos: {error.message}</p>}
 
@@ -66,7 +68,7 @@ export default function DashboardPage() {
             ) : data.activeProcesses.length === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-muted-foreground">No hay ninguna sesión de Claude Code abierta ahora mismo.</p>
             ) : (
-              <div className="divide-y border-y">
+              <div className="scroll-area divide-y border-y">
                 {data.activeProcesses.map((p) => (
                   <Link key={p.pid} href={p.sessionId ? `/sessions/${p.sessionId}` : "/sessions"} className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/60">
                     <StatusDot status={p.status} />
@@ -129,10 +131,10 @@ export default function DashboardPage() {
           <CardContent className="px-0">
             {data && data.recentSessions.length === 0 ? (
               <div className="px-4">
-                <EmptyState icon={MessagesSquareIcon} title="Sin sesiones todavía" description="Cuando uses Claude Code en esta máquina aparecerán aquí." />
+                <EmptyState icon={MessagesSquareIcon} title="Sin sesiones todavía" description={`Cuando uses Claude Code en ${device} aparecerán aquí.`} />
               </div>
             ) : (
-              <div className="divide-y border-y">{data?.recentSessions.map((s) => <SessionRow key={s.id} s={s} />)}</div>
+              <div className="scroll-area divide-y border-y">{data?.recentSessions.map((s) => <SessionRow key={s.id} s={s} />)}</div>
             )}
           </CardContent>
         </Card>
@@ -160,7 +162,7 @@ export default function DashboardPage() {
                 />
               </div>
             ) : (
-              <div className="divide-y border-y">{data?.recentRuns.map((r) => <RunRow key={r.id} r={r} />)}</div>
+              <div className="scroll-area divide-y border-y">{data?.recentRuns.map((r) => <RunRow key={r.id} r={r} />)}</div>
             )}
           </CardContent>
         </Card>

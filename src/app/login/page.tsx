@@ -63,7 +63,7 @@ function Login() {
           <LockIcon className="ml-auto size-4 text-muted-foreground" />
         </div>
         <h1 className="text-base font-semibold">Inicia sesión</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Esta consola controla Claude Code en tu máquina, así que está protegida.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Esta consola controla Claude Code en tu dispositivo, así que está protegida.</p>
 
         {status?.passkeys && status.localhost && (
           <Button className="mt-6 h-11 w-full text-base" onClick={signIn} disabled={busy} autoFocus>
@@ -84,7 +84,7 @@ function Login() {
         <div className="mt-6 border-t pt-4 text-xs leading-relaxed text-muted-foreground">
           {status?.requirePasskey ? (
             <>
-              Touch ID es obligatorio. Si has perdido el acceso, ejecuta <code className="rounded bg-secondary px-1 font-mono">npm run reset-auth</code> en la máquina.
+              Touch ID es obligatorio. Si has perdido el acceso, ejecuta <code className="rounded bg-secondary px-1 font-mono">npm run reset-auth</code> en el dispositivo.
             </>
           ) : (
             <>

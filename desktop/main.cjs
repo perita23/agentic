@@ -5,8 +5,8 @@
 //   external links open in the default browser, minimal permissions.
 "use strict";
 
-const { app, BrowserWindow, clipboard, dialog, ipcMain, shell, session, systemPreferences, Menu } = require("electron");
-const { fork } = require("node:child_process");
+const { app, BrowserWindow, clipboard, dialog, ipcMain, safeStorage, shell, session, systemPreferences, utilityProcess, Menu } = require("electron");
+const crypto = require("node:crypto");
 const os = require("node:os");
 const path = require("node:path");
 const fs = require("node:fs");
@@ -19,10 +19,25 @@ const limiter = appLock.createLimiter();
 
 const DATA_DIR = process.env.AGENTIC_HOME || path.join(os.homedir(), ".agentic");
 let server = null;
+let DATA_KEY = null;
+// Public key that update manifests must be signed with (absent: unsigned builds).
+const UPDATE_PUBLIC_KEY = (() => {
+  try {
+    return fs.readFileSync(path.join(__dirname, "update-key.pem"), "utf8");
+  } catch {
+    return null;
+  }
+})();
 let win = null;
 let origin = null;
 
 if (!app.requestSingleInstanceLock()) app.quit();
+
+// Defence in depth for every web contents: no <webview>, no new windows.
+app.on("web-contents-created", (_e, contents) => {
+  contents.on("will-attach-webview", (ev) => ev.preventDefault());
+  contents.setWindowOpenHandler(() => ({ action: "deny" }));
+});
 app.on("second-instance", () => {
   if (win) {
     if (win.isMinimized()) win.restore();
@@ -55,6 +70,7 @@ function unlock() {
       titleBarStyle: "hiddenInset",
       show: false,
       webPreferences: {
+        devTools: !app.isPackaged, // no inspector in released builds
         preload: path.join(__dirname, "lock-preload.cjs"),
         contextIsolation: true,
         sandbox: true,
@@ -171,16 +187,37 @@ function builtInOAuth(dir) {
   }
 }
 
+/**
+ * Key that encrypts credentials at rest. Kept in the macOS Keychain through
+ * safeStorage: only this app can read it. Returns null when unavailable (the
+ * server then falls back to a local key file).
+ */
+function dataKey() {
+  if (!safeStorage.isEncryptionAvailable()) return null;
+  const f = path.join(DATA_DIR, "data-key.keychain");
+  try {
+    const k = safeStorage.decryptString(fs.readFileSync(f));
+    if (/^[0-9a-f]{64}$/.test(k)) return k;
+  } catch {}
+  const k = crypto.randomBytes(32).toString("hex");
+  fs.mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
+  fs.writeFileSync(f, safeStorage.encryptString(k), { mode: 0o600 });
+  return k;
+}
+
 async function startServer() {
   const port = await pickPort(Number(process.env.PORT) || 4317);
   const entry = serverEntry();
   console.log(`[agentic] starting server ${entry} on port ${port}`);
   if (!fs.existsSync(entry)) throw new Error(`No se encuentra el servidor de Agentic (${entry}). Ejecuta «npm run desktop:prepare».`);
-  server = fork(entry, [], {
+  // A utility process (not ELECTRON_RUN_AS_NODE, whose fuse is turned off so
+  // nobody can run this signed binary as a plain Node interpreter).
+  server = utilityProcess.fork(path.join(__dirname, "server-entry.cjs"), [], {
+    serviceName: "Agentic Server",
     cwd: path.dirname(entry),
+    stdio: "inherit",
     env: {
       ...process.env,
-      ELECTRON_RUN_AS_NODE: "1", // run the server with Electron's embedded Node
       NODE_ENV: "production",
       PORT: String(port),
       HOSTNAME: "127.0.0.1",
@@ -189,8 +226,9 @@ async function startServer() {
       NEXT_TELEMETRY_DISABLED: "1",
       ...builtInOAuth(path.dirname(entry)),
     },
-    stdio: ["ignore", "inherit", "inherit", "ipc"],
   });
+  DATA_KEY = dataKey();
+  server.postMessage({ entry, key: DATA_KEY });
   server.on("exit", (code) => {
     console.error(`[agentic] server exited with code ${code}`);
     if (!app.isQuitting) {
@@ -231,6 +269,7 @@ function createWindow(onShown) {
     trafficLightPosition: { x: 18, y: 21 },
     show: false,
     webPreferences: {
+      devTools: !app.isPackaged, // no inspector in released builds
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       sandbox: true,
@@ -310,7 +349,7 @@ async function doCheck(interactive) {
   }
   let update;
   try {
-    update = await updater.checkForUpdate({ currentVersion: app.getVersion(), arch: process.arch, dataDir: DATA_DIR });
+    update = await updater.checkForUpdate({ currentVersion: app.getVersion(), arch: process.arch, dataDir: DATA_DIR, dataKey: DATA_KEY, publicKey: UPDATE_PUBLIC_KEY });
   } catch (e) {
     if (interactive) dialog.showMessageBox({ type: "warning", message: "No se pudo comprobar si hay actualizaciones.", detail: String(e.message || e) });
     return "error";
@@ -480,5 +519,5 @@ app.on("window-all-closed", () => {
 });
 app.on("before-quit", () => {
   app.isQuitting = true;
-  if (server && !server.killed) server.kill("SIGTERM");
+  if (server) server.kill();
 });

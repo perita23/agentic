@@ -112,6 +112,18 @@ jobs:
         env:
           # Public client id for GitHub's device flow ("Conectar con GitHub" = one login).
           AGENTIC_GITHUB_CLIENT_ID: ${{ secrets.AGENTIC_GITHUB_CLIENT_ID }}
+          # Builds with this public key only accept signed updates.
+          AGENTIC_UPDATE_PUBLIC_KEY: ${{ vars.AGENTIC_UPDATE_PUBLIC_KEY }}
+      # Integrity: sign the update manifest (it pins every zip's SHA-512), publish
+      # SHA-256 checksums of every file and a CycloneDX SBOM of the app.
+      - name: Sign update manifest, checksums and SBOM
+        env:
+          AGENTIC_UPDATE_PRIVATE_KEY: ${{ secrets.AGENTIC_UPDATE_PRIVATE_KEY }}
+          AGENTIC_UPDATE_PUBLIC_KEY: ${{ vars.AGENTIC_UPDATE_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          node scripts/sign-update.mjs desktop/dist
+          npm sbom --omit=dev --sbom-format cyclonedx > desktop/dist/agentic-sbom.cdx.json
       - name: Upload dmg, zip and update manifest
         env:
           GH_TOKEN: ${{ github.token }}
@@ -125,7 +137,8 @@ jobs:
           x64=$(ls *.dmg | grep -v arm64 | head -n1)
           cp "$arm" Agentic-arm64.dmg
           cp "$x64" Agentic-x64.dmg
-          gh release upload "$TAG" *.dmg *.zip latest-mac.yml --repo "$GITHUB_REPOSITORY" --clobber
+          shasum -a 256 *.dmg *.zip latest-mac.yml > SHA256SUMS.txt
+          gh release upload "$TAG" *.dmg *.zip latest-mac.yml $(ls latest-mac.yml.sig 2>/dev/null) SHA256SUMS.txt agentic-sbom.cdx.json --repo "$GITHUB_REPOSITORY" --clobber
 
       # The source repository is private, so its release assets need a GitHub
       # login. Mirror the release to a public repository for the download page
@@ -150,4 +163,4 @@ jobs:
           if ! gh release view "$TAG" --repo "$RELEASES_REPO" >/dev/null 2>&1; then
             gh release create "$TAG" --repo "$RELEASES_REPO" --title "Agentic $TAG" --notes-file notes.md --latest="$LATEST"
           fi
-          gh release upload "$TAG" *.dmg *.zip latest-mac.yml --repo "$RELEASES_REPO" --clobber
+          gh release upload "$TAG" *.dmg *.zip latest-mac.yml $(ls latest-mac.yml.sig 2>/dev/null) SHA256SUMS.txt --repo "$RELEASES_REPO" --clobber

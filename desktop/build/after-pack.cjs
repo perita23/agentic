@@ -1,4 +1,5 @@
 // afterPack hook (runs before any signing):
+//  0. Flip the Electron security fuses.
 //  1. electron-builder drops node_modules from extraResources, so copy the
 //     standalone server's dependencies into Resources/app-server ourselves.
 //  2. Without a Developer ID, ad-hoc sign the WHOLE bundle so that
@@ -23,6 +24,22 @@ exports.default = async function afterPack(context) {
   if (!fs.existsSync(from)) throw new Error(`Missing ${from}: run npm run desktop:prepare first`);
   fs.cpSync(from, to, { recursive: true, verbatimSymlinks: true });
   if (!fs.existsSync(path.join(to, "next", "package.json"))) throw new Error("Bundled server is missing the 'next' package");
+
+  // Electron fuses (security checklist), flipped before any signature:
+  // no ELECTRON_RUN_AS_NODE / NODE_OPTIONS / --inspect, app code only from the
+  // integrity-checked asar, encrypted cookies, no extra file:// privileges.
+  const { flipFuses, FuseVersion, FuseV1Options } = require("@electron/fuses");
+  await flipFuses(app, {
+    version: FuseVersion.V1,
+    strictlyRequireAllFuses: false,
+    [FuseV1Options.RunAsNode]: false,
+    [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
+    [FuseV1Options.EnableNodeCliInspectArguments]: false,
+    [FuseV1Options.EnableCookieEncryption]: true,
+    [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
+    [FuseV1Options.OnlyLoadAppFromAsar]: true,
+    [FuseV1Options.GrantFileProtocolExtraPrivileges]: false,
+  });
 
   if (process.env.CSC_LINK) return; // electron-builder signs with the Developer ID next
   execFileSync("/usr/bin/codesign", ["--force", "--deep", "--sign", "-", "--timestamp=none", app], { stdio: "inherit" });

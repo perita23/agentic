@@ -3,6 +3,32 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.16.0] - 2026-11-03
+
+### Cambiado
+- **Nuevo logo**: una «A» brutalista de alto contraste (pierna gruesa partida por una ranura, pierna fina y barra que sobresale) con el degradado de Agentic sobre negro.
+- La app nombra tu dispositivo (por ejemplo «MacBook Pro de Hugo») en lugar de «esta máquina».
+
+### Seguridad
+- **Credenciales cifradas en disco**: los tokens de las integraciones y los secretos OAuth se guardan cifrados (AES-256-GCM). En la app de Mac la clave vive en el **Llavero de macOS**; los ficheros antiguos se cifran al arrancar.
+- **App de Mac endurecida** según la lista de seguridad de Electron: el servidor corre en un proceso aislado y se desactivan los *fuses* peligrosos (ejecutar la app como Node, `NODE_OPTIONS`, `--inspect`); el código sólo se carga desde el paquete con integridad verificada; cookies cifradas; sin DevTools en versiones publicadas; `<webview>` bloqueado.
+- **Actualizaciones firmadas** (opcional): si se configura la clave del proyecto, la app sólo instala actualizaciones cuyo manifiesto esté firmado (Ed25519). Las releases incluyen además `SHA256SUMS.txt` y un SBOM.
+- **Dependencias**: corregida una vulnerabilidad alta en `js-yaml` (lectura del manifiesto de actualizaciones); auditoría también de la app de escritorio en cada CI y actualizaciones automáticas con Dependabot.
+- **Sin fugas en notificaciones**: las notificaciones del sistema ya no muestran el texto del prompt (se ven en la pantalla de bloqueo y quedan en el Centro de notificaciones).
+- Documentado el estado frente a OWASP ASVS / Top 10 y la lista de Electron en `docs/SECURITY.md`.
+
+## [0.15.0] - 2026-11-03
+
+### Añadido
+- **Novedades al actualizar**: la primera vez que abres Agentic después de una actualización ves qué ha cambiado (todas las versiones desde la última que viste).
+
+### Seguridad
+- Las direcciones de los repositorios ya no muestran credenciales: si un remoto lleva un token dentro (`https://usuario:token@…`), Agentic lo oculta.
+
+### Corregido
+- En la ficha de un proyecto, las direcciones largas ya no se salen de su tarjeta.
+- Las listas largas (commits, ficheros, scripts, sesiones y ejecuciones del dashboard) tienen su propio scroll y no estiran la página.
+
 ## [0.14.2] - 2026-11-03
 
 ### Corregido
