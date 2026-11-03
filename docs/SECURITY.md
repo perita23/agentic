@@ -21,6 +21,7 @@ hablar con `127.0.0.1`. Este documento resume el modelo de amenazas y las defens
 | Inyección en front-matter de agentes | Valores de una sola línea, entrecomillados en JSON cuando hace falta | `agents.test.ts` |
 | Mass assignment | Esquemas zod `.strict()` en actualizaciones; `id`, `createdAt`, … no se pueden sobrescribir | `tasks.test.ts` |
 | DoS / agotamiento de recursos | Cuerpo de petición ≤ 1 MB; logs por ejecución con tope; máximo de ejecuciones simultáneas; historial acotado (500 runs, 5000 tareas); lectura de transcripciones en streaming; ficheros leídos con tamaño máximo | `runs.test.ts`, `api.test.ts` |
+| Ejecución autónoma descontrolada (cola) | Una ejecución cada vez, límite de tareas por tanda (≤50), presupuesto por tarea opcional, parada en el primer fallo por defecto, nunca se reanuda sola tras reiniciar; el modo `bypassPermissions` no se ofrece para la cola | `queue.test.ts` |
 | Corrupción de datos | Escrituras atómicas (tmp + fsync + rename); ficheros corruptos se respaldan y no rompen la app | `store.test.ts` |
 | Fugas de información en errores | Errores 500 genéricos; detalles sólo en el log del servidor | — |
 

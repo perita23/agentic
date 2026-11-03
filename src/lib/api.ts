@@ -27,11 +27,14 @@ async function handle<T>(res: Response): Promise<T> {
 export const fetcher = <T,>(url: string) => fetch(url, { credentials: "same-origin" }).then((r) => handle<T>(r));
 
 export async function api<T = unknown>(method: "POST" | "PUT" | "PATCH" | "DELETE", url: string, body?: unknown): Promise<T> {
+  // Mutations always carry a JSON body: the server rejects anything else (CSRF defence),
+  // including body-less POSTs such as "stop run".
+  const payload = body !== undefined ? body : method === "DELETE" ? undefined : {};
   const res = await fetch(url, {
     method,
     credentials: "same-origin",
-    headers: body !== undefined ? { "content-type": "application/json" } : undefined,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    headers: payload !== undefined ? { "content-type": "application/json" } : undefined,
+    body: payload !== undefined ? JSON.stringify(payload) : undefined,
   });
   return handle<T>(res);
 }

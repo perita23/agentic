@@ -27,6 +27,7 @@ import { errorMessage, PageHeader } from "@/components/app/common";
 import { useLauncher } from "@/components/app/launcher";
 import { PRIORITIES, STATUSES, TaskDialog, type Status } from "@/components/app/task-dialog";
 import { TemplatePicker } from "@/components/app/template-picker";
+import { useQueue } from "@/components/app/queue-panel";
 import { api, useApi, type ProjectListItem, type Task } from "@/lib/api";
 import { baseName, cn } from "@/lib/utils";
 
@@ -155,6 +156,7 @@ function Board() {
   const [dialog, setDialog] = React.useState<{ task?: Task; status?: Status } | null>(params.get("new") ? {} : null);
   const [picker, setPicker] = React.useState(false);
   const [activeId, setActiveId] = React.useState<string | null>(null);
+  const queue = useQueue(project !== ALL ? project : undefined);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
   // Open a task from ?task=<id> (e.g. linked from a run).
@@ -223,6 +225,7 @@ function Board() {
         description="Planifica el trabajo, arrastra entre columnas y lánzalo con Claude Code."
         actions={
           <>
+            {queue.button}
             <Button variant="outline" onClick={() => setPicker(true)}>
               <FileStackIcon /> Desde plantilla
             </Button>
@@ -252,6 +255,7 @@ function Board() {
         </Select>
       </div>
 
+      {queue.banner}
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActiveId(null)}>
         <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-4 md:mx-0 md:px-0">
           {STATUSES.map((s) => (
@@ -269,6 +273,7 @@ function Board() {
           onClose={closeDialog}
         />
       )}
+      {queue.dialog}
       {picker && <TemplatePicker defaultProject={project !== ALL ? project : undefined} onClose={() => setPicker(false)} />}
     </div>
   );
