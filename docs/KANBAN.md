@@ -57,5 +57,5 @@ Leyenda: ✅ hecho · 🔄 en curso · ⏳ pendiente
 ## ⏳ Backlog
 | # | Tarea |
 |---|-------|
-| 34 | Streaming por SSE en lugar de polling |
+| 34 | Streaming por SSE en lugar de polling (v0.8.0, PR #10) 🔄 |
 | 36 | Empaquetado como app de escritorio (Tauri) |

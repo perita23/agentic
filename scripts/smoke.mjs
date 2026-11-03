@@ -261,6 +261,9 @@ try {
     await fetch(base + "/api/runs", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ projectPath: project, prompt: "SLEEP" }) })
   ).json();
   await page.goto(`${base}/runs/${longRun.id}`);
+  await page.getByText("en vivo").waitFor({ timeout: 10000 });
+  await page.locator("main").getByText("some stderr line").waitFor({ timeout: 10000 });
+  check((await fetch(base + `/api/runs/${longRun.id}`, { headers: { authorization: `Bearer ${token}` } }).then((r) => r.json())).status === "running", "live log streams over SSE while the run is still running");
   await page.getByRole("button", { name: "Detener" }).click();
   await page.locator("main").getByText("detenida", { exact: true }).waitFor({ timeout: 15000 });
   check(true, "stop a running run from the UI");
