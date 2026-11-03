@@ -3,6 +3,14 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.11.0] - 2026-11-03
+
+### Añadido
+- **Instalar herramientas que faltan desde Ajustes**: si no está `tmux` o Claude Code aparece «Instalar con brew» (o npm para Claude Code si no hay Homebrew). Detecta Homebrew aunque no esté en el `PATH` (`/opt/homebrew`, `/usr/local`), muestra el comando y su salida en directo y refresca el estado al terminar. Sólo se ejecutan recetas fijas (`brew install tmux`, `brew install --cask claude-code`, `npm install -g @anthropic-ai/claude-code`), sin shell, una a la vez y con límite de 15 minutos.
+
+### Cambiado
+- **Nuevo logo**: «A» grotesca fina y rígida con el degradado de la web sobre fondo negro, en el icono de macOS, la barra lateral, el inicio de sesión, la ventana de desbloqueo, el favicon y la página de descarga.
+
 ## [0.10.2] - 2026-11-03
 
 ### Corregido
