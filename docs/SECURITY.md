@@ -26,6 +26,7 @@ hablar con `127.0.0.1`. Este documento resume el modelo de amenazas y las defens
 | **SSRF / fuga de tokens** en llamadas salientes | https obligatorio, sin credenciales en URL, las rutas no pueden salir del origen configurado, redirecciones sólo del mismo origen (máx. 3, nunca en escrituras), timeout 10 s, respuesta ≤ 5 MB | `integrations-slack.test.ts` |
 | Inyección en mensajes de Slack | El texto de usuario que Agentic publica escapa `& < >` (sin `@channel` ni enlaces forjados); IDs de canal y `ts` validados por regex; los mensajes recibidos se pintan como texto | `integrations-slack.test.ts` |
 | Acciones sobre pull requests | Sólo repos de proyectos conocidos; owner/repo/número validados; merge con el SHA de cabeza esperado (GitHub lo comprueba; en Bitbucket se verifica antes) para no mergear commits no revisados; confirmación en la UI; enlaces externos sólo `http(s)` | `integrations-prs.test.ts`, smoke |
+| Acciones sobre Jira | Claves validadas (`PROY-123`), JQL acotada a 2000 caracteres y enviada en el cuerpo (no en la URL), transiciones verificadas contra las disponibles antes de aplicarlas, comentarios convertidos a ADF como texto (sin marcado ejecutable) | `integrations-jira.test.ts`, smoke |
 | Corrupción de datos | Escrituras atómicas (tmp + fsync + rename); ficheros corruptos se respaldan y no rompen la app | `store.test.ts` |
 | Fugas de información en errores | Errores 500 genéricos; detalles sólo en el log del servidor | — |
 

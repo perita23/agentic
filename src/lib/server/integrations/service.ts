@@ -340,6 +340,10 @@ export class IntegrationService {
 
   // ---------- Jira / Bitbucket (v0.6.0) ----------
 
+  jiraSite(): string {
+    return this.need("jira").siteUrl;
+  }
+
   async jira<T>(path: string, init?: Parameters<typeof request>[3]) {
     const cfg = this.need("jira");
     const auth = Buffer.from(`${cfg.email}:${cfg.token}`).toString("base64");

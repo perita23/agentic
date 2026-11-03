@@ -110,6 +110,34 @@ const github = http.createServer((req, res) => {
 await new Promise((r) => github.listen(0, "127.0.0.1", r));
 const githubUrl = `http://127.0.0.1:${github.address().port}`;
 
+
+// Minimal Jira Cloud stand-in.
+const jiraWrites = [];
+const jira = http.createServer((req, res) => {
+  let body = "";
+  req.on("data", (d) => (body += d));
+  req.on("end", () => {
+    const p = new URL(req.url, "http://x").pathname;
+    const json = (o, status = 200) => {
+      res.writeHead(status, { "content-type": "application/json" });
+      res.end(o === undefined ? "" : JSON.stringify(o));
+    };
+    if (req.headers.authorization !== `Basic ${Buffer.from("ana@acme.test:jira-smoke").toString("base64")}`) return json({}, 401);
+    if (req.method === "POST" && p !== "/rest/api/3/search/jql") {
+      jiraWrites.push({ path: p, body: JSON.parse(body) });
+      return json(undefined, 204);
+    }
+    const fields = { summary: "El checkout falla en Safari", status: { name: "To Do", statusCategory: { key: "new" } }, priority: { name: "High" }, issuetype: { name: "Bug" }, assignee: { displayName: "Ana" }, updated: new Date().toISOString() };
+    if (p === "/rest/api/3/myself") return json({ displayName: "Ana" });
+    if (p === "/rest/api/3/search/jql") return json({ issues: [{ key: "SHOP-7", fields }] });
+    if (p === "/rest/api/3/issue/SHOP-7") return json({ key: "SHOP-7", fields: { ...fields, description: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Al pagar con Safari 17 aparece un error 500." }] }] }, labels: ["checkout"], comment: { comments: [] } } });
+    if (p === "/rest/api/3/issue/SHOP-7/transitions") return json({ transitions: [{ id: "31", name: "Empezar", to: { name: "In Progress", statusCategory: { key: "indeterminate" } } }] });
+    json({}, 404);
+  });
+});
+await new Promise((r) => jira.listen(0, "127.0.0.1", r));
+const jiraUrl = `http://127.0.0.1:${jira.address().port}`;
+
 const port = 4400 + Math.floor(Math.random() * 500);
 const base = `http://127.0.0.1:${port}`;
 const env = { ...process.env, AGENTIC_HOME: dataDir, CLAUDE_HOME: claudeHome, CLAUDE_BIN: path.join(root, "test/fixtures/fake-claude.mjs"), PORT: String(port), HOST: "127.0.0.1", AGENTIC_ALLOW_INSECURE_INTEGRATIONS: "1", AGENTIC_SLACK_API_URL: slackUrl };
@@ -353,6 +381,29 @@ try {
     "approve and merge a PR from the app (merge pinned to the reviewed head SHA)",
   );
 
+  // Jira: search, open an issue, move it, comment and import it as a task.
+  await fetch(base + "/api/integrations/jira", { method: "PUT", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ siteUrl: jiraUrl, email: "ana@acme.test", token: "jira-smoke" }) });
+  await page.goto(`${base}/jira`);
+  await page.getByText("El checkout falla en Safari").click();
+  await page.getByText("Al pagar con Safari 17 aparece un error 500.").waitFor();
+  check(true, "Jira issues list and detail (ADF description) render");
+  await page.getByRole("combobox", { name: "Cambiar estado" }).click();
+  await page.getByRole("option", { name: /Empezar/ }).click();
+  await page.getByText("SHOP-7 → In Progress").waitFor();
+  await page.getByPlaceholder("Añadir comentario…").fill("Lo reproduzco y lo arreglo hoy");
+  await page.getByRole("button", { name: "Comentar" }).click();
+  await page.getByText("Comentario publicado en Jira").waitFor();
+  await page.getByRole("button", { name: "Importar como tarea" }).click();
+  await page.getByText("SHOP-7 importada como tarea").waitFor();
+  await shot("13-jira");
+  const jt = (await (await fetch(base + "/api/tasks", { headers: { authorization: `Bearer ${token}` } })).json()).tasks.find((t) => t.external?.id === "SHOP-7");
+  check(
+    jiraWrites.some((w) => w.path.endsWith("/transitions") && w.body.transition.id === "31") &&
+      jiraWrites.some((w) => w.path.endsWith("/comment") && JSON.stringify(w.body).includes("Lo reproduzco")) &&
+      jt?.title === "SHOP-7 El checkout falla en Safari",
+    "transition, comment and import a Jira issue from the app",
+  );
+
   await page.goto(`${base}/settings`);
   await page.getByText("9.9.9 (Fake Claude)").waitFor();
   const appVersion = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
@@ -404,6 +455,7 @@ try {
   server.kill("SIGTERM");
   slack.close();
   github.close();
+  jira.close();
   fs.rmSync(tmp, { recursive: true, force: true });
 }
 console.log(failures.length ? `\n${failures.length} check(s) failed` : "\nAll smoke checks passed");

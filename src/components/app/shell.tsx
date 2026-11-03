@@ -19,6 +19,7 @@ import {
   RocketIcon,
   SearchIcon,
   SettingsIcon,
+  TicketIcon,
   TerminalSquareIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ const NAV = [
   { href: "/runs", label: "Ejecuciones", icon: TerminalSquareIcon, badge: "runs" as const },
   { href: "/tasks", label: "Tareas", icon: KanbanSquareIcon },
   { href: "/pulls", label: "Pull requests", icon: GitPullRequestIcon },
+  { href: "/jira", label: "Jira", icon: TicketIcon },
   { href: "/templates", label: "Plantillas", icon: FileStackIcon },
   { href: "/agents", label: "Agentes", icon: BotIcon },
   { href: "/projects", label: "Proyectos", icon: FolderGit2Icon },
