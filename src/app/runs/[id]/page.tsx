@@ -45,12 +45,12 @@ function EventView({ e }: { e: Ev }) {
         {blocks.map((b, i) =>
           b.type === "text" ? (
             <div key={i} className="flex gap-2">
-              <BotIcon className="mt-0.5 size-4 shrink-0 text-[#f78166]" />
+              <BotIcon className="mt-0.5 size-4 shrink-0 text-orange" />
               <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">{b.text}</div>
             </div>
           ) : b.type === "tool_use" ? (
             <details key={i} className="ml-6 rounded border bg-inset text-xs">
-              <summary className="flex cursor-pointer items-center gap-1.5 px-2 py-1 font-mono text-[#58a6ff]">
+              <summary className="flex cursor-pointer items-center gap-1.5 px-2 py-1 font-mono text-link">
                 <WrenchIcon className="size-3" /> {b.name}
               </summary>
               <pre className="max-h-64 overflow-auto px-2 py-1.5 font-mono text-[11px] text-muted-foreground">{JSON.stringify(b.input, null, 2)}</pre>
@@ -188,7 +188,7 @@ function TmuxConsole({ run }: { run: Run }) {
           <CopyButton value={`tmux attach -t ${run.tmuxSession}`} label="Copiar comando attach" />
         </div>
       </CardHeader>
-      <pre ref={pre} className="max-h-[60vh] min-h-64 overflow-auto bg-black p-4 font-mono text-[12px] leading-snug text-[#c9d1d9]">
+      <pre ref={pre} className="max-h-[60vh] min-h-64 overflow-auto bg-inset p-4 font-mono text-[12px] leading-snug text-foreground/85">
         {data?.text || (data && !data.alive ? "La sesión de tmux ha terminado." : "Conectando…")}
       </pre>
       {run.status === "running" && (

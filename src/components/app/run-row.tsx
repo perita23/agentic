@@ -22,7 +22,7 @@ export function RunRow({ r }: { r: Run }) {
     <Link href={`/runs/${r.id}`} className="group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-accent/60">
       <StatusDot status={r.status} />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium group-hover:text-[#58a6ff]">{r.prompt.split("\n")[0] || (r.mode === "tmux" ? "Sesión interactiva" : "(sin prompt)")}</div>
+        <div className="truncate text-sm font-medium group-hover:text-link">{r.prompt.split("\n")[0] || (r.mode === "tmux" ? "Sesión interactiva" : "(sin prompt)")}</div>
         <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <Icon className="size-3" /> {r.mode}

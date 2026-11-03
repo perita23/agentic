@@ -50,7 +50,7 @@ const STATUS_COLORS: Record<string, string> = {
   failed: "bg-destructive",
   stopped: "bg-muted-foreground",
   interrupted: "bg-muted-foreground",
-  closed: "bg-[#484f58]",
+  closed: "bg-closed",
 };
 
 export function StatusDot({ status, className }: { status: string; className?: string }) {
@@ -99,7 +99,7 @@ export function Kbd({ children, className }: { children: React.ReactNode; classN
 
 export function Stat({ label, value, hint, icon: Icon, accent }: { label: string; value: React.ReactNode; hint?: React.ReactNode; icon: React.ElementType; accent?: string }) {
   return (
-    <div className="group relative overflow-hidden rounded-lg border bg-card p-4 transition-colors hover:border-[#8b949e]/40">
+    <div className="group relative overflow-hidden rounded-lg border bg-card p-4 transition-colors hover:border-border-strong">
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         {label}
         <Icon className={cn("size-4", accent)} />

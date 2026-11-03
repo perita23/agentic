@@ -13,7 +13,7 @@ export function SessionRow({ s }: { s: SessionSummary }) {
       <StatusDot status={s.status} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium group-hover:text-[#58a6ff]">{s.title}</span>
+          <span className="truncate text-sm font-medium group-hover:text-link">{s.title}</span>
           {s.active && (
             <Badge variant={s.status === "busy" ? "yellow" : "green"} className="shrink-0">
               {s.status === "busy" ? "trabajando" : "activa"}

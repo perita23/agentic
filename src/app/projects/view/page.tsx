@@ -137,7 +137,7 @@ function ProjectView() {
                   <div className="divide-y rounded-md border">
                     {data.git.recentCommits.map((c) => (
                       <div key={c.hash} className="flex items-center gap-3 px-3 py-2">
-                        <span className="font-mono text-xs text-[#58a6ff]">{c.hash}</span>
+                        <span className="font-mono text-xs text-link">{c.hash}</span>
                         <span className="flex-1 truncate">{c.subject}</span>
                         <span className="hidden text-xs text-muted-foreground sm:inline">{c.author}</span>
                         <span className="text-xs text-muted-foreground">{timeAgo(c.date)}</span>

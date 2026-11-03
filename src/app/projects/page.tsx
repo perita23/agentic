@@ -49,12 +49,12 @@ export default function ProjectsPage() {
             <motion.div key={p.path} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }}>
               <Link
                 href={`/projects/view?path=${encodeURIComponent(p.path)}`}
-                className={cn("group relative flex h-full flex-col gap-3 overflow-hidden rounded-lg border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-[#8b949e]/40", !p.exists && "opacity-60")}
+                className={cn("group relative flex h-full flex-col gap-3 overflow-hidden rounded-lg border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-border-strong", !p.exists && "opacity-60")}
               >
                 <div className={cn("absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r to-transparent", PROJECT_COLORS[p.color] ?? PROJECT_COLORS.blue)} />
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 font-semibold group-hover:text-[#58a6ff]">
+                    <div className="flex items-center gap-1.5 font-semibold group-hover:text-link">
                       {p.pinned && <PinIcon className="size-3.5 text-warning" />}
                       <span className="truncate">{p.name}</span>
                     </div>

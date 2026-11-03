@@ -78,7 +78,7 @@ export default function SessionPage() {
               className={cn("rounded-lg border", m.role === "user" ? "border-primary/30 bg-primary/5" : "bg-card")}
             >
               <div className="flex items-center gap-2 border-b px-3 py-1.5 text-xs text-muted-foreground">
-                {m.role === "user" ? <UserIcon className="size-3.5 text-primary" /> : <BotIcon className="size-3.5 text-[#f78166]" />}
+                {m.role === "user" ? <UserIcon className="size-3.5 text-primary" /> : <BotIcon className="size-3.5 text-orange" />}
                 <span className="font-medium text-foreground">{m.role === "user" ? "Tú" : "Claude"}</span>
                 {m.timestamp && <span className="ml-auto">{new Date(m.timestamp).toLocaleString("es-ES")}</span>}
               </div>

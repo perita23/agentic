@@ -14,7 +14,7 @@ import { useApi, type Overview } from "@/lib/api";
 import { baseName, shortPath } from "@/lib/utils";
 
 const COLUMNS = [
-  { key: "backlog", label: "Backlog", color: "bg-[#6e7681]" },
+  { key: "backlog", label: "Backlog", color: "bg-muted-foreground" },
   { key: "todo", label: "To do", color: "bg-primary" },
   { key: "in_progress", label: "En curso", color: "bg-warning" },
   { key: "review", label: "Revisión", color: "bg-purple" },
@@ -92,7 +92,7 @@ export default function DashboardPage() {
             <CardTitle className="flex items-center gap-2">
               <KanbanSquareIcon className="size-4 text-primary" /> Tareas
             </CardTitle>
-            <Link href="/tasks" className="flex items-center gap-1 text-xs text-[#58a6ff] hover:underline">
+            <Link href="/tasks" className="flex items-center gap-1 text-xs text-link hover:underline">
               Abrir tablero <ArrowRightIcon className="size-3" />
             </Link>
           </CardHeader>
@@ -122,7 +122,7 @@ export default function DashboardPage() {
             <CardTitle className="flex items-center gap-2">
               <MessagesSquareIcon className="size-4" /> Sesiones recientes
             </CardTitle>
-            <Link href="/sessions" className="flex items-center gap-1 text-xs text-[#58a6ff] hover:underline">
+            <Link href="/sessions" className="flex items-center gap-1 text-xs text-link hover:underline">
               Ver todas <ArrowRightIcon className="size-3" />
             </Link>
           </CardHeader>
@@ -141,7 +141,7 @@ export default function DashboardPage() {
             <CardTitle className="flex items-center gap-2">
               <TerminalSquareIcon className="size-4" /> Últimas ejecuciones
             </CardTitle>
-            <Link href="/runs" className="flex items-center gap-1 text-xs text-[#58a6ff] hover:underline">
+            <Link href="/runs" className="flex items-center gap-1 text-xs text-link hover:underline">
               Ver todas <ArrowRightIcon className="size-3" />
             </Link>
           </CardHeader>

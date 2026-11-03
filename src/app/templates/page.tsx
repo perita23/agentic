@@ -184,7 +184,7 @@ export default function TemplatesPage() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.03 }}
-            className="group flex flex-col gap-3 rounded-lg border bg-card p-4 transition-colors hover:border-[#8b949e]/40"
+            className="group flex flex-col gap-3 rounded-lg border bg-card p-4 transition-colors hover:border-border-strong"
           >
             <div className="flex items-start gap-3">
               <span className="rounded-md border bg-secondary/50 p-2">
