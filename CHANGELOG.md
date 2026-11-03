@@ -3,6 +3,15 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.14.1] - 2026-11-03
+
+### Cambiado
+- **Conectar integraciones, mucho más sencillo**: cada servicio tiene un único botón «Conectar» con dos pasos: un botón que abre la página exacta del servicio (en GitHub, con los permisos ya marcados) y un campo para pegar lo que copias. Agentic lo prueba al momento.
+  - GitHub: si ya tienes sesión en el CLI `gh`, se conecta directamente sin pedir nada.
+  - Jira: basta con escribir `tuempresa` o `tuempresa.atlassian.net`.
+  - Si algo falla, un mensaje claro (token mal copiado, sin permisos, Jira no encontrado) y no queda nada a medias.
+- OAuth y el resto de opciones quedan dentro de «Avanzado».
+
 ## [0.14.0] - 2026-11-03
 
 ### Añadido
