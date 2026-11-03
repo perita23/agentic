@@ -39,7 +39,9 @@ npm run build
 npm start
 ```
 
-La terminal muestra un enlace del tipo `http://127.0.0.1:4317/auth?token=…`. Ábrelo una vez: el navegador guarda una cookie segura y ya puedes usar `http://127.0.0.1:4317`.
+La terminal muestra un enlace del tipo `http://localhost:4317/auth?token=…`. Ábrelo una vez y quedará abierta una sesión en ese navegador.
+
+**Touch ID:** en Ajustes → «Añadir Touch ID» registra tu huella; a partir de ahí puedes entrar en `http://localhost:4317/login` con Touch ID y, si quieres, activar **«Exigir Touch ID»** para que el enlace con token deje de servir. Si pierdes el acceso: `npm run reset-auth`.
 
 Modo desarrollo (recarga en caliente):
 
@@ -47,7 +49,7 @@ Modo desarrollo (recarga en caliente):
 npm run dev
 ```
 
-¿Perdiste el enlace? `npm run url`. ¿Quieres cerrar todas las sesiones del navegador? `npm run rotate-token` y reinicia.
+¿Perdiste el enlace? `npm run url`. Sesiones y passkeys se gestionan en Ajustes → Seguridad.
 
 ### Configuración (variables de entorno)
 

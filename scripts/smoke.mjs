@@ -139,7 +139,8 @@ await new Promise((r) => jira.listen(0, "127.0.0.1", r));
 const jiraUrl = `http://127.0.0.1:${jira.address().port}`;
 
 const port = 4400 + Math.floor(Math.random() * 500);
-const base = `http://127.0.0.1:${port}`;
+// localhost (not 127.0.0.1): WebAuthn / Touch ID requires a domain.
+const base = `http://localhost:${port}`;
 const env = { ...process.env, AGENTIC_HOME: dataDir, CLAUDE_HOME: claudeHome, CLAUDE_BIN: path.join(root, "test/fixtures/fake-claude.mjs"), PORT: String(port), HOST: "127.0.0.1", AGENTIC_ALLOW_INSECURE_INTEGRATIONS: "1", AGENTIC_SLACK_API_URL: slackUrl };
 const server = spawn(process.execPath, [path.join(root, "scripts/agentic.mjs"), "start"], { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] });
 let out = "";
@@ -181,8 +182,8 @@ try {
   await waitUp();
   const token = fs.readFileSync(path.join(dataDir, "token"), "utf8").trim();
   console.log("HTTP security");
-  let r = await fetch(base + "/");
-  check(r.status === 401, "page without token -> 401");
+  let r = await fetch(base + "/", { redirect: "manual" });
+  check(r.status === 303 && (r.headers.get("location") || "").includes("/login"), "page without session -> redirect to /login");
   r = await fetch(base + "/api/tasks");
   check(r.status === 401, "API without token -> 401");
   // fetch() cannot override Host, so use a raw HTTP request.
@@ -202,7 +203,8 @@ try {
   r = await fetch(base + "/auth?token=wrong", { redirect: "manual" });
   check(r.status === 401, "/auth with wrong token -> 401");
   r = await fetch(base + `/auth?token=${token}`, { redirect: "manual" });
-  check(r.status === 303 && /HttpOnly/i.test(r.headers.get("set-cookie") || ""), "/auth sets HttpOnly cookie");
+  const setCookie = r.headers.get("set-cookie") || "";
+  check(r.status === 303 && /agentic_session=[0-9a-f]{64}/.test(setCookie) && /HttpOnly/i.test(setCookie) && !setCookie.includes(token), "/auth opens a server-side session (cookie is not the token)");
   r = await fetch(base + "/", { headers: { authorization: `Bearer ${token}` } });
   const csp = r.headers.get("content-security-policy") || "";
   check(/script-src 'self' 'nonce-/.test(csp) && !csp.includes("unsafe-eval"), "strict CSP with nonce, no unsafe-eval");
@@ -444,6 +446,39 @@ try {
   });
   check(wide.length === 0, `no horizontal overflow on mobile ${wide.join(" ; ")}`);
   await shot("09-mobile");
+
+
+  // ---- Touch ID / passkeys with Chromium's virtual platform authenticator ----
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("WebAuthn.enable");
+  await cdp.send("WebAuthn.addVirtualAuthenticator", {
+    options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${base}/settings`);
+  await page.getByRole("button", { name: "Añadir Touch ID" }).click();
+  await page.getByText("Touch ID registrado").waitFor();
+  check(true, "register Touch ID (platform passkey with user verification)");
+  await page.getByRole("button", { name: "Cerrar sesión" }).click();
+  await page.waitForURL(/\/login/);
+  await page.goto(`${base}/`);
+  await page.waitForURL(/\/login/);
+  check(true, "logout revokes the session (redirected to /login)");
+  await page.waitForTimeout(500); // let the entrance animation finish
+  await shot("14-login");
+  await page.getByRole("button", { name: "Entrar con Touch ID" }).click();
+  await page.getByRole("heading", { name: "Dashboard" }).waitFor();
+  check(true, "sign in with Touch ID");
+  await page.goto(`${base}/settings`);
+  await page.getByRole("switch", { name: "Exigir Touch ID" }).click();
+  await page.getByText("Touch ID ahora es obligatorio").waitFor();
+  const bearer = await fetch(base + "/api/tasks", { headers: { authorization: `Bearer ${token}` } });
+  const tokenLogin = await fetch(base + `/auth?token=${token}`, { redirect: "manual" });
+  check(bearer.status === 401 && tokenLogin.status === 303 && (tokenLogin.headers.get("location") || "").includes("reason=passkey"), "with Touch ID required, the token no longer grants access");
+  await page.getByText("Registro de auditoría").scrollIntoViewIfNeeded();
+  await page.getByText("Passkey añadida").first().waitFor();
+  check(true, "audit log records security events");
+  await shot("15-security");
 
   const cspErrors = consoleErrors.filter((e) => /Content Security Policy|Refused to/i.test(e));
   check(cspErrors.length === 0, `no CSP violations (${cspErrors.slice(0, 2).join(" | ")})`);

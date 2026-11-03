@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createContext, setContext, type Context } from "@/lib/server/context";
-import { COOKIE_NAME } from "@/lib/server/security";
 import { FAKE_CLAUDE, makeClaudeHome, tmpDir, waitFor } from "./helpers";
 import * as tasksRoute from "@/app/api/tasks/route";
 import * as taskRoute from "@/app/api/tasks/[id]/route";
@@ -37,7 +36,7 @@ afterAll(() => {
 
 type H = (req: Request, ctx: { params: Promise<Record<string, string>> }) => Promise<Response>;
 async function call(h: unknown, opts: { method?: string; body?: unknown; params?: Record<string, string>; query?: string; headers?: Record<string, string>; rawBody?: string } = {}) {
-  const headers: Record<string, string> = { host: "127.0.0.1:4317", cookie: `${COOKIE_NAME}=${c.token}`, ...opts.headers };
+  const headers: Record<string, string> = { host: "127.0.0.1:4317", authorization: `Bearer ${c.token}`, ...opts.headers };
   let body: string | undefined = opts.rawBody;
   if (opts.body !== undefined) {
     body = JSON.stringify(opts.body);
@@ -50,7 +49,7 @@ async function call(h: unknown, opts: { method?: string; body?: unknown; params?
 
 describe("API", () => {
   it("rejects unauthenticated / foreign-host / cross-origin requests", async () => {
-    expect((await call(tasksRoute.GET, { headers: { cookie: "" } })).status).toBe(401);
+    expect((await call(tasksRoute.GET, { headers: { authorization: "" } })).status).toBe(401);
     expect((await call(tasksRoute.GET, { headers: { host: "evil.test" } })).status).toBe(421);
     expect((await call(tasksRoute.POST, { body: { title: "x" }, headers: { origin: "https://evil.test" } })).status).toBe(403);
     expect((await call(tasksRoute.POST, { rawBody: '{"title":"x"}', headers: { "content-type": "text/plain" } })).status).toBe(415);
@@ -123,7 +122,7 @@ describe("API", () => {
     expect((await call(projectInfoRoute.GET, { query: `?path=${encodeURIComponent(projectDir)}` })).status).toBe(200);
   });
 
-  it("/auth sets an HttpOnly SameSite=Strict cookie only for the right token", async () => {
+  it("/auth opens a server-side session (HttpOnly, SameSite=Strict) only for the right token", async () => {
     process.env.AGENTIC_HOME = c.config.dataDir;
     const bad = authRoute.GET(new NextRequest("http://127.0.0.1:4317/auth?token=nope", { headers: { host: "127.0.0.1:4317" } }));
     expect(bad.status).toBe(401);

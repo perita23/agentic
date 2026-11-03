@@ -7,6 +7,7 @@ import { setNotificationsEnabled, useNotificationPref } from "@/lib/notify";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CopyButton, PageHeader } from "@/components/app/common";
+import { SecuritySettings } from "@/components/app/security-settings";
 import { useApi, type SystemInfo } from "@/lib/api";
 
 function Row({ k, v, mono, copy }: { k: string; v: React.ReactNode; mono?: boolean; copy?: string }) {
@@ -102,6 +103,7 @@ export default function SettingsPage() {
             )}
           </CardContent>
         </Card>
+        <SecuritySettings />
         <NotificationsCard />
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -115,7 +117,7 @@ export default function SettingsPage() {
           <CardContent className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
             {[
               "Escucha sólo en 127.0.0.1 (loopback).",
-              "Token aleatorio de 256 bits; cookie HttpOnly + SameSite=Strict.",
+              "Sesiones de servidor (sólo se guarda su hash) + Touch ID / passkeys opcional u obligatorio.",
               "Allow-list de Host contra ataques de DNS rebinding.",
               "Comprobación de Origin / Sec-Fetch-Site y JSON obligatorio (anti-CSRF).",
               "CSP con nonce por petición, sin scripts inline ni eval en producción.",
@@ -128,7 +130,7 @@ export default function SettingsPage() {
               </div>
             ))}
             <p className="mt-2 sm:col-span-2">
-              Para cerrar todas las sesiones del navegador ejecuta <code className="rounded bg-secondary px-1 font-mono text-xs">npm run rotate-token</code> y reinicia.
+              ¿Perdiste el acceso? <code className="rounded bg-secondary px-1 font-mono text-xs">npm run reset-auth</code> borra passkeys y sesiones y genera un token nuevo.
             </p>
           </CardContent>
         </Card>

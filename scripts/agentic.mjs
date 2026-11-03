@@ -30,13 +30,27 @@ if (!/^[0-9a-f]{64}$/.test(token)) {
   token = crypto.randomBytes(32).toString("hex");
   fs.writeFileSync(tokenFile, token, { mode: 0o600 });
 }
-if (process.argv.includes("--rotate-token")) {
+if (process.argv.includes("--reset-auth")) {
+  // Local recovery: whoever can run this already owns ~/.agentic.
+  const authFile = path.join(dataDir, "auth.json");
+  try {
+    const st = JSON.parse(fs.readFileSync(authFile, "utf8"));
+    st.passkeys = [];
+    st.sessions = [];
+    st.requirePasskey = false;
+    fs.writeFileSync(authFile, JSON.stringify(st, null, 2), { mode: 0o600 });
+  } catch {}
+  fs.appendFileSync(path.join(dataDir, "audit.log"), JSON.stringify({ at: new Date().toISOString(), event: "auth.reset" }) + "\n", { mode: 0o600 });
+  console.log("Passkeys y sesiones eliminadas; Touch ID ya no es obligatorio.");
+}
+if (process.argv.includes("--rotate-token") || process.argv.includes("--reset-auth")) {
   token = crypto.randomBytes(32).toString("hex");
   fs.writeFileSync(tokenFile, token, { mode: 0o600 });
   console.log("Token rotated: existing browser sessions are now logged out.");
 }
 
-const urlHost = host === "::1" ? "[::1]" : host;
+// Passkeys / Touch ID require a domain, so point the browser at localhost.
+const urlHost = ["127.0.0.1", "::1", "localhost"].includes(host) ? "localhost" : host;
 const url = `http://${urlHost}:${port}/auth?token=${token}`;
 const banner = () => {
   console.log("\n  \x1b[1m\x1b[36m◆ Agentic Console\x1b[0m");

@@ -1,5 +1,7 @@
 import { ctx, type Context } from "./context";
-import { assertRequestAllowed } from "./security";
+import { audit } from "./audit";
+import { SESSION_COOKIE, sessionIdHash, validateSession } from "./auth";
+import { assertRequestAllowed, parseCookies } from "./security";
 import { HttpError } from "./util";
 
 const MAX_BODY = 1024 * 1024;
@@ -44,13 +46,16 @@ export function json(data: unknown, status = 200) {
  * validates Host/Origin/Content-Type, parses JSON lazily with a size cap and maps
  * errors to `{ error }` JSON without leaking stack traces.
  */
-export function route(handler: Handler) {
+export function route(handler: Handler, opts: { public?: boolean } = {}) {
   return async (req: Request, context: { params: Promise<Params> }) => {
     try {
       const c = ctx();
-      assertRequestAllowed(req, c.token);
+      assertRequestAllowed(req, opts.public ? null : { token: c.token, dataDir: c.config.dataDir });
       const params = (await context?.params) ?? {};
-      const result = await handler({ req, params, c, url: new URL(req.url), body: () => readJson(req) });
+      const url = new URL(req.url);
+      const result = await handler({ req, params, c, url, body: () => readJson(req) });
+      // Audit every successful state change (method + path only: never bodies or secrets).
+      if (req.method !== "GET" && !url.pathname.startsWith("/api/auth/") && !url.pathname.endsWith("/search")) audit(c.config.dataDir, "api", { method: req.method, path: url.pathname.slice(0, 300) });
       if (result instanceof Response) return result;
       return json(result ?? { ok: true });
     } catch (e) {
@@ -59,4 +64,14 @@ export function route(handler: Handler) {
       return json({ error: "Internal server error" }, 500);
     }
   };
+}
+
+/** Endpoints reachable without a session (passkey login). Host/Origin/JSON checks still apply. */
+export const publicRoute = (handler: Handler) => route(handler, { public: true });
+
+/** The caller's session (if any), from the session cookie. */
+export function currentSession(req: Request, dataDir: string) {
+  const raw = parseCookies(req.headers.get("cookie"))[SESSION_COOKIE];
+  const s = validateSession(dataDir, raw);
+  return s ? { session: s, idHash: sessionIdHash(raw!) } : null;
 }

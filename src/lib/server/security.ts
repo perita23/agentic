@@ -1,9 +1,9 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { readAuth, SESSION_COOKIE, validateSession } from "./auth";
 import { HttpError } from "./util";
 
-export const COOKIE_NAME = "agentic_token";
 const TOKEN_RE = /^[0-9a-f]{64}$/;
 
 /** Load the access token from `<dataDir>/token` or create one (mode 0600). */
@@ -68,10 +68,19 @@ export interface RequestLike {
   headers: { get(name: string): string | null };
 }
 
-export function isAuthorized(req: RequestLike, token: string): boolean {
-  const auth = req.headers.get("authorization") || "";
-  if (auth.startsWith("Bearer ") && safeEqual(auth.slice(7).trim(), token)) return true;
-  return safeEqual(parseCookies(req.headers.get("cookie"))[COOKIE_NAME], token);
+export interface AuthContext {
+  token: string;
+  dataDir: string;
+}
+
+/**
+ * A request is authenticated by a valid server-side session cookie, or by the
+ * master token as a Bearer header (scripts/CLI) unless passkeys are required.
+ */
+export function isAuthorized(req: RequestLike, ctx: AuthContext): boolean {
+  const header = req.headers.get("authorization") || "";
+  if (header.startsWith("Bearer ") && !readAuth(ctx.dataDir).requirePasskey && safeEqual(header.slice(7).trim(), ctx.token)) return true;
+  return !!validateSession(ctx.dataDir, parseCookies(req.headers.get("cookie"))[SESSION_COOKIE]);
 }
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -81,9 +90,10 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
  * state-changing methods same-origin + JSON body (CSRF defence; JSON cannot be
  * sent cross-origin by a plain HTML form without a CORS preflight).
  */
-export function assertRequestAllowed(req: RequestLike, token: string) {
+export function assertRequestAllowed(req: RequestLike, ctx: AuthContext | null) {
   if (!isAllowedHost(req.headers.get("host"))) throw new HttpError(421, "Host not allowed");
-  if (!isAuthorized(req, token)) throw new HttpError(401, "Unauthorized: open the URL with ?token= printed by `npm start`");
+  // ctx === null: public endpoint (login ceremony); every other check still applies.
+  if (ctx && !isAuthorized(req, ctx)) throw new HttpError(401, "Unauthorized: inicia sesión en /login");
   if (SAFE_METHODS.has(req.method)) return;
 
   const origin = req.headers.get("origin");
