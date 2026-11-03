@@ -18,7 +18,7 @@ module.exports = {
   // The Next.js standalone server (incl. its .next folder) runs with Electron's Node.
   extraResources: [{ from: "../.next/standalone", to: "app-server", filter: ["**/*", ".next/**/*", "**/.next/**/*"] }],
   asar: true,
-  afterPack: "build/adhoc-sign.cjs",
+  afterPack: "build/after-pack.cjs",
   mac: {
     category: "public.app-category.developer-tools",
     icon: "build/icon.png",
