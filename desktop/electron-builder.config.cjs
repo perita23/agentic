@@ -18,6 +18,7 @@ module.exports = {
   // The Next.js standalone server (incl. its .next folder) runs with Electron's Node.
   extraResources: [{ from: "../.next/standalone", to: "app-server", filter: ["**/*", ".next/**/*", "**/.next/**/*"] }],
   asar: true,
+  afterPack: "build/adhoc-sign.cjs",
   mac: {
     category: "public.app-category.developer-tools",
     icon: "build/icon.png",
@@ -26,7 +27,8 @@ module.exports = {
       { target: "zip", arch: ["arm64", "x64"] },
     ],
     minimumSystemVersion: "13.0",
-    identity: signed ? undefined : "-",
+    // Unsigned builds skip electron-builder's signing; build/adhoc-sign.cjs seals the bundle instead.
+    identity: signed ? undefined : null,
     hardenedRuntime: signed,
     gatekeeperAssess: false,
     entitlements: "build/entitlements.mac.plist",
