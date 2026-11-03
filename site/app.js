@@ -11,7 +11,10 @@ async function detectIntel() {
   // Only Chromium exposes the CPU; Safari/Firefox report "Intel" for every Mac,
   // so Apple Silicon stays the default when unknown.
   try {
-    const d = await navigator.userAgentData?.getHighEntropyValues?.(["architecture", "platform"]);
+    const d = await navigator.userAgentData?.getHighEntropyValues?.([
+      "architecture",
+      "platform",
+    ]);
     return d?.platform === "macOS" && d?.architecture === "x86";
   } catch {
     return false;
@@ -29,10 +32,17 @@ async function main() {
     secondary.textContent = "Mac con Apple Silicon";
   }
   try {
-    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { accept: "application/vnd.github+json" } });
+    const res = await fetch(
+      `https://api.github.com/repos/${REPO}/releases/latest`,
+      { headers: { accept: "application/vnd.github+json" } },
+    );
     if (!res.ok) return;
     const rel = await res.json();
-    const date = new Date(rel.published_at).toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
+    const date = new Date(rel.published_at).toLocaleDateString("es-ES", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
     const meta = document.getElementById("release-meta");
     meta.textContent = `${String(rel.tag_name).replace(/[^\w.-]/g, "")} · ${date} · macOS 13 o superior · se actualiza sola`;
   } catch {
