@@ -1,0 +1,36 @@
+# Seguridad
+
+Agentic puede **lanzar Claude Code con permisos sobre tus proyectos**, leer tus transcripciones
+y escribir subagentes. Aunque sólo escucha en local, cualquier web que visites puede intentar
+hablar con `127.0.0.1`. Este documento resume el modelo de amenazas y las defensas.
+
+## Amenazas consideradas
+
+| Amenaza | Defensa | Test |
+|---------|---------|------|
+| Otra máquina de la red accede al servidor | Bind a `127.0.0.1`; el launcher se niega a otra interfaz sin `AGENTIC_ALLOW_REMOTE=1` | — |
+| Otro usuario/proceso local o web maliciosa sin credenciales | Token aleatorio de 256 bits (`~/.agentic/token`, modo 0600); cookie `HttpOnly; SameSite=Strict`; comparación en tiempo constante | `security.test.ts`, `api.test.ts`, smoke |
+| **DNS rebinding** (dominio atacante que resuelve a 127.0.0.1) | Allow-list del header `Host` (sólo `127.0.0.1`, `localhost`, `[::1]`) en `proxy.ts`, en `/auth` y en cada Route Handler | ídem |
+| **CSRF** desde otra web | Mutaciones exigen `Content-Type: application/json` (no enviable por formularios sin preflight CORS), `Origin` propio si existe y `Sec-Fetch-Site` same-origin; además cookie `SameSite=Strict` | ídem |
+| **XSS** con datos de transcripciones/tareas | React escapa todo el texto; nunca se usa `dangerouslySetInnerHTML`; CSP con nonce por petición y `strict-dynamic`, sin `unsafe-eval` en producción, `object-src 'none'`, `base-uri 'none'`, `frame-ancestors 'none'` | smoke (payload `<img onerror>`) |
+| Clickjacking | `X-Frame-Options: DENY` + `frame-ancestors 'none'` | smoke |
+| **Inyección de comandos** al lanzar Claude | `spawn` con array de argumentos y `shell: false`; tmux recibe el comando como argv (sin shell); el prompt va tras `--` para que no pueda convertirse en flag; `model`, `agent`, `permissionMode` y `resumeSessionId` validados con regex/enum | `runs.test.ts` (`$(touch …)`, `--dangerously-skip-permissions` como prompt) |
+| **Path traversal** | IDs de sesión/ejecución deben ser UUID; nombres de agente `^[a-z0-9][a-z0-9-]{0,63}$` + comprobación de directorio; colecciones del store con regex; agentes de proyecto e info de proyecto sólo para proyectos conocidos; no se siguen symlinks en carpetas de agentes | `agents.test.ts`, `sessions.test.ts`, `api.test.ts` |
+| **Repositorios maliciosos** (config git que ejecuta código) | git se invoca con `core.fsmonitor=false`, `core.hooksPath=/dev/null`, `core.pager=cat`, `GIT_CONFIG_NOSYSTEM=1`, sin prompts y con timeout | `projects.test.ts` (fsmonitor malicioso) |
+| Inyección en front-matter de agentes | Valores de una sola línea, entrecomillados en JSON cuando hace falta | `agents.test.ts` |
+| Mass assignment | Esquemas zod `.strict()` en actualizaciones; `id`, `createdAt`, … no se pueden sobrescribir | `tasks.test.ts` |
+| DoS / agotamiento de recursos | Cuerpo de petición ≤ 1 MB; logs por ejecución con tope; máximo de ejecuciones simultáneas; historial acotado (500 runs, 5000 tareas); lectura de transcripciones en streaming; ficheros leídos con tamaño máximo | `runs.test.ts`, `api.test.ts` |
+| Corrupción de datos | Escrituras atómicas (tmp + fsync + rename); ficheros corruptos se respaldan y no rompen la app | `store.test.ts` |
+| Fugas de información en errores | Errores 500 genéricos; detalles sólo en el log del servidor | — |
+
+## Recomendaciones de uso
+
+- No ejecutes Agentic como root.
+- El modo de permisos `bypassPermissions` permite a Claude ejecutar cualquier herramienta: úsalo sólo en entornos aislados.
+- Si crees que el token se ha filtrado: `npm run rotate-token` y reinicia.
+- El enlace con `?token=` queda en el historial del navegador local; la cookie dura un año.
+
+## Dependencias
+
+`npm audit --omit=dev` → 0 vulnerabilidades en dependencias de producción.
+Las alertas moderadas restantes (`minimatch`) están sólo en la cadena de ESLint (herramienta de desarrollo, no se ejecuta en la app).
