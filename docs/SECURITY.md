@@ -64,3 +64,7 @@ Las alertas moderadas restantes (`minimatch`) están sólo en la cadena de ESLin
 
 - Contraseña elegida en el primer arranque, guardada sólo como hash scrypt con sal aleatoria en `~/.agentic/desktop-lock.json` (0600); comparación en tiempo constante y espera exponencial tras 5 fallos.
 - Touch ID sólo se activa tras verificar la huella; cambiar la contraseña exige la actual. Ambas acciones sólo las acepta el proceso principal desde páginas del servidor local.
+
+## Identidad de la app de Mac sin Developer ID
+
+Sin certificado de Apple, la app se firma ad-hoc y su requisito designado sería el hash exacto del código, distinto en cada versión, con lo que macOS (TCC) olvidaba los permisos de carpetas en cada actualización. El bundle se firma con el requisito explícito `designated => identifier "dev.agentic.console"`, así los permisos se mantienen. Contrapartida: otro binario ad-hoc con el mismo identificador cumpliría ese requisito; con un Developer ID (`CSC_LINK`) el requisito vuelve a incluir el certificado.

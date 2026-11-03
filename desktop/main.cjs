@@ -401,6 +401,12 @@ app.whenReady().then(async () => {
       touchIdEnabled: appLock.touchIdEnabled(DATA_DIR),
       hasPassword: appLock.hasPassword(DATA_DIR),
     });
+    // Fixed deep link to System Settings → Privacy → Full Disk Access.
+    ipcMain.handle("agentic:open-privacy", (e) => {
+      if (!fromApp(e) || process.platform !== "darwin") return false;
+      shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles");
+      return true;
+    });
     ipcMain.handle("agentic:lock-info", (e) => (fromApp(e) ? lockInfo() : null));
     ipcMain.handle("agentic:set-touch-id", async (e, on) => {
       if (!fromApp(e)) return null;
