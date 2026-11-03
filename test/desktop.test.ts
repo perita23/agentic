@@ -133,7 +133,6 @@ describe("update sources", () => {
 });
 
 describe("desktop app lock", () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const lock = require("../desktop/lib/lock.cjs");
 
   it("creates the password once, stores only a scrypt hash and verifies it", () => {

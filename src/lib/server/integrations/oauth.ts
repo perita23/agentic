@@ -345,6 +345,8 @@ export function slackManifestUrl() {
     oauth_config: {
       scopes: {
         bot: ["channels:read", "channels:history", "groups:read", "groups:history", "im:read", "im:history", "mpim:read", "mpim:history", "users:read", "chat:write"],
+        // A user token (xoxp-) is what lets Agentic read and answer *your* direct messages.
+        user: ["channels:read", "channels:history", "groups:read", "groups:history", "im:read", "im:history", "mpim:read", "mpim:history", "users:read", "chat:write"],
       },
     },
     settings: { org_deploy_enabled: false, socket_mode_enabled: false, token_rotation_enabled: false },

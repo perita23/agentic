@@ -3,6 +3,16 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.13.0] - 2026-11-03
+
+### Añadido
+- **Mensajes directos de Slack**: tus conversaciones privadas y de grupo aparecen en «Mensajes directos» y puedes leerlas y responderlas. Hace falta el *User OAuth Token* (`xoxp-…`); con el token del bot (`xoxb-…`) Slack sólo deja ver lo que ve el bot, y la app te lo indica. La app de Slack creada con «Crear app de Slack» ya incluye los permisos de usuario necesarios.
+- **Crear tarea desde un mensaje**: cualquier mensaje o respuesta se convierte en una tarea del backlog (etiqueta `slack`, con autor, conversación y texto).
+
+### Cambiado
+- **Mensajes rediseñado** con identidad propia de Agentic: bandeja con canales y mensajes directos, avatares con color propio por persona, separadores por día, mensajes seguidos agrupados, acciones al pasar el ratón y un compositor nuevo.
+- Las apps de Slack antiguas sin permisos de mensajes directos siguen mostrando sus canales.
+
 ## [0.12.1] - 2026-11-03
 
 ### Corregido

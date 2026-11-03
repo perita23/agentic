@@ -7,6 +7,8 @@ import { request, safeBaseUrl } from "@/lib/server/integrations/http";
 import { createContext, type Context } from "@/lib/server/context";
 import { FAKE_CLAUDE, tmpDir, waitFor } from "./helpers";
 
+let legacyScopes = false; // app created before DMs were supported (no im:read)
+
 const TOKEN = "xoxb-test-123";
 let server: http.Server;
 let base: string;
@@ -32,8 +34,13 @@ beforeAll(async () => {
           return send({ ok: true, user: "agentic-bot", team: "Acme" });
         case "/users.list":
           return send({ ok: true, members: [{ id: "U1", name: "ana", profile: { display_name: "Ana" } }] });
-        case "/conversations.list":
-          return send({ ok: true, channels: [{ id: "C02RND", name: "random", is_private: false, is_member: false }, { id: "C01DEV", name: "dev", is_private: false, is_member: true }] });
+        case "/conversations.list": {
+          const types = url.searchParams.get("types") ?? "";
+          if (types.includes("im") && legacyScopes) return send({ ok: false, error: "missing_scope" });
+          const chans: unknown[] = [{ id: "C02RND", name: "random", is_private: false, is_member: false }, { id: "C01DEV", name: "dev", is_private: false, is_member: true }];
+          if (types.includes("im")) chans.push({ id: "D01ANA", is_im: true, user: "U1", updated: 10 }, { id: "G01GRP", name: "mpdm-ana--luis-1", is_mpim: true, updated: 20 });
+          return send({ ok: true, channels: chans });
+        }
         case "/conversations.history":
           if (url.searchParams.get("channel") === "C0404X") return send({ ok: false, error: "channel_not_found" });
           return send({
@@ -95,7 +102,16 @@ describe("Slack integration", () => {
     c.integrations.configure("slack", { botToken: TOKEN });
     expect(await c.integrations.test("slack")).toEqual({ ok: true, account: "agentic-bot @ Acme" });
     const channels = await c.integrations.slackChannels();
-    expect(channels.map((x) => x.name)).toEqual(["dev", "random"]);
+    // Channels first (member ones on top), then DMs and group DMs by recent activity.
+    expect(channels.map((x) => [x.name, x.kind])).toEqual([
+      ["dev", "channel"],
+      ["random", "channel"],
+      ["Ana, luis", "group"],
+      ["Ana", "dm"],
+    ]);
+    legacyScopes = true;
+    expect((await c.integrations.slackChannels()).map((x) => x.name)).toEqual(["dev", "random"]);
+    legacyScopes = false;
     const h = await c.integrations.slackHistory("C01DEV");
     expect(h.messages.map((m) => m.text)).toEqual(["<script>x</script>", "segundo @Ana"]); // oldest first, joins hidden
     expect(h.messages[1]).toMatchObject({ author: "Ana", replyCount: 2 });

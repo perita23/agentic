@@ -38,14 +38,15 @@ const PROVIDERS: {
     name: "Slack",
     description: "Lee y responde mensajes de tus canales y recibe avisos de Agentic.",
     fields: [
-      { name: "botToken", label: "Bot token", placeholder: "xoxb-…", secret: true, required: true },
+      { name: "botToken", label: "Token (usuario xoxp- o bot xoxb-)", placeholder: "xoxp-… / xoxb-…", secret: true, required: true },
       { name: "notifyChannel", label: "Canal para avisos (ID, opcional)", placeholder: "C0123ABCD" },
       { name: "webhookUrl", label: "Incoming webhook (alternativa para avisos, opcional)", placeholder: "https://hooks.slack.com/services/…" },
     ],
     help: (
       <>
-        Con «Crear app de Slack» la app se crea ya con los permisos correctos: pulsa <em>Install to Workspace</em>, copia el <em>Bot User OAuth Token</em>{" "}
-        (<code>xoxb-…</code>) de «OAuth &amp; Permissions» e invita al bot a tus canales (<code>/invite @Agentic</code>).
+        Con «Crear app de Slack» la app se crea ya con los permisos correctos. Pulsa <em>Install to Workspace</em> y, en «OAuth &amp; Permissions», copia el{" "}
+        <em>User OAuth Token</em> (<code>xoxp-…</code>) para ver tus canales <b>y tus mensajes directos</b> y responder como tú. El <em>Bot User OAuth Token</em>{" "}
+        (<code>xoxb-…</code>) sólo ve los canales a los que invites al bot.
       </>
     ),
   },
