@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { CopyButton, PageHeader } from "@/components/app/common";
 import { DesktopCard } from "@/components/app/desktop-card";
+import { InstallTool } from "@/components/app/install-tool";
 import { AuditCard, SessionsCard, TouchIdCard } from "@/components/app/security-settings";
 import { useApi, type SystemInfo } from "@/lib/api";
 
@@ -15,7 +16,7 @@ function Row({ k, v, mono, copy }: { k: string; v: React.ReactNode; mono?: boole
   return (
     <div className="flex items-center justify-between gap-4 border-b py-2 text-sm last:border-0">
       <span className="text-muted-foreground">{k}</span>
-      <span className={`flex items-center gap-1 truncate ${mono ? "font-mono text-xs" : ""}`}>
+      <span className={`flex items-center gap-2 truncate ${mono ? "font-mono text-xs" : ""}`}>
         {v}
         {copy && <CopyButton value={copy} />}
       </span>
@@ -81,9 +82,25 @@ export default function SettingsPage() {
             ) : (
               <>
                 <Row k="Agentic" v={`v${data.version}`} mono />
-                <Row k="Claude Code" v={<Ok ok={!!data.claudeVersion}>{data.claudeVersion ?? "no encontrado"}</Ok>} />
+                <Row
+                  k="Claude Code"
+                  v={
+                    <>
+                      <Ok ok={!!data.claudeVersion}>{data.claudeVersion ?? "no encontrado"}</Ok>
+                      {!data.claudeVersion && <InstallTool tool="claude" />}
+                    </>
+                  }
+                />
                 <Row k="Binario (CLAUDE_BIN)" v={data.claudeBin} mono />
-                <Row k="tmux" v={<Ok ok={data.tmux}>{data.tmux ? "disponible" : "no instalado"}</Ok>} />
+                <Row
+                  k="tmux"
+                  v={
+                    <>
+                      <Ok ok={data.tmux}>{data.tmux ? "disponible" : "no instalado"}</Ok>
+                      {!data.tmux && <InstallTool tool="tmux" />}
+                    </>
+                  }
+                />
                 <Row k="Node.js" v={data.node} mono />
                 <Row k="Plataforma" v={data.platform} mono />
                 <Row k="Ejecuciones simultáneas (AGENTIC_MAX_RUNS)" v={data.maxConcurrentRuns} />

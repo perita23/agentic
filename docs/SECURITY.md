@@ -49,3 +49,7 @@ hablar con `127.0.0.1`. Este documento resume el modelo de amenazas y las defens
 
 `npm audit --omit=dev` → 0 vulnerabilidades en dependencias de producción.
 Las alertas moderadas restantes (`minimatch`) están sólo en la cadena de ESLint (herramienta de desarrollo, no se ejecuta en la app).
+
+## Instalación de herramientas
+
+`POST /api/system/install` sólo acepta `{"tool": "tmux" | "claude"}` y ejecuta una receta fija con el gestor detectado (`brew install tmux`, `brew install --cask claude-code` o `npm install -g @anthropic-ai/claude-code`): ningún dato del usuario llega a la línea de comandos, sin shell, stdin cerrado (`NONINTERACTIVE=1`), una instalación a la vez, 15 minutos como máximo y salida limitada a 64 KB. Requiere sesión como el resto de la API y queda en el registro de auditoría.

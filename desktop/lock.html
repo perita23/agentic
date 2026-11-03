@@ -31,18 +31,9 @@
         -webkit-app-region: drag;
       }
       .logo {
-        display: grid;
-        place-items: center;
-        width: 56px;
-        height: 56px;
-        border-radius: 14px;
-        background: #e6e6e6;
-        box-shadow: 0 10px 30px rgb(255 255 255 / 0.06);
-      }
-      .logo svg {
-        width: 30px;
-        height: 30px;
-        color: #0a0a0a;
+        width: 64px;
+        height: 64px;
+        filter: drop-shadow(0 8px 24px rgb(167 139 250 / 0.25));
       }
       h1 {
         margin: 4px 0 0;
@@ -96,9 +87,13 @@
     <script src="lock.js" defer></script>
   </head>
   <body data-state="waiting">
-    <div class="logo" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 12 4l8 16" /><path d="M7.5 14h9" /></svg>
-    </div>
+    <svg class="logo" viewBox="100 100 824 824" aria-hidden="true">
+      <defs>
+        <linearGradient id="g" x1="276" y1="0" x2="748" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#f2f2f2" /><stop offset=".55" stop-color="#a78bfa" /><stop offset="1" stop-color="#ff8a5b" /></linearGradient>
+      </defs>
+      <path d="M512 100c228 0 300 0 356 56s56 128 56 356 0 300-56 356-128 56-356 56-300 0-356-56-56-128-56-356 0-300 56-356 128-56 356-56z" fill="#000" stroke="#fff" stroke-opacity=".16" stroke-width="10" />
+      <path fill="url(#g)" fill-rule="evenodd" d="M276 774 470 250H554L748 774H684L630.7 630H393.3L340 774ZM512 309.4 615.9 590H408.1Z" />
+    </svg>
     <h1>Agentic está bloqueada</h1>
     <svg class="finger" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" />

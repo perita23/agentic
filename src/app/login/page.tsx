@@ -8,6 +8,7 @@ import { FingerprintIcon, KeyRoundIcon, LockIcon, TerminalIcon } from "lucide-re
 import { Button } from "@/components/ui/button";
 import { api, fetcher } from "@/lib/api";
 import { useLocation } from "@/lib/use-location";
+import { BrandMark } from "@/components/app/brand-mark";
 
 /** Only same-app paths are allowed after login (no open redirects). */
 function safeNext(n: string | null) {
@@ -57,11 +58,7 @@ function Login() {
         className="w-full max-w-sm rounded-xl border bg-card p-7 shadow-2xl shadow-black/50"
       >
         <div className="mb-6 flex items-center gap-2">
-          <span className="grid size-8 place-items-center rounded-md bg-foreground">
-            <svg viewBox="0 0 24 24" className="size-4 text-background" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M12 3 4 21M12 3l8 18M7.5 14h9" />
-            </svg>
-          </span>
+          <BrandMark className="size-9" />
           <span className="text-lg font-semibold">Agentic</span>
           <LockIcon className="ml-auto size-4 text-muted-foreground" />
         </div>

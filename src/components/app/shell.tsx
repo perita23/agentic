@@ -29,6 +29,7 @@ import { cn, shortPath } from "@/lib/utils";
 import { Kbd, StatusDot } from "./common";
 import { LauncherProvider, useLauncher } from "./launcher";
 import { RunNotifier } from "./run-notifier";
+import { BrandMark } from "@/components/app/brand-mark";
 
 const NAV = [
   { href: "/", label: "Dashboard", icon: LayoutDashboardIcon },
@@ -53,11 +54,7 @@ function isActive(pathname: string, href: string) {
 function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2 px-2 py-1">
-      <span className="grid size-7 place-items-center rounded-md bg-foreground shadow-lg shadow-white/5">
-        <svg viewBox="0 0 24 24" className="size-4 text-background" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M12 3 4 21M12 3l8 18M7.5 14h9" />
-        </svg>
-      </span>
+      <BrandMark className="drop-shadow-[0_2px_8px_rgba(167,139,250,0.25)]" />
       <span className="font-semibold tracking-tight">Agentic</span>
       <span className="rounded border px-1 font-mono text-[10px] text-muted-foreground">local</span>
     </Link>
