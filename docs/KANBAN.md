@@ -38,9 +38,10 @@ Leyenda: ✅ hecho · 🔄 en curso · ⏳ pendiente
 | 27 | Review de la v1: fix de PATCH que borraba campos al mover tareas | #1 | ✅ |
 | 28 | Tema oscuro estilo Cursor | #2 | ✅ |
 | 29 | CI en GitHub Actions (typecheck, lint, tests, build, smoke E2E, audit) | #3 | ✅ |
-| 30 | Diff git por ejecución + endurecimiento de git contra filtros/textconv | #4 | 🔄 |
-| 31 | Notificaciones de escritorio al terminar una ejecución | #4 | 🔄 |
-| 32 | Analítica de uso (tokens por día / proyecto / modelo / herramienta) | #5 | ⏳ |
+| 30 | Diff git por ejecución + endurecimiento de git contra filtros/textconv | #4 | ✅ v0.2.0 |
+| 31 | Notificaciones de escritorio al terminar una ejecución | #4 | ✅ v0.2.0 |
+| 31b | Releases automáticas (tag + GitHub Release al pasar CI en main) | #4 | ✅ v0.2.0 |
+| 32 | Analítica de uso (tokens por día / proyecto / modelo / herramienta) | #5 | 🔄 v0.3.0 |
 | 33 | Cola de tareas autónoma (ejecutar To do en secuencia) | #6 | ⏳ |
 
 ## ⏳ Backlog

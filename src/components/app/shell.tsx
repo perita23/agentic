@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import {
   BotIcon,
+  ChartColumnIcon,
   FileStackIcon,
   FolderGit2Icon,
   KanbanSquareIcon,
@@ -33,6 +34,7 @@ const NAV = [
   { href: "/templates", label: "Plantillas", icon: FileStackIcon },
   { href: "/agents", label: "Agentes", icon: BotIcon },
   { href: "/projects", label: "Proyectos", icon: FolderGit2Icon },
+  { href: "/analytics", label: "Analítica", icon: ChartColumnIcon },
   { href: "/settings", label: "Ajustes", icon: SettingsIcon },
 ];
 
