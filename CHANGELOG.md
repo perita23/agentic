@@ -5,6 +5,10 @@ Cada versión se etiqueta y publica automáticamente como GitHub Release cuando 
 
 ## [0.16.0] - 2026-11-03
 
+### Cambiado
+- **Nuevo logo**: una «A» brutalista de alto contraste (pierna gruesa partida por una ranura, pierna fina y barra que sobresale) con el degradado de Agentic sobre negro.
+- La app nombra tu dispositivo (por ejemplo «MacBook Pro de Hugo») en lugar de «esta máquina».
+
 ### Seguridad
 - **Credenciales cifradas en disco**: los tokens de las integraciones y los secretos OAuth se guardan cifrados (AES-256-GCM). En la app de Mac la clave vive en el **Llavero de macOS**; los ficheros antiguos se cifran al arrancar.
 - **App de Mac endurecida** según la lista de seguridad de Electron: el servidor corre en un proceso aislado y se desactivan los *fuses* peligrosos (ejecutar la app como Node, `NODE_OPTIONS`, `--inspect`); el código sólo se carga desde el paquete con integridad verificada; cookies cifradas; sin DevTools en versiones publicadas; `<webview>` bloqueado.
