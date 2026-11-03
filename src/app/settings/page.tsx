@@ -1,6 +1,9 @@
 "use client";
 
-import { CheckCircle2Icon, SettingsIcon, ShieldCheckIcon, XCircleIcon } from "lucide-react";
+import { BellIcon, CheckCircle2Icon, SettingsIcon, ShieldCheckIcon, XCircleIcon } from "lucide-react";
+import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
+import { setNotificationsEnabled, useNotificationPref } from "@/lib/notify";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CopyButton, PageHeader } from "@/components/app/common";
@@ -24,6 +27,34 @@ const Ok = ({ ok, children }: { ok: boolean; children: React.ReactNode }) => (
   </span>
 );
 
+function NotificationsCard() {
+  const { supported, enabled: on } = useNotificationPref();
+  return (
+    <Card>
+      <CardHeader>
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <BellIcon className="size-4" /> Notificaciones
+          </CardTitle>
+          <CardDescription>Avisos de escritorio cuando termina una ejecución y la pestaña no está visible.</CardDescription>
+        </div>
+        <Switch
+          aria-label="Notificaciones de escritorio"
+          checked={on}
+          disabled={!supported}
+          onCheckedChange={async (v) => {
+            const res = await setNotificationsEnabled(v);
+            if (v && !res) toast.error("El navegador ha bloqueado las notificaciones");
+          }}
+        />
+      </CardHeader>
+      {!supported && (
+        <CardContent className="text-xs text-muted-foreground">Este navegador no soporta notificaciones.</CardContent>
+      )}
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const { data } = useApi<SystemInfo>("/api/system");
   return (
@@ -42,6 +73,7 @@ export default function SettingsPage() {
               <Skeleton className="h-40" />
             ) : (
               <>
+                <Row k="Agentic" v={`v${data.version}`} mono />
                 <Row k="Claude Code" v={<Ok ok={!!data.claudeVersion}>{data.claudeVersion ?? "no encontrado"}</Ok>} />
                 <Row k="Binario (CLAUDE_BIN)" v={data.claudeBin} mono />
                 <Row k="tmux" v={<Ok ok={data.tmux}>{data.tmux ? "disponible" : "no instalado"}</Ok>} />
@@ -70,6 +102,7 @@ export default function SettingsPage() {
             )}
           </CardContent>
         </Card>
+        <NotificationsCard />
         <Card className="lg:col-span-2">
           <CardHeader>
             <div>

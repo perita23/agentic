@@ -12,6 +12,12 @@ const sid = "11111111-2222-4333-8444-555555555555";
 out({ type: "system", subtype: "init", session_id: sid, cwd: process.cwd() });
 out({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: JSON.stringify({ args, cwd: process.cwd() }) }] } });
 process.stderr.write("some stderr line\n");
+if (prompt.includes("EDIT")) {
+  const fs = await import("node:fs");
+  fs.appendFileSync("tracked.txt", "line added by claude\n");
+  fs.writeFileSync("created-by-claude.txt", "hello from claude\n");
+  if (fs.existsSync("old-name.txt")) fs.renameSync("old-name.txt", "new-name.txt");
+}
 if (prompt.includes("SLEEP")) {
   setTimeout(() => {}, 60_000);
 } else if (prompt.includes("FAIL")) {

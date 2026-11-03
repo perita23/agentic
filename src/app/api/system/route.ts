@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { route } from "@/lib/server/api";
 import { hasTmux } from "@/lib/server/runs";
+import pkg from "../../../../package.json";
 
 const execFileP = promisify(execFile);
 
@@ -12,6 +13,7 @@ export const GET = route(async ({ c }) => {
     claudeVersion = stdout.trim().slice(0, 200);
   } catch {}
   return {
+    version: pkg.version,
     dataDir: c.config.dataDir,
     claudeHome: c.config.claudeHome,
     claudeBin: c.config.claudeBin,

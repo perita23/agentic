@@ -32,11 +32,20 @@ Leyenda: ✅ hecho · 🔄 en curso · ⏳ pendiente
 | 25 | Build de producción + lint + typecheck | 7 |
 | 26 | `SECURITY.md` + README + `npm audit` | 7 |
 
-## ⏳ Backlog (siguientes iteraciones)
+## Iteración 2 (PRs autónomas)
+| # | Tarea | PR | Estado |
+|---|-------|----|--------|
+| 27 | Review de la v1: fix de PATCH que borraba campos al mover tareas | #1 | ✅ |
+| 28 | Tema oscuro estilo Cursor | #2 | ✅ |
+| 29 | CI en GitHub Actions (typecheck, lint, tests, build, smoke E2E, audit) | #3 | ✅ |
+| 30 | Diff git por ejecución + endurecimiento de git contra filtros/textconv | #4 | 🔄 |
+| 31 | Notificaciones de escritorio al terminar una ejecución | #4 | 🔄 |
+| 32 | Analítica de uso (tokens por día / proyecto / modelo / herramienta) | #5 | ⏳ |
+| 33 | Cola de tareas autónoma (ejecutar To do en secuencia) | #6 | ⏳ |
+
+## ⏳ Backlog
 | # | Tarea |
 |---|-------|
-| 27 | Notificaciones de escritorio al terminar una ejecución |
-| 28 | Cola de tareas / ejecución programada |
-| 29 | Diff git por ejecución (qué cambió Claude) |
-| 30 | Streaming por SSE en lugar de polling |
-| 31 | Empaquetado como app de escritorio (Tauri) |
+| 34 | Streaming por SSE en lugar de polling |
+| 35 | Búsqueda de texto completo dentro de transcripciones |
+| 36 | Empaquetado como app de escritorio (Tauri) |

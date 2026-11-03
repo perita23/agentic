@@ -23,6 +23,7 @@ import { useApi, type Overview, type ProjectListItem, type SessionSummary } from
 import { cn, shortPath } from "@/lib/utils";
 import { Kbd, StatusDot } from "./common";
 import { LauncherProvider, useLauncher } from "./launcher";
+import { RunNotifier } from "./run-notifier";
 
 const NAV = [
   { href: "/", label: "Dashboard", icon: LayoutDashboardIcon },
@@ -94,6 +95,7 @@ function Sidebar({ overview }: { overview?: Overview }) {
       <div className="border-t p-3 text-[11px] text-muted-foreground">
         <div className="flex items-center gap-1.5">
           <span className="size-1.5 rounded-full bg-success" /> Todo se ejecuta en tu máquina
+          <span className="ml-auto font-mono">v{process.env.NEXT_PUBLIC_APP_VERSION}</span>
         </div>
       </div>
     </aside>
@@ -229,6 +231,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 md:px-8">{children}</main>
       </div>
       <CommandPalette open={paletteOpen} setOpen={setPaletteOpen} />
+      <RunNotifier />
     </div>
   );
 }

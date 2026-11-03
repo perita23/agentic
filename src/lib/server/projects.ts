@@ -1,14 +1,11 @@
-import { execFile } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { promisify } from "node:util";
 import { z } from "zod";
+import { git } from "./git";
 import type { SessionIndex } from "./sessions";
 import type { JsonStore } from "./store";
 import { absPath, existingDir, HttpError, nowIso, parse, text } from "./util";
-
-const execFileP = promisify(execFile);
 
 export interface StoredProject {
   id: string;
@@ -59,28 +56,6 @@ export const projectUpdateSchema = z
   .strict();
 
 const P = "projects";
-
-/**
- * git invocation hardened against hostile repositories: repo-local config can
- * define fsmonitor / hooks / pagers that would execute code on `git status`.
- */
-async function git(cwd: string, args: string[]): Promise<string | null> {
-  try {
-    const { stdout } = await execFileP(
-      "git",
-      ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-c", "core.pager=cat", "-c", "diff.external=", "--no-optional-locks", ...args],
-      {
-        cwd,
-        timeout: 4000,
-        maxBuffer: 2 * 1024 * 1024,
-        env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0", GIT_CONFIG_NOSYSTEM: "1" },
-      },
-    );
-    return stdout;
-  } catch {
-    return null;
-  }
-}
 
 function readSmall(file: string, max = 64 * 1024): string | null {
   try {

@@ -134,11 +134,19 @@ try {
   await page.getByText("demo-app").first().click();
   await page.getByText("Usa TypeScript estricto", { exact: false }).count();
   await page.getByRole("button", { name: "Nueva sesión aquí" }).click();
-  await page.getByLabel("Prompt").fill("Escribe tests para el login");
+  await page.getByLabel("Prompt").fill("Escribe tests para el login EDIT");
   await page.getByRole("button", { name: "Lanzar", exact: true }).click();
   await page.waitForURL(/\/runs\/[0-9a-f-]{36}$/);
-  await page.getByText("done: Escribe tests para el login").waitFor({ timeout: 15000 });
+  await page.getByText("done: Escribe tests para el login EDIT").waitFor({ timeout: 15000 });
   check(true, "headless run launched from UI and finished with result");
+  await page.getByText("Ejecución completada").waitFor({ timeout: 10000 });
+  check(true, "finished run triggers a notification toast");
+  await page.getByRole("tab", { name: "Cambios" }).click();
+  await page.locator("main").getByText("created-by-claude.txt").waitFor({ timeout: 10000 });
+  await page.locator("main").getByText("+hello from claude").waitFor();
+  check(await page.locator("main").getByText("+2", { exact: true }).isVisible(), "diff summary counts lines of new files");
+  check(true, "run diff tab shows files created by Claude");
+  await shot("03b-run-diff");
   await shot("03-run");
 
   // Tasks: create from template, then see it on the board.
@@ -196,6 +204,8 @@ try {
 
   await page.goto(`${base}/settings`);
   await page.getByText("9.9.9 (Fake Claude)").waitFor();
+  const appVersion = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
+  check((await page.locator("aside").textContent()).includes(`v${appVersion}`), `app version v${appVersion} shown`);
   check(true, "settings shows detected claude version");
   await shot("08-settings");
 

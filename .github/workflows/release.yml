@@ -1,0 +1,88 @@
+name: Release
+
+# A version is "stable" when CI passes on main. Then, if package.json carries a
+# version that has no release yet, tag it and publish a GitHub Release whose
+# notes come from CHANGELOG.md. Re-runs are idempotent.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Commit or branch to release (default: main). Older versions are not marked as latest."
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve version and target commit
+        id: t
+        env:
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          INPUT_REF: ${{ inputs.ref }}
+        run: |
+          set -euo pipefail
+          if [ -n "${RUN_SHA:-}" ]; then sha="$RUN_SHA"; else sha=$(git rev-parse --verify "${INPUT_REF:-origin/main}^{commit}"); fi
+          version=$(git show "$sha:package.json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).version))')
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "invalid version: $version"; exit 1; }
+          {
+            echo "sha=$sha"
+            echo "version=$version"
+            echo "tag=v$version"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check whether it is already released
+        id: exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.t.outputs.tag }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists, nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build release notes from CHANGELOG.md
+        if: steps.exists.outputs.skip != 'true'
+        env:
+          VERSION: ${{ steps.t.outputs.version }}
+        run: |
+          set -euo pipefail
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then echo "Versión $VERSION." > notes.md; fi
+          cat notes.md
+
+      - name: Create tag and release
+        if: steps.exists.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.t.outputs.tag }}
+          SHA: ${{ steps.t.outputs.sha }}
+          LATEST: ${{ github.event_name == 'workflow_run' }}
+        run: |
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$SHA" \
+            --title "Agentic Console $TAG" --notes-file notes.md --latest="$LATEST"
