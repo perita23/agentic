@@ -114,5 +114,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.release.outputs.tag }}
         run: |
+          set -euo pipefail
           cd desktop/dist
+          # Stable names so .../releases/latest/download/Agentic-<arch>.dmg always
+          # points at the newest build (used by the download page).
+          arm=$(ls *.dmg | grep arm64 | head -n1)
+          x64=$(ls *.dmg | grep -v arm64 | head -n1)
+          cp "$arm" Agentic-arm64.dmg
+          cp "$x64" Agentic-x64.dmg
           gh release upload "$TAG" *.dmg *.zip latest-mac.yml --repo "$GITHUB_REPOSITORY" --clobber
