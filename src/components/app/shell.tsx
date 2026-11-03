@@ -10,6 +10,8 @@ import {
   FileStackIcon,
   FolderGit2Icon,
   KanbanSquareIcon,
+  MessageCircleIcon,
+  PlugIcon,
   LayoutDashboardIcon,
   MessagesSquareIcon,
   PlusIcon,
@@ -35,6 +37,8 @@ const NAV = [
   { href: "/agents", label: "Agentes", icon: BotIcon },
   { href: "/projects", label: "Proyectos", icon: FolderGit2Icon },
   { href: "/analytics", label: "Analítica", icon: ChartColumnIcon },
+  { href: "/messages", label: "Mensajes", icon: MessageCircleIcon },
+  { href: "/integrations", label: "Integraciones", icon: PlugIcon },
   { href: "/settings", label: "Ajustes", icon: SettingsIcon },
 ];
 

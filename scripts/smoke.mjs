@@ -45,9 +45,39 @@ const lines = [
 fs.writeFileSync(path.join(claudeHome, "projects", enc, `${sid}.jsonl`), lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
 fs.writeFileSync(path.join(claudeHome, "sessions", `${process.pid}.json`), JSON.stringify({ pid: process.pid, sessionId: sid, cwd: project, status: "busy", name: "demo-app", entrypoint: "cli", startedAt: Date.now(), updatedAt: Date.now() }));
 
+
+// Minimal Slack Web API stand-in so integrations can be exercised end to end.
+const slackPosted = [];
+const slack = http.createServer((req, res) => {
+  const url = new URL(req.url, "http://x");
+  const send = (o) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify(o));
+  };
+  if (req.headers.authorization !== "Bearer xoxb-smoke-token") return send({ ok: false, error: "invalid_auth" });
+  let body = "";
+  req.on("data", (d) => (body += d));
+  req.on("end", () => {
+    const routes = {
+      "/auth.test": () => ({ ok: true, user: "agentic", team: "Smoke" }),
+      "/users.list": () => ({ ok: true, members: [{ id: "U01ANA", name: "ana", profile: { display_name: "Ana" } }] }),
+      "/conversations.list": () => ({ ok: true, channels: [{ id: "C01DEV", name: "dev", is_private: false, is_member: true, topic: { value: "Equipo" } }] }),
+      "/conversations.history": () => ({ ok: true, messages: [{ ts: "1700000000.000100", user: "U01ANA", text: "¿Alguien revisa la PR <@U01ANA>?", reply_count: 0 }] }),
+      "/conversations.replies": () => ({ ok: true, messages: [{ ts: url.searchParams.get("ts"), user: "U01ANA", text: "¿Alguien revisa la PR?" }] }),
+      "/chat.postMessage": () => {
+        slackPosted.push(JSON.parse(body));
+        return { ok: true, ts: "1700000001.000100" };
+      },
+    };
+    send((routes[url.pathname] ?? (() => ({ ok: false, error: "unknown_method" })))());
+  });
+});
+await new Promise((r) => slack.listen(0, "127.0.0.1", r));
+const slackUrl = `http://127.0.0.1:${slack.address().port}/`;
+
 const port = 4400 + Math.floor(Math.random() * 500);
 const base = `http://127.0.0.1:${port}`;
-const env = { ...process.env, AGENTIC_HOME: dataDir, CLAUDE_HOME: claudeHome, CLAUDE_BIN: path.join(root, "test/fixtures/fake-claude.mjs"), PORT: String(port), HOST: "127.0.0.1" };
+const env = { ...process.env, AGENTIC_HOME: dataDir, CLAUDE_HOME: claudeHome, CLAUDE_BIN: path.join(root, "test/fixtures/fake-claude.mjs"), PORT: String(port), HOST: "127.0.0.1", AGENTIC_ALLOW_INSECURE_INTEGRATIONS: "1", AGENTIC_SLACK_API_URL: slackUrl };
 const server = spawn(process.execPath, [path.join(root, "scripts/agentic.mjs"), "start"], { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] });
 let out = "";
 server.stdout.on("data", (d) => (out += d));
@@ -61,6 +91,15 @@ const check = (cond, msg) => {
     failures.push(msg);
   }
 };
+
+
+async function waitUntil(fn, ms = 10000) {
+  const t = Date.now();
+  while (!fn()) {
+    if (Date.now() - t > ms) throw new Error("waitUntil timeout");
+    await new Promise((r) => setTimeout(r, 100));
+  }
+}
 
 async function waitUp() {
   for (let i = 0; i < 100; i++) {
@@ -239,6 +278,25 @@ try {
   await page.locator("main table").waitFor();
   check(true, "analytics: table view available");
 
+  // Integrations: connect Slack through the UI, then read and reply from Mensajes.
+  await page.goto(`${base}/integrations`);
+  await page.locator("main").getByRole("button", { name: "Conectar" }).first().click();
+  await page.getByLabel("Bot token").fill("xoxb-smoke-token");
+  await page.getByRole("button", { name: "Guardar y probar" }).click();
+  await page.getByText("agentic @ Smoke").waitFor();
+  const integrations = await (await fetch(base + "/api/integrations", { headers: { authorization: `Bearer ${token}` } })).text();
+  check(!integrations.includes("xoxb-smoke-token"), "integration secrets are never returned by the API");
+  await page.goto(`${base}/messages`);
+  await page.getByText("¿Alguien revisa la PR @Ana?").waitFor();
+  check(true, "Slack channel history renders with resolved mentions");
+  await page.getByText("¿Alguien revisa la PR @Ana?").hover();
+  await page.getByText("Responder en hilo").click();
+  await page.getByPlaceholder("Responder en el hilo…").fill("Yo la reviso");
+  await page.keyboard.press("Enter");
+  await waitUntil(() => slackPosted.length === 1);
+  check(slackPosted[0]?.text === "Yo la reviso" && slackPosted[0]?.thread_ts === "1700000000.000100", "reply in a Slack thread from the app");
+  await shot("11-messages");
+
   await page.goto(`${base}/settings`);
   await page.getByText("9.9.9 (Fake Claude)").waitFor();
   const appVersion = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
@@ -288,6 +346,7 @@ try {
 } finally {
   await browser?.close();
   server.kill("SIGTERM");
+  slack.close();
   fs.rmSync(tmp, { recursive: true, force: true });
 }
 console.log(failures.length ? `\n${failures.length} check(s) failed` : "\nAll smoke checks passed");

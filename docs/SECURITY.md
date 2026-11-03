@@ -22,6 +22,9 @@ hablar con `127.0.0.1`. Este documento resume el modelo de amenazas y las defens
 | Mass assignment | Esquemas zod `.strict()` en actualizaciones; `id`, `createdAt`, … no se pueden sobrescribir | `tasks.test.ts` |
 | DoS / agotamiento de recursos | Cuerpo de petición ≤ 1 MB; logs por ejecución con tope; máximo de ejecuciones simultáneas; historial acotado (500 runs, 5000 tareas); lectura de transcripciones en streaming; ficheros leídos con tamaño máximo | `runs.test.ts`, `api.test.ts` |
 | Ejecución autónoma descontrolada (cola) | Una ejecución cada vez, límite de tareas por tanda (≤50), presupuesto por tarea opcional, parada en el primer fallo por defecto, nunca se reanuda sola tras reiniciar; el modo `bypassPermissions` no se ofrece para la cola | `queue.test.ts` |
+| **Credenciales de integraciones** (Slack, GitHub, Bitbucket, Jira) | Sólo en `~/.agentic/integrations.json` (0600); la API devuelve pistas enmascaradas, nunca el secreto; editar sin reescribir el secreto lo conserva | `integrations-slack.test.ts`, smoke |
+| **SSRF / fuga de tokens** en llamadas salientes | https obligatorio, sin credenciales en URL, las rutas no pueden salir del origen configurado, redirecciones sólo del mismo origen (máx. 3, nunca en escrituras), timeout 10 s, respuesta ≤ 5 MB | `integrations-slack.test.ts` |
+| Inyección en mensajes de Slack | El texto de usuario que Agentic publica escapa `& < >` (sin `@channel` ni enlaces forjados); IDs de canal y `ts` validados por regex; los mensajes recibidos se pintan como texto | `integrations-slack.test.ts` |
 | Corrupción de datos | Escrituras atómicas (tmp + fsync + rename); ficheros corruptos se respaldan y no rompen la app | `store.test.ts` |
 | Fugas de información en errores | Errores 500 genéricos; detalles sólo en el log del servidor | — |
 
