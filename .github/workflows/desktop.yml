@@ -1,0 +1,56 @@
+name: Desktop
+
+on:
+  pull_request:
+    paths:
+      - "desktop/**"
+      - "next.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - "src/proxy.ts"
+      - "src/lib/server/auth.ts"
+      - ".github/workflows/desktop.yml"
+      - ".github/actions/build-desktop/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and launch the macOS app
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/build-desktop
+      - name: Launch the packaged app and probe its server
+        shell: bash
+        run: |
+          APP=$(ls -d desktop/dist/mac-arm64/*.app 2>/dev/null || ls -d desktop/dist/mac/*.app)
+          codesign --verify --deep --strict "$APP"
+          export AGENTIC_HOME="$RUNNER_TEMP/agentic-home"
+          "$APP/Contents/MacOS/Agentic" > "$RUNNER_TEMP/app.log" 2>&1 &
+          PID=$!
+          for i in $(seq 1 60); do
+            if curl -fsS -o /dev/null "http://127.0.0.1:4317/login"; then echo "server up"; break; fi
+            sleep 1
+          done
+          curl -fsS "http://127.0.0.1:4317/login" -o /dev/null
+          test -f "$AGENTIC_HOME/auth.json" && grep -q '"userAgent": "Agentic Desktop"' "$AGENTIC_HOME/auth.json"
+          kill $PID || true
+          cat "$RUNNER_TEMP/app.log" | tail -20
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agentic-macos
+          path: |
+            desktop/dist/*.dmg
+            desktop/dist/*.zip
+            desktop/dist/latest-mac.yml
+          retention-days: 7

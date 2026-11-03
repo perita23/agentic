@@ -151,11 +151,11 @@ export function removePasskey(dataDir: string, id: string) {
 export function setRequirePasskey(dataDir: string, on: boolean, current: StoredSession | null) {
   const st = readAuth(dataDir);
   if (on && !st.passkeys.length) throw new HttpError(400, "Registra una passkey antes de exigirla");
-  if (on && current?.method !== "passkey") throw new HttpError(409, "Inicia sesión con Touch ID al menos una vez antes de exigirlo");
+  if (on && current?.method !== "passkey" && current?.method !== "desktop") throw new HttpError(409, "Inicia sesión con Touch ID al menos una vez antes de exigirlo");
   updateAuth(dataDir, (s) => {
     s.requirePasskey = on;
     // Turning it on ends every session that was opened with the plain token.
-    if (on) s.sessions = s.sessions.filter((x) => x.method === "passkey");
+    if (on) s.sessions = s.sessions.filter((x) => x.method !== "token");
   });
   audit(dataDir, "auth.requirePasskey", { on });
 }

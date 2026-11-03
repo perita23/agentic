@@ -1,0 +1,19 @@
+{
+  "name": "agentic-desktop",
+  "private": true,
+  "version": "0.10.0",
+  "description": "Agentic Console para macOS",
+  "main": "main.cjs",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^45.2.1",
+    "electron-builder": "^26.18.0"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --mac --config electron-builder.config.cjs --publish never"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  }
+}

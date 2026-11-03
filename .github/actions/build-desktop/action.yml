@@ -1,0 +1,39 @@
+name: Build macOS app
+description: Build the Next.js standalone server and package the Electron app (dmg + zip + latest-mac.yml).
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+        cache-dependency-path: |
+          package-lock.json
+          desktop/package-lock.json
+    - name: Install web app dependencies
+      shell: bash
+      run: npm ci
+    - name: Build standalone server
+      shell: bash
+      env:
+        NEXT_TELEMETRY_DISABLED: "1"
+      run: npm run desktop:prepare
+    - name: Install desktop dependencies
+      shell: bash
+      working-directory: desktop
+      run: npm ci
+    - name: Package app
+      shell: bash
+      working-directory: desktop
+      env:
+        # Ad-hoc signed unless a Developer ID is provided as repository secrets.
+        CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      run: npm run dist
+    - name: Check artifacts
+      shell: bash
+      working-directory: desktop/dist
+      run: |
+        ls -la
+        test -f latest-mac.yml
+        ls *.dmg *.zip
+        grep -q "arm64-mac.zip" latest-mac.yml

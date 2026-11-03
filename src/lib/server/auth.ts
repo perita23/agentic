@@ -28,7 +28,8 @@ export interface StoredSession {
   createdAt: string;
   lastSeenAt: string;
   expiresAt: string;
-  method: "token" | "passkey";
+  /** desktop = opened by the macOS app after a native Touch ID check. */
+  method: "token" | "passkey" | "desktop";
   userAgent: string;
 }
 

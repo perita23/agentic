@@ -23,7 +23,7 @@ interface Passkey {
 }
 interface Session {
   id: string;
-  method: "token" | "passkey";
+  method: "token" | "passkey" | "desktop";
   createdAt: string;
   lastSeenAt: string;
   userAgent: string;
@@ -168,7 +168,7 @@ export function SecuritySettings() {
                 <div className="flex items-center gap-2 font-medium">
                   {browserName(s.userAgent)}
                   {s.current && <Badge variant="green">esta</Badge>}
-                  <Badge>{s.method === "passkey" ? "Touch ID" : "token"}</Badge>
+                  <Badge>{s.method === "token" ? "token" : "Touch ID"}</Badge>
                 </div>
                 <div className="text-xs text-muted-foreground">
                   iniciada {timeAgo(s.createdAt)} · activa {timeAgo(s.lastSeenAt)}
