@@ -1,6 +1,8 @@
 import { AgentManager } from "./agents";
 import { getConfig, type Config } from "./config";
+import { queueMessage, runMessage } from "./integrations/messages";
 import { ProjectService } from "./projects";
+import { IntegrationService } from "./integrations/service";
 import { TaskQueue } from "./queue";
 import { RunManager } from "./runs";
 import { loadOrCreateToken } from "./security";
@@ -18,6 +20,7 @@ export interface Context {
   runs: RunManager;
   projects: ProjectService;
   queue: TaskQueue;
+  integrations: IntegrationService;
 }
 
 const g = globalThis as unknown as { __agentic?: Context };
@@ -26,6 +29,7 @@ export function createContext(config: Config): Context {
   const store = new JsonStore(config.dataDir);
   const sessions = new SessionIndex(config.claudeHome);
   const tasks = new TaskService(store);
+  const integrations = new IntegrationService(store, tasks);
   const runs = new RunManager(store, {
     dataDir: config.dataDir,
     claudeBin: config.claudeBin,
@@ -35,9 +39,13 @@ export function createContext(config: Config): Context {
       if (run.taskId) tasks.onRunFinished(run.taskId, run.status === "completed");
       // Late-bound: the queue is created right after the run manager.
       void queue.onRunFinished(run).catch((e) => console.error("[agentic] queue error", e));
+      void integrations.notify("runFinished", runMessage(run), run.status !== "completed");
     },
   });
-  const queue: TaskQueue = new TaskQueue(store, tasks, runs);
+  const queue: TaskQueue = new TaskQueue(store, tasks, runs, (st) => {
+    const ok = st.processed.filter((p) => p.status === "completed").length;
+    void integrations.notify("queueFinished", queueMessage(st), ok < st.processed.length);
+  });
   return {
     config,
     token: loadOrCreateToken(config.dataDir),
@@ -48,6 +56,7 @@ export function createContext(config: Config): Context {
     runs,
     projects: new ProjectService(store, sessions),
     queue,
+    integrations,
   };
 }
 

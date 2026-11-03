@@ -39,6 +39,7 @@ export class TaskQueue {
     private store: JsonStore,
     private tasks: TaskService,
     private runs: RunManager,
+    private onStopped?: (state: QueueState) => void,
   ) {
     this.store.update<QueueState>(Q, idle(), (s) => {
       if (s.running) {
@@ -78,12 +79,15 @@ export class TaskQueue {
 
   stop(reason = "Detenida por el usuario"): QueueState {
     // The current run keeps going; we simply don't start another one.
-    return this.save((s) => {
+    const wasRunning = this.state().running;
+    const st = this.save((s) => {
       if (!s.running) return;
       s.running = false;
       s.finishedAt = nowIso();
       s.stopReason = reason;
     });
+    if (wasRunning) this.onStopped?.(st);
+    return st;
   }
 
   /** Called by the run manager whenever any run finishes. */

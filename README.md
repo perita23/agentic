@@ -12,6 +12,7 @@ Consola **web local** para gestionar Claude Code en tu máquina, con estética o
 - **Plantillas** — plantillas con variables `{{var}}` para crear tareas y prompts (bug, feature, review, tests, refactor, auditoría…).
 - **Proyectos** — detectados desde tus sesiones o registrados a mano; ficha con git (rama, commits, cambios), `CLAUDE.md`, scripts, stack, sesiones, tareas y agentes.
 - **Analítica** — tokens por día, proyecto, modelo y herramienta a partir de tus transcripciones locales.
+- **Integraciones** — Slack (leer y responder canales e hilos, avisos), y conexión con GitHub, Bitbucket y Jira (ver [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md)).
 - **Paleta de comandos** `Ctrl/⌘ K`, atajo `N` para nueva sesión.
 
 Todo corre en tu ordenador: el servidor sólo escucha en `127.0.0.1` y los datos se guardan en `~/.agentic/`.

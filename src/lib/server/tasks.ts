@@ -48,6 +48,8 @@ export type Task = z.infer<typeof taskCreateSchema> & {
   order: number;
   runIds: string[];
   templateId?: string | null;
+  /** Link to the GitHub / Jira / Bitbucket item this task was imported from (server-managed). */
+  external?: { provider: string; id: string; key: string; url: string } | null;
   createdAt: string;
   updatedAt: string;
   checklist: { id: string; text: string; done: boolean }[];
