@@ -23,8 +23,9 @@ const execFileP = promisify(execFile);
  * for Jira/Bitbucket, a secret). They are stored locally (0600) or read from
  * AGENTIC_<PROVIDER>_CLIENT_ID / _CLIENT_SECRET, and never sent to the browser.
  */
-export type OAuthProvider = "github" | "jira" | "bitbucket";
-const APP_PROVIDERS = ["github", "jira", "bitbucket"] as const;
+export type OAuthProvider = "github" | "jira" | "bitbucket" | "slack";
+const APP_PROVIDERS = ["github", "jira", "bitbucket", "slack"] as const;
+type BrowserProvider = "jira" | "bitbucket" | "slack";
 
 export interface Endpoints {
   githubWeb: string; // https://github.com
@@ -33,6 +34,7 @@ export interface Endpoints {
   atlassianApi: string; // https://api.atlassian.com
   bitbucketWeb: string; // https://bitbucket.org
   bitbucketApi: string; // https://api.bitbucket.org/2.0
+  slackWeb: string; // https://slack.com
 }
 
 const DEFAULT_ENDPOINTS: Endpoints = {
@@ -42,7 +44,21 @@ const DEFAULT_ENDPOINTS: Endpoints = {
   atlassianApi: "https://api.atlassian.com",
   bitbucketWeb: "https://bitbucket.org",
   bitbucketApi: "https://api.bitbucket.org/2.0",
+  slackWeb: "https://slack.com",
 };
+
+/**
+ * Public HTTPS page (GitHub Pages) that forwards the provider's redirect to
+ * http://localhost:<port>/… on this machine. One fixed redirect URL works for
+ * every provider (Slack requires HTTPS) and every port. "" disables it and
+ * falls back to the loopback URL.
+ */
+export const DEFAULT_RELAY = "https://perita23.github.io/agentic-releases/oauth/";
+export function relayUrl() {
+  const v = process.env.AGENTIC_OAUTH_RELAY;
+  return v === undefined ? DEFAULT_RELAY : v;
+}
+const SLACK_USER_SCOPES = "channels:read,channels:history,groups:read,groups:history,im:read,im:history,mpim:read,mpim:history,users:read,chat:write";
 
 export const CALLBACK_PATH = "/api/integrations/oauth/callback";
 const GITHUB_SCOPES = "repo read:org read:user";
@@ -60,7 +76,7 @@ const appSchema = z
   .strict();
 
 interface PendingFlow {
-  provider: "jira" | "bitbucket";
+  provider: BrowserProvider;
   redirectUri: string;
   createdAt: number;
 }
@@ -103,12 +119,15 @@ export class OAuthService {
 
   // ---------- OAuth apps (client credentials) ----------
 
+  /** Apps configured in Ajustes win; otherwise the ones shipped with the build (env). */
   private apps(): Apps {
     const stored = this.store.read<Apps>(F, {});
-    const out: Apps = { ...stored };
+    const out: Apps = {};
     for (const p of APP_PROVIDERS) {
       const id = process.env[`AGENTIC_${p.toUpperCase()}_CLIENT_ID`];
-      if (id) out[p] = { clientId: id, clientSecret: process.env[`AGENTIC_${p.toUpperCase()}_CLIENT_SECRET`] };
+      const builtIn = id ? { clientId: id, clientSecret: process.env[`AGENTIC_${p.toUpperCase()}_CLIENT_SECRET`] } : undefined;
+      const a = stored[p]?.clientId ? stored[p] : builtIn;
+      if (a) out[p] = a;
     }
     return out;
   }
@@ -122,7 +141,10 @@ export class OAuthService {
   /** What the UI may know: which apps are configured and the Client ID (never the secret). */
   appsStatus() {
     const a = this.apps();
-    return Object.fromEntries(APP_PROVIDERS.map((p) => [p, { configured: !!a[p]?.clientId && (p === "github" || !!a[p]?.clientSecret), clientId: a[p]?.clientId ?? null }]));
+    const stored = this.store.read<Apps>(F, {});
+    return Object.fromEntries(
+      APP_PROVIDERS.map((p) => [p, { configured: !!a[p]?.clientId && (p === "github" || !!a[p]?.clientSecret), clientId: a[p]?.clientId ?? null, builtIn: !!a[p] && !stored[p]?.clientId }]),
+    );
   }
 
   setApp(provider: string, body: unknown) {
@@ -234,22 +256,33 @@ export class OAuthService {
   // ---------- Jira / Bitbucket: authorization code with loopback redirect ----------
 
   /** Begin a browser login; `origin` is this server as the browser reaches it (http://localhost:PORT). */
+  /** Where providers send the browser back: the HTTPS relay, or this server directly. */
+  redirectUri(origin: string) {
+    return relayUrl() || `${origin}${CALLBACK_PATH}`;
+  }
+
   start(provider: string, origin: string): { url: string } {
-    const p = provider === "jira" || provider === "bitbucket" ? provider : null;
+    const p = provider === "jira" || provider === "bitbucket" || provider === "slack" ? provider : null;
     if (!p) throw new HttpError(400, "Este proveedor no usa este flujo");
     const { clientId } = this.app(p);
-    const redirectUri = `${origin}${CALLBACK_PATH}`;
-    const state = crypto.randomBytes(32).toString("base64url");
+    const redirectUri = this.redirectUri(origin);
+    // The relay reads the local port from the state's prefix; the random part is the secret.
+    const port = new URL(origin).port || "80";
+    const state = `${port}.${crypto.randomBytes(32).toString("base64url")}`;
     this.gc();
     this.flows.set(state, { provider: p, redirectUri, createdAt: Date.now() });
     const url =
       p === "jira"
         ? new URL(`${this.ep.atlassianAuth}/authorize`)
-        : new URL(`${this.ep.bitbucketWeb}/site/oauth2/authorize`);
-    const q =
+        : p === "slack"
+          ? new URL(`${this.ep.slackWeb}/oauth/v2/authorize`)
+          : new URL(`${this.ep.bitbucketWeb}/site/oauth2/authorize`);
+    const q: Record<string, string> =
       p === "jira"
         ? { audience: "api.atlassian.com", client_id: clientId, scope: JIRA_SCOPES, redirect_uri: redirectUri, state, response_type: "code", prompt: "consent" }
-        : { client_id: clientId, response_type: "code", state };
+        : p === "slack"
+          ? { client_id: clientId, user_scope: SLACK_USER_SCOPES, redirect_uri: redirectUri, state }
+          : { client_id: clientId, response_type: "code", state };
     for (const [k, v] of Object.entries(q)) url.searchParams.set(k, v);
     return { url: url.toString() };
   }
@@ -267,6 +300,7 @@ export class OAuthService {
     this.flows.delete(state);
     if (error) throw new HttpError(400, error === "access_denied" ? "Has cancelado la autorización." : `El proveedor devolvió: ${error.slice(0, 100)}`);
     if (!code || code.length > 2000) throw new HttpError(400, "Falta el código de autorización");
+    if (flow.provider === "slack") return this.slackCallback(code, flow.redirectUri);
     const t = await this.exchange(flow.provider, { grant_type: "authorization_code", code, redirect_uri: flow.redirectUri });
     if (flow.provider === "jira") {
       const sites = await request<{ id: string; url: string; name: string; scopes: string[] }[]>("Jira", new URL(this.ep.atlassianApi), "/oauth/token/accessible-resources", {
@@ -300,6 +334,26 @@ export class OAuthService {
     return { provider: "Bitbucket", account: me.display_name ?? "Bitbucket" };
   }
 
+  /** Slack: exchange for a user token (xoxp-) so Agentic sees and answers *your* conversations. */
+  private async slackCallback(code: string, redirectUri: string) {
+    const { clientId, clientSecret } = this.app("slack");
+    const r = await request<{ ok: boolean; error?: string; authed_user?: { access_token?: string }; team?: { name?: string } }>("Slack", new URL(this.ep.slackWeb), "/api/oauth.v2.access", {
+      method: "POST",
+      form: { client_id: clientId, client_secret: clientSecret, code, redirect_uri: redirectUri },
+    });
+    const token = r?.authed_user?.access_token;
+    if (!r?.ok || !token || !/^xoxp-[\w-]+$/.test(token)) throw new HttpError(502, `Slack: ${r?.error ?? "no se obtuvo el token"}`);
+    const prev = this.integrations.connection("slack");
+    this.integrations.saveConnection("slack", {
+      botToken: token,
+      source: "oauth",
+      webhookUrl: prev?.webhookUrl ?? "",
+      notifyChannel: prev?.notifyChannel ?? "",
+      events: prev?.events ?? { runFinished: true, queueFinished: true, onlyFailures: false },
+    });
+    return { provider: "Slack", account: r.team?.name ?? "Slack" };
+  }
+
   private async exchange(p: "jira" | "bitbucket", params: Record<string, string>): Promise<Required<Pick<TokenResponse, "access_token">> & TokenResponse> {
     const { clientId, clientSecret } = this.app(p);
     const t =
@@ -330,7 +384,7 @@ export class OAuthService {
   }
 }
 
-const LABEL: Record<OAuthProvider, string> = { github: "GitHub", jira: "Jira", bitbucket: "Bitbucket" };
+const LABEL: Record<OAuthProvider, string> = { github: "GitHub", jira: "Jira", bitbucket: "Bitbucket", slack: "Slack" };
 
 function appProvider(p: string): OAuthProvider {
   if (!(APP_PROVIDERS as readonly string[]).includes(p)) throw new HttpError(404, "Proveedor sin OAuth");
@@ -343,6 +397,7 @@ export function slackManifestUrl() {
     display_information: { name: "Agentic", description: "Consola local para Claude Code", background_color: "#0a0a0a" },
     features: { bot_user: { display_name: "Agentic", always_online: false } },
     oauth_config: {
+      redirect_urls: [relayUrl() || "http://localhost:4317/api/integrations/oauth/callback"],
       scopes: {
         bot: ["channels:read", "channels:history", "groups:read", "groups:history", "im:read", "im:history", "mpim:read", "mpim:history", "users:read", "chat:write"],
         // A user token (xoxp-) is what lets Agentic read and answer *your* direct messages.

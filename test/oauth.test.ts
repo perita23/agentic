@@ -55,6 +55,12 @@ beforeAll(async () => {
         if (form.get("grant_type") === "authorization_code" && form.get("code") === "bb-code") return json({ access_token: "bb-access", refresh_token: "bb-refresh", expires_in: 7200 });
         return json({ error: "invalid_grant" }, 400);
       }
+      // Slack
+      if (p === "/api/oauth.v2.access") {
+        if (form.get("client_id") !== "slack-client" || form.get("client_secret") !== "slack-secret") return json({ ok: false, error: "invalid_client" });
+        if (form.get("code") !== "slack-code" || form.get("redirect_uri") !== "https://relay.test/oauth/") return json({ ok: false, error: "invalid_code" });
+        return json({ ok: true, authed_user: { id: "U1", access_token: "xoxp-user-token-123" }, access_token: "xoxb-not-used", team: { name: "Acme" } });
+      }
       if (p === "/2.0/user") return req.headers.authorization === "Bearer bb-access" ? json({ display_name: "Ana BB" }) : json({}, 401);
       json({ error: "not found" }, 404);
     });
@@ -63,16 +69,18 @@ beforeAll(async () => {
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   process.env.AGENTIC_ALLOW_INSECURE_INTEGRATIONS = "1";
   process.env.AGENTIC_ATLASSIAN_API_URL = base;
+  process.env.AGENTIC_OAUTH_RELAY = ""; // loopback redirect unless a test opts into the relay
 });
 afterAll(() => {
   server.close();
   delete process.env.AGENTIC_ALLOW_INSECURE_INTEGRATIONS;
   delete process.env.AGENTIC_ATLASSIAN_API_URL;
+  delete process.env.AGENTIC_OAUTH_RELAY;
 });
 
 function setup(opts: { ghPaths?: string[] } = {}) {
   const c = createContext({ dataDir: tmpDir(), claudeHome: tmpDir(), claudeBin: FAKE_CLAUDE, maxConcurrentRuns: 2, maxLogBytes: 1e6 });
-  const endpoints = { githubWeb: base, githubApi: base, atlassianAuth: base, atlassianApi: base, bitbucketWeb: base, bitbucketApi: `${base}/2.0` };
+  const endpoints = { slackWeb: base, githubWeb: base, githubApi: base, atlassianAuth: base, atlassianApi: base, bitbucketWeb: base, bitbucketApi: `${base}/2.0` };
   const oauth = new OAuthService(c.store, c.integrations, { endpoints, ghPaths: opts.ghPaths ?? ["/nonexistent/gh"], pollScale: 1 });
   return { c, oauth };
 }
@@ -127,7 +135,7 @@ describe("Jira (Atlassian 3LO)", () => {
     expect(u.searchParams.get("redirect_uri")).toBe("http://localhost:4317/api/integrations/oauth/callback");
     expect(u.searchParams.get("scope")).toContain("offline_access");
     const state = u.searchParams.get("state")!;
-    expect(state.length).toBeGreaterThanOrEqual(43);
+    expect(state).toMatch(/^4317\.[\w-]{43,}$/);
 
     expect(await oauth.callback(state, "jira-code", null)).toEqual({ provider: "Jira", account: "Acme" });
     // The state is single-use.
@@ -169,5 +177,41 @@ describe("Bitbucket", () => {
     expect(await oauth.callback(u.searchParams.get("state"), "bb-code", null)).toEqual({ provider: "Bitbucket", account: "Ana BB" });
     expect(c.integrations.status().bitbucket).toMatchObject({ configured: true, auth: "oauth" });
     expect((await c.integrations.test("bitbucket")).account).toBe("Ana BB");
+  });
+});
+
+describe("Slack and the HTTPS relay", () => {
+  it("connects Slack with a user token through the relay redirect", async () => {
+    process.env.AGENTIC_OAUTH_RELAY = "https://relay.test/oauth/";
+    try {
+      const { c, oauth } = setup();
+      oauth.setApp("slack", { clientId: "slack-client", clientSecret: "slack-secret" });
+      expect(oauth.redirectUri("http://localhost:4317")).toBe("https://relay.test/oauth/");
+      const u = new URL(oauth.start("slack", "http://localhost:4317").url);
+      expect(u.pathname).toBe("/oauth/v2/authorize");
+      expect(u.searchParams.get("redirect_uri")).toBe("https://relay.test/oauth/");
+      expect(u.searchParams.get("user_scope")).toContain("im:history");
+      expect(u.searchParams.get("state")).toMatch(/^4317\./);
+      expect(await oauth.callback(u.searchParams.get("state"), "slack-code", null)).toEqual({ provider: "Slack", account: "Acme" });
+      expect(c.integrations.connection("slack")?.botToken).toBe("xoxp-user-token-123");
+      expect(c.integrations.status().slack).toMatchObject({ configured: true });
+    } finally {
+      process.env.AGENTIC_OAUTH_RELAY = "";
+    }
+  });
+
+  it("uses apps shipped with the build unless one is configured in the app", () => {
+    process.env.AGENTIC_SLACK_CLIENT_ID = "built-in-id";
+    process.env.AGENTIC_SLACK_CLIENT_SECRET = "built-in-secret";
+    try {
+      const { oauth } = setup();
+      expect(oauth.appsStatus().slack).toEqual({ configured: true, clientId: "built-in-id", builtIn: true });
+      expect(JSON.stringify(oauth.appsStatus())).not.toContain("built-in-secret");
+      oauth.setApp("slack", { clientId: "mine", clientSecret: "my-secret" });
+      expect(oauth.appsStatus().slack).toEqual({ configured: true, clientId: "mine", builtIn: false });
+    } finally {
+      delete process.env.AGENTIC_SLACK_CLIENT_ID;
+      delete process.env.AGENTIC_SLACK_CLIENT_SECRET;
+    }
   });
 });

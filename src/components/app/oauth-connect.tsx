@@ -10,9 +10,9 @@ import { Label } from "@/components/ui/label";
 import { api, refresh, useApi } from "@/lib/api";
 import { errorMessage } from "./common";
 
-type OAuthProvider = "github" | "jira" | "bitbucket";
+type OAuthProvider = "github" | "jira" | "bitbucket" | "slack";
 export interface OAuthInfo {
-  apps: Record<OAuthProvider, { configured: boolean; clientId: string | null }>;
+  apps: Record<OAuthProvider, { configured: boolean; clientId: string | null; builtIn?: boolean }>;
   callbackUrl: string;
   slackManifestUrl: string;
 }
@@ -25,7 +25,7 @@ interface DeviceFlow {
   error?: string;
 }
 
-const NAME: Record<OAuthProvider, string> = { github: "GitHub", jira: "Jira", bitbucket: "Bitbucket" };
+const NAME: Record<OAuthProvider, string> = { github: "GitHub", jira: "Jira", bitbucket: "Bitbucket", slack: "Slack" };
 
 function openExternal(url: string) {
   // In the macOS app this opens the default browser (the window never navigates away).
@@ -70,6 +70,13 @@ function AppDialog({ provider, info, onClose, onSaved }: { provider: OAuthProvid
           Authorization → Callback URL: <code>{cb}</code> <Copy value={cb} />
         </>,
         <>Settings → copia <b>Client ID</b> y <b>Secret</b> aquí.</>,
+      ],
+    },
+    slack: {
+      url: info.slackManifestUrl,
+      items: [
+        <>Elige tu workspace y pulsa <b>Create</b>: la app se crea con los permisos y la URL de vuelta correctos.</>,
+        <>En <b>Basic Information → App Credentials</b> copia el <b>Client ID</b> y el <b>Client Secret</b> aquí.</>,
       ],
     },
     bitbucket: {
@@ -217,7 +224,7 @@ function DeviceDialog({ flow: initial, onClose }: { flow: DeviceFlow; onClose: (
 }
 
 /** The "Conectar" actions of one provider card (OAuth first, pasting a token as the fallback). */
-export function ConnectActions({ provider, onManual, onWaiting }: { provider: "slack" | OAuthProvider; onManual: () => void; onWaiting: (on: boolean) => void }) {
+export function ConnectActions({ provider, onManual, onWaiting }: { provider: OAuthProvider; onManual: () => void; onWaiting: (on: boolean) => void }) {
   const { data: info } = useApi<OAuthInfo>("/api/integrations/oauth");
   const [appFor, setAppFor] = React.useState<OAuthProvider | null>(null);
   const [device, setDevice] = React.useState<DeviceFlow | null>(null);
@@ -254,19 +261,6 @@ export function ConnectActions({ provider, onManual, onWaiting }: { provider: "s
     }
   }
 
-  if (provider === "slack") {
-    return (
-      <>
-        <Button size="sm" onClick={() => info && openExternal(info.slackManifestUrl)} disabled={!info}>
-          <LogInIcon /> Crear app de Slack
-        </Button>
-        <Button size="sm" variant="outline" onClick={onManual}>
-          <KeyRoundIcon /> Pegar token
-        </Button>
-      </>
-    );
-  }
-
   const configured = info?.apps[provider]?.configured;
   return (
     <>
@@ -281,7 +275,7 @@ export function ConnectActions({ provider, onManual, onWaiting }: { provider: "s
       <Button size="sm" variant="ghost" onClick={onManual}>
         <KeyRoundIcon /> Token
       </Button>
-      {configured && (
+      {configured && !info?.apps[provider]?.builtIn && (
         <Button size="icon-sm" variant="ghost" aria-label={`App OAuth de ${NAME[provider]}`} onClick={() => setAppFor(provider)}>
           <SettingsIcon />
         </Button>

@@ -3,6 +3,16 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.14.0] - 2026-11-03
+
+### Añadido
+- **Slack con login**: «Conectar con Slack» autoriza con tu cuenta y guarda un token de usuario, así ves y respondes tus canales y mensajes directos.
+- **URL de vuelta común en HTTPS** (`https://perita23.github.io/agentic-releases/oauth/`) para todos los servicios y cualquier puerto: una página pública que sólo reenvía al Agentic de tu ordenador (`localhost`).
+- **«Conectar con GitHub» sin configurar nada** cuando la build incluye el Client ID público de Agentic (device flow, sin secreto). Guía en `docs/OAUTH-SETUP.md`.
+
+### Seguridad
+- Ningún Client Secret se incluye en la app: Slack, Jira y Bitbucket guardan los suyos sólo en tu Mac.
+
 ## [0.13.0] - 2026-11-03
 
 ### Añadido

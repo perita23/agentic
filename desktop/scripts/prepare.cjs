@@ -13,6 +13,12 @@ if (!fs.existsSync(path.join(standalone, "server.js"))) {
 // Next does not copy these into the standalone output.
 fs.cpSync(path.join(root, ".next", "static"), path.join(standalone, ".next", "static"), { recursive: true });
 if (fs.existsSync(path.join(root, "public"))) fs.cpSync(path.join(root, "public"), path.join(standalone, "public"), { recursive: true });
+// Public OAuth client ids shipped with the build. Only GitHub's device flow
+// works with an id alone; client secrets are never bundled (the app is public).
+const oauth = {};
+if (process.env.AGENTIC_GITHUB_CLIENT_ID) oauth.AGENTIC_GITHUB_CLIENT_ID = process.env.AGENTIC_GITHUB_CLIENT_ID;
+fs.writeFileSync(path.join(standalone, "oauth-apps.json"), JSON.stringify(oauth), { mode: 0o644 });
+
 // The desktop app always carries the same version as the web app.
 const rootPkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 const deskPkgFile = path.join(root, "desktop", "package.json");
