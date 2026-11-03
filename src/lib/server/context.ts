@@ -2,6 +2,7 @@ import { AgentManager } from "./agents";
 import { getConfig, type Config } from "./config";
 import { queueMessage, runMessage } from "./integrations/messages";
 import { ProjectService } from "./projects";
+import { JiraService } from "./integrations/jira";
 import { PullService } from "./integrations/pulls";
 import { IntegrationService } from "./integrations/service";
 import { TaskQueue } from "./queue";
@@ -23,6 +24,7 @@ export interface Context {
   queue: TaskQueue;
   integrations: IntegrationService;
   pulls: PullService;
+  jira: JiraService;
 }
 
 const g = globalThis as unknown as { __agentic?: Context };
@@ -59,6 +61,7 @@ export function createContext(config: Config): Context {
     runs,
     projects,
     pulls: new PullService(integrations, projects),
+    jira: new JiraService(integrations, tasks),
     queue,
     integrations,
   };
