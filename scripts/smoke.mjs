@@ -33,6 +33,7 @@ fs.writeFileSync(path.join(project, "CLAUDE.md"), "# Demo app\n\n- Usa TypeScrip
 execFileSync("git", ["init", "-q", "-b", "main"], { cwd: project });
 execFileSync("git", ["-c", "user.name=demo", "-c", "user.email=d@d", "add", "."], { cwd: project });
 execFileSync("git", ["-c", "user.name=demo", "-c", "user.email=d@d", "commit", "-qm", "Initial commit"], { cwd: project });
+execFileSync("git", ["remote", "add", "origin", "https://127.0.0.1/acme/demo.git"], { cwd: project });
 
 const enc = project.replace(/\//g, "-");
 fs.mkdirSync(path.join(claudeHome, "projects", enc), { recursive: true });
@@ -74,6 +75,40 @@ const slack = http.createServer((req, res) => {
 });
 await new Promise((r) => slack.listen(0, "127.0.0.1", r));
 const slackUrl = `http://127.0.0.1:${slack.address().port}/`;
+
+
+// Minimal GitHub REST stand-in for the pull request flow.
+const ghWrites = [];
+const PR_SHA = "0123456789abcdef0123456789abcdef01234567";
+const github = http.createServer((req, res) => {
+  let body = "";
+  req.on("data", (d) => (body += d));
+  req.on("end", () => {
+    const p = new URL(req.url, "http://x").pathname;
+    const json = (o, status = 200) => {
+      res.writeHead(status, { "content-type": "application/json" });
+      res.end(JSON.stringify(o));
+    };
+    if (req.headers.authorization !== "Bearer ghp_smoke") return json({ message: "Bad credentials" }, 401);
+    if (req.method !== "GET") ghWrites.push({ method: req.method, path: p, body: body ? JSON.parse(body) : null });
+    const pr = { number: 12, title: "Añade modo oscuro", user: { login: "ana" }, head: { ref: "feat/dark", sha: PR_SHA }, base: { ref: "main" }, updated_at: new Date().toISOString(), html_url: "https://github.com/acme/demo/pull/12", state: "open", draft: false, body: "Implementa el tema oscuro.", mergeable: true, comments: 0 };
+    const routes = {
+      "/user": () => ({ login: "smoke" }),
+      "/repos/acme/demo/pulls": () => [pr],
+      "/repos/acme/demo/pulls/12": () => pr,
+      "/repos/acme/demo/pulls/12/files": () => [{ filename: "src/theme.css", status: "modified", additions: 2, deletions: 0, patch: "@@ -1 +1,3 @@\n body {}\n+.dark { color: white }\n+.dark a {}" }],
+      "/repos/acme/demo/pulls/12/reviews": () => (req.method === "GET" ? [] : { id: 1 }),
+      "/repos/acme/demo/issues/12/comments": () => [],
+      [`/repos/acme/demo/commits/${PR_SHA}/check-runs`]: () => ({ check_runs: [{ name: "CI", status: "completed", conclusion: "success" }] }),
+      [`/repos/acme/demo/commits/${PR_SHA}/status`]: () => ({ statuses: [] }),
+      "/repos/acme/demo/pulls/12/merge": () => ({ merged: true }),
+    };
+    const fn = routes[p];
+    return fn ? json(fn()) : json({ message: "Not Found" }, 404);
+  });
+});
+await new Promise((r) => github.listen(0, "127.0.0.1", r));
+const githubUrl = `http://127.0.0.1:${github.address().port}`;
 
 const port = 4400 + Math.floor(Math.random() * 500);
 const base = `http://127.0.0.1:${port}`;
@@ -297,6 +332,27 @@ try {
   check(slackPosted[0]?.text === "Yo la reviso" && slackPosted[0]?.thread_ts === "1700000000.000100", "reply in a Slack thread from the app");
   await shot("11-messages");
 
+  // Pull requests: configure GitHub, open the PR from the inbox, approve and merge it.
+  await fetch(base + "/api/integrations/github", { method: "PUT", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ token: "ghp_smoke", apiUrl: githubUrl }) });
+  await page.goto(`${base}/pulls`);
+  await page.getByText("Añade modo oscuro").click();
+  await page.getByText("Implementa el tema oscuro.").waitFor();
+  await page.getByText("checks OK").waitFor();
+  check(true, "PR inbox and detail render (description, checks)");
+  await page.getByRole("tab", { name: /Archivos/ }).click();
+  await page.locator("main").getByText("+.dark { color: white }").waitFor();
+  await shot("12-pull-request");
+  await page.getByRole("button", { name: "Aprobar" }).click();
+  await page.getByText("PR aprobada").waitFor();
+  await page.getByRole("button", { name: "Mergear" }).click();
+  await page.getByRole("button", { name: "Confirmar merge" }).click();
+  await page.getByText("PR #12 mergeada").waitFor();
+  const writes = ghWrites.map((w) => `${w.method} ${w.path}`);
+  check(
+    writes.includes("POST /repos/acme/demo/pulls/12/reviews") && ghWrites.some((w) => w.path.endsWith("/merge") && w.body.sha === PR_SHA && w.body.merge_method === "squash"),
+    "approve and merge a PR from the app (merge pinned to the reviewed head SHA)",
+  );
+
   await page.goto(`${base}/settings`);
   await page.getByText("9.9.9 (Fake Claude)").waitFor();
   const appVersion = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
@@ -347,6 +403,7 @@ try {
   await browser?.close();
   server.kill("SIGTERM");
   slack.close();
+  github.close();
   fs.rmSync(tmp, { recursive: true, force: true });
 }
 console.log(failures.length ? `\n${failures.length} check(s) failed` : "\nAll smoke checks passed");

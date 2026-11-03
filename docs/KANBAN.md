@@ -50,8 +50,8 @@ Leyenda: ✅ hecho · 🔄 en curso · ⏳ pendiente
 |---|-------|---------|--------|
 | 40 | Framework: credenciales locales 0600 nunca expuestas, cliente HTTP seguro (https, timeout, sin redirecciones, tope de tamaño) | v0.5.0 | ✅ |
 | 41 | Slack: canales, leer historial e hilos, enviar y responder, avisos de ejecuciones/cola | v0.5.0 | ✅ |
-| 42 | Pull Requests GitHub + Bitbucket: bandeja, detalle (diff, checks, reviews, comentarios), comentar, aprobar/pedir cambios, merge, cerrar | v0.6.0 | 🔄 |
-| 43 | Jira: incidencias por JQL, detalle y comentarios, comentar, transiciones, importar como tarea | v0.7.0 | ⏳ |
+| 42 | Pull Requests GitHub + Bitbucket: bandeja, detalle (diff, checks, reviews, comentarios), comentar, aprobar/pedir cambios, merge, cerrar | v0.6.0 | ✅ |
+| 43 | Jira: incidencias por JQL, detalle y comentarios, comentar, transiciones, importar como tarea | v0.7.0 | 🔄 |
 | 44 | Confluence: buscar páginas y usarlas como contexto del prompt | backlog | ⏳ |
 
 ## ⏳ Backlog

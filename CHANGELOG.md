@@ -3,6 +3,19 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.6.0] - 2026-11-03
+
+### Añadido
+- **Pull requests de GitHub y Bitbucket** (`/pulls`): bandeja unificada con las PRs abiertas de los repositorios de tus proyectos (detectados por `git remote`), filtros por proveedor y texto.
+- **Detalle de PR**: descripción, conversación (comentarios y reviews en orden), archivos con diff y checks.
+- **Acciones**: comentar, aprobar, pedir cambios, **mergear** (squash / merge / rebase o fast-forward) y cerrar o rechazar, con confirmación.
+- **«Revisar con Claude»**: lanza una ejecución de Claude Code en el proyecto con un prompt de review de la PR.
+
+### Seguridad
+- El merge va anclado al SHA que estabas viendo: si la PR recibe commits nuevos, se rechaza en lugar de mergear código no revisado.
+- Sólo se opera sobre repositorios asociados a proyectos conocidos; owner/repo/número validados.
+- Los enlaces externos sólo se renderizan si son `http(s)`.
+
 ## [0.5.0] - 2026-11-03
 
 ### Añadido
