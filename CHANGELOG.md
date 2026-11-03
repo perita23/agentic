@@ -3,6 +3,17 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.10.2] - 2026-11-03
+
+### Corregido
+- App de macOS: los botones de la ventana (cerrar/minimizar/ampliar) ya no se solapan con el logo; las barras superiores sirven para arrastrar la ventana (y el hueco desaparece a pantalla completa).
+- App de macOS: Touch ID se pide en una **ventana pequeña de desbloqueo** con «Reintentar» y «Salir» si falla, en lugar de cerrar la app; el servidor arranca mientras tanto.
+- «Añadir Touch ID» se quedaba en «Esperando a Touch ID…» dentro de la app (WebAuthn no está disponible en la ventana de Electron). En la app, Touch ID es nativo y ya no se ofrece registrar passkeys allí; en el navegador, el registro se cancela solo a los 90 s.
+- «Exigir Touch ID» se puede activar desde la app de Mac aunque no haya passkeys (la app verifica con Touch ID nativo al abrirse).
+
+### Cambiado
+- Ajustes reorganizado: seguridad (Touch ID y sesiones) arriba, después app de escritorio y notificaciones, sistema y datos, y la auditoría. La tarjeta de la app muestra versión, comprobación automática, última comprobación y verificación.
+
 ## [0.10.1] - 2026-11-03
 
 ### Añadido

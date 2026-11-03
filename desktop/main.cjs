@@ -27,17 +27,88 @@ app.on("second-instance", () => {
   }
 });
 
-/** Ask for Touch ID when the Mac has it; returns whether the user was verified. */
-async function unlock() {
-  if (process.platform !== "darwin" || !systemPreferences.canPromptTouchID()) return false;
-  try {
-    await systemPreferences.promptTouchID("desbloquear Agentic");
-    return true;
-  } catch {
-    dialog.showErrorBox("Agentic", "No se ha verificado Touch ID. La app se cerrará.");
-    app.exit(1);
-    return false;
-  }
+/**
+ * Small lock window that asks for Touch ID (with "Reintentar" / "Salir" when it
+ * fails). Resolves once verified with { touchId, close } so the lock stays on
+ * screen ("Abriendo…") until the main window is ready. Without Touch ID it
+ * resolves immediately with touchId false.
+ */
+function unlock() {
+  if (process.platform !== "darwin" || !systemPreferences.canPromptTouchID()) return Promise.resolve({ touchId: false, close() {} });
+  return new Promise((resolve) => {
+    const lock = new BrowserWindow({
+      width: 340,
+      height: 360,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
+      center: true,
+      title: "Desbloquear Agentic",
+      backgroundColor: "#0a0a0a",
+      titleBarStyle: "hiddenInset",
+      show: false,
+      webPreferences: {
+        preload: path.join(__dirname, "lock-preload.cjs"),
+        contextIsolation: true,
+        sandbox: true,
+        nodeIntegration: false,
+        webSecurity: true,
+      },
+    });
+    const wc = lock.webContents;
+    let verified = false;
+    let prompting = false;
+    const send = (state) => {
+      if (!lock.isDestroyed()) wc.send("agentic-lock:state", state);
+    };
+    const onRetry = (e) => {
+      if (e.sender === wc) prompt();
+    };
+    const onQuit = (e) => {
+      if (e.sender === wc) app.exit(0);
+    };
+    const cleanup = () => {
+      ipcMain.removeListener("agentic-lock:retry", onRetry);
+      ipcMain.removeListener("agentic-lock:quit", onQuit);
+    };
+    async function prompt() {
+      if (prompting || verified) return;
+      prompting = true;
+      send("waiting");
+      try {
+        await systemPreferences.promptTouchID("desbloquear Agentic");
+        verified = true;
+        cleanup();
+        send("ok");
+        resolve({
+          touchId: true,
+          close: () => {
+            if (!lock.isDestroyed()) lock.destroy();
+          },
+        });
+      } catch {
+        send("error");
+      } finally {
+        prompting = false;
+      }
+    }
+    ipcMain.on("agentic-lock:retry", onRetry);
+    ipcMain.on("agentic-lock:quit", onQuit);
+    // Closing the lock window before unlocking quits the app.
+    lock.on("closed", () => {
+      cleanup();
+      if (!verified) app.exit(0);
+    });
+    wc.setWindowOpenHandler(() => ({ action: "deny" }));
+    wc.on("will-navigate", (e) => e.preventDefault());
+    lock.once("ready-to-show", () => {
+      lock.show();
+      lock.focus();
+      prompt();
+    });
+    lock.loadFile(path.join(__dirname, "lock.html"));
+  });
 }
 
 function serverEntry() {
@@ -84,7 +155,7 @@ function harden(ses) {
   ses.setPermissionCheckHandler((_wc, permission) => permission === "notifications");
 }
 
-function createWindow() {
+function createWindow(onShown) {
   win = new BrowserWindow({
     width: 1440,
     height: 920,
@@ -93,7 +164,8 @@ function createWindow() {
     title: "Agentic",
     backgroundColor: "#0a0a0a",
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
-    trafficLightPosition: { x: 14, y: 18 },
+    // Vertically centred in the 56px top bar; the UI leaves room for them.
+    trafficLightPosition: { x: 18, y: 21 },
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -104,7 +176,13 @@ function createWindow() {
       spellcheck: true,
     },
   });
-  win.once("ready-to-show", () => win.show());
+  win.once("ready-to-show", () => {
+    win.show();
+    onShown?.();
+  });
+  // The traffic lights disappear in full screen, so the UI can drop their gap.
+  win.on("enter-full-screen", () => win.webContents.send("agentic:fullscreen", true));
+  win.on("leave-full-screen", () => win.webContents.send("agentic:fullscreen", false));
 
   const isInternal = (url) => {
     try {
@@ -246,11 +324,14 @@ function buildMenu() {
 
 app.whenReady().then(async () => {
   try {
-    const touchId = await unlock();
     buildMenu();
     harden(session.defaultSession);
-    origin = await startServer();
-    const sid = createDesktopSession(DATA_DIR, { touchId });
+    // The server boots while the lock window waits for Touch ID.
+    const serverReady = startServer();
+    serverReady.catch(() => {});
+    const lock = await unlock();
+    origin = await serverReady;
+    const sid = createDesktopSession(DATA_DIR, { touchId: lock.touchId });
     await session.defaultSession.cookies.set({
       url: origin,
       name: "agentic_session",
@@ -270,7 +351,7 @@ app.whenReady().then(async () => {
     };
     ipcMain.handle("agentic:version", (e) => (fromApp(e) ? app.getVersion() : null));
     ipcMain.handle("agentic:check-for-updates", (e) => (fromApp(e) ? checkForUpdates(true) : "denied"));
-    createWindow();
+    createWindow(() => lock.close());
     // Check every time the user enters the app: at launch, and when it is
     // activated or a window regains focus (throttled to every 10 minutes).
     win.webContents.once("did-finish-load", () => checkOnEntry());

@@ -74,6 +74,17 @@ describe("server-side sessions", () => {
     expect(readAuth(d).passkeys).toEqual([]);
     expect(readAudit(d).map((x) => x.event)).toEqual(["passkey.removed", "auth.requirePasskey", "auth.requirePasskey"]);
   });
+
+  it("lets the macOS app (native Touch ID) require Touch ID without browser passkeys", () => {
+    const d = tmpDir();
+    const tokenSid = createSession(d, "token", "");
+    const appSid = createSession(d, "desktop", "Agentic Desktop");
+    expect(() => setRequirePasskey(d, true, validateSession(d, tokenSid))).toThrow(/Registra una passkey/);
+    setRequirePasskey(d, true, validateSession(d, appSid));
+    expect(readAuth(d).requirePasskey).toBe(true);
+    expect(validateSession(d, tokenSid)).toBeNull();
+    expect(validateSession(d, appSid)?.method).toBe("desktop");
+  });
 });
 
 describe("challenges, rate limits and RP", () => {

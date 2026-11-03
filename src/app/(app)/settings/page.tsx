@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { CopyButton, PageHeader } from "@/components/app/common";
 import { DesktopCard } from "@/components/app/desktop-card";
-import { SecuritySettings } from "@/components/app/security-settings";
+import { AuditCard, SessionsCard, TouchIdCard } from "@/components/app/security-settings";
 import { useApi, type SystemInfo } from "@/lib/api";
 
 function Row({ k, v, mono, copy }: { k: string; v: React.ReactNode; mono?: boolean; copy?: string }) {
@@ -50,9 +50,7 @@ function NotificationsCard() {
           }}
         />
       </CardHeader>
-      {!supported && (
-        <CardContent className="text-xs text-muted-foreground">Este navegador no soporta notificaciones.</CardContent>
-      )}
+      {!supported && <CardContent className="text-xs text-muted-foreground">Este navegador no soporta notificaciones.</CardContent>}
     </Card>
   );
 }
@@ -63,6 +61,13 @@ export default function SettingsPage() {
     <div className="flex flex-col gap-5">
       <PageHeader icon={SettingsIcon} title="Ajustes" description="Configuración del entorno local. Se cambia con variables de entorno al arrancar." />
       <div className="grid gap-4 lg:grid-cols-2">
+        <TouchIdCard />
+        <SessionsCard />
+        {/* Notifications spans both columns when there is no desktop card (browser). */}
+        <div className="grid gap-4 lg:col-span-2 lg:grid-cols-2 lg:[&>*:only-child]:col-span-2">
+          <DesktopCard />
+          <NotificationsCard />
+        </div>
         <Card>
           <CardHeader>
             <div>
@@ -104,9 +109,7 @@ export default function SettingsPage() {
             )}
           </CardContent>
         </Card>
-        <DesktopCard />
-        <SecuritySettings />
-        <NotificationsCard />
+        <AuditCard />
         <Card className="lg:col-span-2">
           <CardHeader>
             <div>

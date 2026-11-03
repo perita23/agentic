@@ -69,7 +69,7 @@ function Sidebar({ overview }: { overview?: Overview }) {
   const counts = { sessions: overview?.counts.activeSessions ?? 0, runs: overview?.counts.runningRuns ?? 0 };
   return (
     <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r bg-sidebar md:flex">
-      <div className="flex h-14 items-center border-b px-3">
+      <div className="app-drag traffic-light-gap flex h-14 items-center border-b px-3">
         <Logo />
       </div>
       <nav className="flex flex-1 flex-col gap-0.5 p-2" aria-label="Principal">
@@ -188,7 +188,7 @@ function CommandPalette({ open, setOpen }: { open: boolean; setOpen: (o: boolean
 function Topbar({ onSearch }: { onSearch: () => void }) {
   const launcher = useLauncher();
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:px-6">
+    <header className="app-drag sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:px-6">
       <div className="md:hidden">
         <Logo />
       </div>

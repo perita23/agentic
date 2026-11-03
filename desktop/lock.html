@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; img-src 'self' data:" />
+    <title>Desbloquear Agentic</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0a0a0a;
+        color: #e6e6e6;
+        font: 13px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding: 36px 28px 24px;
+        box-sizing: border-box;
+        text-align: center;
+        -webkit-app-region: drag;
+      }
+      .logo {
+        display: grid;
+        place-items: center;
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        background: #e6e6e6;
+        box-shadow: 0 10px 30px rgb(255 255 255 / 0.06);
+      }
+      .logo svg {
+        width: 30px;
+        height: 30px;
+        color: #0a0a0a;
+      }
+      h1 {
+        margin: 4px 0 0;
+        font-size: 16px;
+        font-weight: 600;
+      }
+      p {
+        margin: 0;
+        color: #8a8a8a;
+        min-height: 40px;
+      }
+      .finger {
+        width: 40px;
+        height: 40px;
+        color: #ff6b6b;
+        transition: color 0.2s;
+      }
+      body[data-state="error"] .finger {
+        color: #8a8a8a;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        visibility: hidden;
+        -webkit-app-region: no-drag;
+      }
+      body[data-state="error"] .actions {
+        visibility: visible;
+      }
+      button {
+        height: 30px;
+        padding: 0 14px;
+        border-radius: 7px;
+        border: 1px solid #363636;
+        background: #161616;
+        color: #e6e6e6;
+        font: inherit;
+        cursor: pointer;
+      }
+      button.primary {
+        background: #e6e6e6;
+        border-color: #e6e6e6;
+        color: #0a0a0a;
+        font-weight: 500;
+      }
+      button:focus-visible {
+        outline: 2px solid #7aa7ff;
+        outline-offset: 2px;
+      }
+    </style>
+    <script src="lock.js" defer></script>
+  </head>
+  <body data-state="waiting">
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 12 4l8 16" /><path d="M7.5 14h9" /></svg>
+    </div>
+    <h1>Agentic está bloqueada</h1>
+    <svg class="finger" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" />
+      <path d="M14 13.12c0 2.38 0 6.38-1 8.88" />
+      <path d="M17.29 21.02c.12-.6.43-2.3.5-3.02" />
+      <path d="M2 12a10 10 0 0 1 18-6" />
+      <path d="M2 16h.01" />
+      <path d="M21.8 16c.2-2 .131-5.354 0-6" />
+      <path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2" />
+      <path d="M8.65 22c.21-.66.45-1.32.57-2" />
+      <path d="M9 6.8a6 6 0 0 1 9 5.2v2" />
+    </svg>
+    <p id="msg" role="status" aria-live="polite">Usa Touch ID para desbloquear.</p>
+    <div class="actions">
+      <button id="quit" type="button">Salir</button>
+      <button id="retry" class="primary" type="button">Reintentar</button>
+    </div>
+  </body>
+</html>

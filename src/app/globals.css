@@ -113,3 +113,15 @@
     linear-gradient(to bottom, rgb(255 255 255 / 0.03) 1px, transparent 1px);
   background-size: 32px 32px;
 }
+
+/* macOS app (Electron, hidden inset title bar): the preload sets data-desktop on
+   <html>. Leave room for the traffic lights and let the top bars move the window. */
+html[data-desktop] .app-drag {
+  -webkit-app-region: drag;
+}
+html[data-desktop] .app-drag :is(a, button, input, select, textarea, [role="button"], [role="combobox"]) {
+  -webkit-app-region: no-drag;
+}
+html[data-desktop="mac"]:not([data-fullscreen]) .traffic-light-gap {
+  padding-left: 84px;
+}

@@ -147,10 +147,14 @@ export function removePasskey(dataDir: string, id: string) {
   audit(dataDir, "passkey.removed", { name });
 }
 
-/** Require passkeys for every login. Only from a passkey session, so you can't lock yourself out. */
+/**
+ * Require Touch ID for every login. Only from a session verified with Touch ID,
+ * so you can't lock yourself out: a passkey session, or the macOS app (native
+ * Touch ID, which keeps working without browser passkeys).
+ */
 export function setRequirePasskey(dataDir: string, on: boolean, current: StoredSession | null) {
   const st = readAuth(dataDir);
-  if (on && !st.passkeys.length) throw new HttpError(400, "Registra una passkey antes de exigirla");
+  if (on && !st.passkeys.length && current?.method !== "desktop") throw new HttpError(400, "Registra una passkey antes de exigirla");
   if (on && current?.method !== "passkey" && current?.method !== "desktop") throw new HttpError(409, "Inicia sesión con Touch ID al menos una vez antes de exigirlo");
   updateAuth(dataDir, (s) => {
     s.requirePasskey = on;
