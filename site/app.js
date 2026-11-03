@@ -3,7 +3,7 @@
 //  - show the latest version and date from the GitHub API.
 "use strict";
 
-const REPO = "perita23/agentic";
+const REPO = "perita23/agentic-releases";
 const ARM = `https://github.com/${REPO}/releases/latest/download/Agentic-arm64.dmg`;
 const X64 = `https://github.com/${REPO}/releases/latest/download/Agentic-x64.dmg`;
 

@@ -1,6 +1,8 @@
 name: Pages
 
-# Publishes the static download page in site/ to GitHub Pages.
+# Publishes the static download page in site/ to the gh-pages branch of the
+# public releases repository (this repository is private). Needs the
+# RELEASES_TOKEN secret; that repository serves Pages from gh-pages.
 on:
   push:
     branches: [main]
@@ -9,8 +11,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -20,16 +20,28 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Push site/ to gh-pages
+        env:
+          RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          RELEASES_REPO: ${{ vars.RELEASES_REPO || 'perita23/agentic-releases' }}
+        run: |
+          set -euo pipefail
+          if [ -z "$RELEASES_TOKEN" ]; then
+            echo "::notice::RELEASES_TOKEN is not set; nothing to deploy."
+            exit 0
+          fi
+          cd site
+          touch .nojekyll
+          git init -q -b gh-pages
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Deploy download page from ${GITHUB_REPOSITORY}@${GITHUB_SHA::7}"
+          auth=$(printf 'x-access-token:%s' "$RELEASES_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" \
+            push --force --quiet "https://github.com/${RELEASES_REPO}.git" gh-pages
+          echo "Deployed to https://${RELEASES_REPO%%/*}.github.io/${RELEASES_REPO#*/}/"

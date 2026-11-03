@@ -53,7 +53,7 @@ npm run dev
 
 ### App para macOS
 
-Descarga [`Agentic-arm64.dmg`](https://github.com/perita23/agentic/releases/latest/download/Agentic-arm64.dmg) (Apple Silicon) o [`Agentic-x64.dmg`](https://github.com/perita23/agentic/releases/latest/download/Agentic-x64.dmg) (Intel) desde la página de descarga (`site/`, publicada en GitHub Pages) o la [última Release](https://github.com/perita23/agentic/releases/latest), arrástrala a Aplicaciones y ábrela. Pide Touch ID al abrir y se actualiza sola: comprueba si hay versión nueva cada vez que entras, o desde el menú «Buscar actualizaciones…» / Ajustes.
+Descarga [`Agentic-arm64.dmg`](https://github.com/perita23/agentic-releases/releases/latest/download/Agentic-arm64.dmg) (Apple Silicon) o [`Agentic-x64.dmg`](https://github.com/perita23/agentic-releases/releases/latest/download/Agentic-x64.dmg) (Intel) desde la [página de descarga](https://perita23.github.io/agentic-releases/) o la [última Release](https://github.com/perita23/agentic-releases/releases/latest), arrástrala a Aplicaciones y ábrela. Pide Touch ID al abrir y se actualiza sola: comprueba si hay versión nueva cada vez que entras, o desde el menú «Buscar actualizaciones…» / Ajustes.
 
 > Mientras no esté firmada con un Developer ID de Apple, la primera vez macOS pedirá confirmación: clic derecho → **Abrir** (o `xattr -dr com.apple.quarantine /Applications/Agentic.app`). Las actualizaciones posteriores ya no lo piden.
 
