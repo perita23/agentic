@@ -44,7 +44,7 @@ function splitPatch(patch: string): Map<string, string[]> {
   return out;
 }
 
-function PatchLines({ lines }: { lines: string[] }) {
+export function PatchLines({ lines }: { lines: string[] }) {
   return (
     <pre className="overflow-x-auto bg-inset font-mono text-[12px] leading-5">
       {lines.map((l, i) => {
@@ -66,7 +66,7 @@ function PatchLines({ lines }: { lines: string[] }) {
   );
 }
 
-function FileBlock({ title, badge, stats, children, defaultOpen }: { title: string; badge?: React.ReactNode; stats?: React.ReactNode; children: React.ReactNode; defaultOpen: boolean }) {
+export function FileBlock({ title, badge, stats, children, defaultOpen }: { title: string; badge?: React.ReactNode; stats?: React.ReactNode; children: React.ReactNode; defaultOpen: boolean }) {
   const [open, setOpen] = React.useState(defaultOpen);
   return (
     <div className="overflow-hidden rounded-lg border bg-card">

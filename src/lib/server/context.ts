@@ -2,6 +2,7 @@ import { AgentManager } from "./agents";
 import { getConfig, type Config } from "./config";
 import { queueMessage, runMessage } from "./integrations/messages";
 import { ProjectService } from "./projects";
+import { PullService } from "./integrations/pulls";
 import { IntegrationService } from "./integrations/service";
 import { TaskQueue } from "./queue";
 import { RunManager } from "./runs";
@@ -21,6 +22,7 @@ export interface Context {
   projects: ProjectService;
   queue: TaskQueue;
   integrations: IntegrationService;
+  pulls: PullService;
 }
 
 const g = globalThis as unknown as { __agentic?: Context };
@@ -46,6 +48,7 @@ export function createContext(config: Config): Context {
     const ok = st.processed.filter((p) => p.status === "completed").length;
     void integrations.notify("queueFinished", queueMessage(st), ok < st.processed.length);
   });
+  const projects = new ProjectService(store, sessions);
   return {
     config,
     token: loadOrCreateToken(config.dataDir),
@@ -54,7 +57,8 @@ export function createContext(config: Config): Context {
     agents: new AgentManager(config.claudeHome),
     tasks,
     runs,
-    projects: new ProjectService(store, sessions),
+    projects,
+    pulls: new PullService(integrations, projects),
     queue,
     integrations,
   };

@@ -27,7 +27,7 @@ tareas y ejecuciones de Claude Code.
 | Versión | Alcance | Estado |
 |---------|---------|--------|
 | v0.5.0 | Framework + página Integraciones (conectar / probar / desconectar los 4 proveedores) + **Slack**: canales, historial, hilos, enviar y responder, avisos de ejecuciones y cola | ✅ |
-| v0.6.0 | **Pull requests GitHub + Bitbucket**: bandeja unificada, detalle (descripción, conversación, reviews, checks, diff), comentar, aprobar / pedir cambios, merge con SHA esperado, cerrar, «Revisar con Claude» | ⏳ |
+| v0.6.0 | **Pull requests GitHub + Bitbucket**: bandeja unificada, detalle (descripción, conversación, reviews, checks, diff), comentar, aprobar / pedir cambios, merge con SHA esperado, cerrar, «Revisar con Claude» | ✅ |
 | v0.7.0 | **Jira**: incidencias por JQL, detalle y comentarios, comentar, transiciones de estado, importar como tarea (enlazada) | ⏳ |
 | backlog | Confluence (páginas como contexto del prompt), webhooks entrantes en tiempo real | ⏳ |
 
