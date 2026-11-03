@@ -62,7 +62,10 @@ const slack = http.createServer((req, res) => {
     const routes = {
       "/auth.test": () => ({ ok: true, user: "agentic", team: "Smoke" }),
       "/users.list": () => ({ ok: true, members: [{ id: "U01ANA", name: "ana", profile: { display_name: "Ana" } }] }),
-      "/conversations.list": () => ({ ok: true, channels: [{ id: "C01DEV", name: "dev", is_private: false, is_member: true, topic: { value: "Equipo" } }] }),
+      "/conversations.list": () => ({
+        ok: true,
+        channels: [{ id: "C01DEV", name: "dev", is_private: false, is_member: true, topic: { value: "Equipo" } }, { id: "D01ANA", is_im: true, user: "U01ANA", updated: 1 }],
+      }),
       "/conversations.history": () => ({ ok: true, messages: [{ ts: "1700000000.000100", user: "U01ANA", text: "¿Alguien revisa la PR <@U01ANA>?", reply_count: 0 }] }),
       "/conversations.replies": () => ({ ok: true, messages: [{ ts: url.searchParams.get("ts"), user: "U01ANA", text: "¿Alguien revisa la PR?" }] }),
       "/chat.postMessage": () => {
@@ -370,7 +373,7 @@ try {
   const cbRes = await fetch(`${base}/api/integrations/oauth/callback?state=forged&code=x`);
   check(cbRes.status === 400 && (await cbRes.text()).includes("caducó"), "OAuth callback is reachable without a session but rejects unknown states");
   await page.locator("main").getByRole("button", { name: "Pegar token" }).click();
-  await page.getByLabel("Bot token").fill("xoxb-smoke-token");
+  await page.getByLabel("Token (usuario xoxp- o bot xoxb-)").fill("xoxb-smoke-token");
   await page.getByRole("button", { name: "Guardar y probar" }).click();
   await page.getByText("agentic @ Smoke").waitFor();
   const integrations = await (await fetch(base + "/api/integrations", { headers: { authorization: `Bearer ${token}` } })).text();
@@ -378,7 +381,14 @@ try {
   await page.goto(`${base}/messages`);
   await page.getByText("¿Alguien revisa la PR @Ana?").waitFor();
   check(true, "Slack channel history renders with resolved mentions");
+  await page.getByText("Mensajes directos").waitFor();
+  check(await page.getByRole("navigation", { name: "Conversaciones" }).getByRole("button", { name: "Ana" }).isVisible(), "Slack direct messages are listed");
   await page.getByText("¿Alguien revisa la PR @Ana?").hover();
+  await page.getByRole("button", { name: "Crear tarea" }).click();
+  await page.getByText("Tarea creada en el backlog").waitFor();
+  const slackTasks = await (await fetch(base + "/api/tasks", { headers: { authorization: `Bearer ${token}` } })).json();
+  check(slackTasks.tasks.some((t) => t.labels.includes("slack") && t.title.startsWith("¿Alguien revisa la PR")), "a Slack message becomes an Agentic task");
+  await page.locator("main section").getByText("¿Alguien revisa la PR @Ana?").hover();
   await page.getByText("Responder en hilo").click();
   await page.getByPlaceholder("Responder en el hilo…").fill("Yo la reviso");
   await page.keyboard.press("Enter");

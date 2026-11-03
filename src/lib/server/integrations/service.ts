@@ -269,15 +269,48 @@ export class IntegrationService {
     return map;
   }
 
+  /**
+   * Channels plus direct messages. With a user token (xoxp-) this includes your
+   * own DMs and group DMs; a bot token (xoxb-) only ever sees the bot's.
+   */
   async slackChannels() {
-    const r = await this.slackApi<{ ok: boolean; channels: { id: string; name: string; is_private: boolean; is_member: boolean; num_members?: number; topic?: { value: string } }[] }>("conversations.list", {
-      types: "public_channel,private_channel",
-      exclude_archived: "true",
-      limit: 500,
-    });
-    return (r.channels ?? [])
-      .map((c) => ({ id: c.id, name: c.name, isPrivate: c.is_private, isMember: c.is_member, members: c.num_members ?? null, topic: c.topic?.value ?? "" }))
-      .sort((a, b) => Number(b.isMember) - Number(a.isMember) || a.name.localeCompare(b.name));
+    type Raw = { id: string; name?: string; is_private?: boolean; is_member?: boolean; is_im?: boolean; is_mpim?: boolean; user?: string; num_members?: number; topic?: { value: string }; updated?: number };
+    const all: Raw[] = [];
+    const list = async (types: string) => {
+      let cursor: string | undefined;
+      for (let page = 0; page < 5; page++) {
+        const r = await this.slackApi<{ ok: boolean; channels: Raw[]; response_metadata?: { next_cursor?: string } }>("conversations.list", { types, exclude_archived: "true", limit: 500, cursor });
+        all.push(...(r.channels ?? []));
+        cursor = r.response_metadata?.next_cursor || undefined;
+        if (!cursor) break;
+      }
+    };
+    try {
+      await list("public_channel,private_channel,mpim,im");
+    } catch (e) {
+      // Apps created before DMs were supported lack im:read / mpim:read: keep showing channels.
+      if (!(e instanceof IntegrationError) || !/scope/.test(e.message)) throw e;
+      all.length = 0;
+      await list("public_channel,private_channel");
+    }
+    const users = all.some((c) => c.is_im) ? await this.slackUsers() : new Map<string, string>();
+    const mpimName = (n: string) =>
+      n
+        .replace(/^mpdm-/, "")
+        .replace(/-\d+$/, "")
+        .split("--")
+        .map((u) => [...users.values()].find((v) => v.toLowerCase() === u.toLowerCase()) ?? u)
+        .join(", ");
+    return all
+      .map((c) => {
+        const kind: "channel" | "dm" | "group" = c.is_im ? "dm" : c.is_mpim ? "group" : "channel";
+        const name = kind === "dm" ? (users.get(c.user ?? "") ?? c.user ?? "DM") : kind === "group" ? mpimName(c.name ?? "") : (c.name ?? c.id);
+        return { id: c.id, name, kind, isPrivate: kind !== "channel" || !!c.is_private, isMember: kind !== "channel" || !!c.is_member, members: c.num_members ?? null, topic: c.topic?.value ?? "", updated: c.updated ?? 0 };
+      })
+      .sort((a, b) => {
+        const rank = (c: { kind: string }) => (c.kind === "channel" ? 0 : 1);
+        return rank(a) - rank(b) || (a.kind === "channel" ? Number(b.isMember) - Number(a.isMember) || a.name.localeCompare(b.name) : b.updated - a.updated);
+      });
   }
 
   private async slackMessages(raw: SlackRawMessage[]) {
