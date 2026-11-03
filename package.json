@@ -9,7 +9,7 @@
     "url": "node scripts/agentic.mjs url",
     "rotate-token": "node scripts/agentic.mjs url --rotate-token",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke": "node scripts/smoke.mjs",
