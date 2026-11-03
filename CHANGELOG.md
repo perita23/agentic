@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.11.1] - 2026-11-03
+
+### Corregido
+- El aviso «Cola finalizada» no aparecía si la cola terminaba antes de que la página la viera en marcha (tareas rápidas). Ahora se avisa de cada lote que termina después de abrir la página, usando su hora de fin.
+
 ## [0.11.0] - 2026-11-03
 
 ### Añadido

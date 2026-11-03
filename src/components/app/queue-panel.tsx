@@ -22,6 +22,7 @@ interface QueueInfo {
   processed: { taskId: string; runId: string; status: string }[];
   currentRunId: string | null;
   stopReason: string | null;
+  finishedAt: string | null;
   pending: { id: string; title: string; priority: string; projectPath: string }[];
 }
 
@@ -150,12 +151,17 @@ function QueueDialog({ onClose, defaultProject }: { onClose: () => void; default
 export function useQueue(defaultProject?: string) {
   const { data } = useApi<QueueInfo>("/api/queue", { refreshInterval: (d) => (d?.running ? 2000 : 10_000) });
   const [open, setOpen] = React.useState(false);
-  const wasRunning = React.useRef(false);
+  // undefined until the first response: only batches that finish after the page
+  // loaded are announced, even when they finish before a poll sees them running.
+  const lastFinished = React.useRef<string | null | undefined>(undefined);
 
   React.useEffect(() => {
     if (!data) return;
-    if (wasRunning.current && !data.running && data.stopReason) toast.info("Cola finalizada", { description: data.stopReason });
-    wasRunning.current = data.running;
+    if (lastFinished.current !== undefined && !data.running && data.finishedAt && data.finishedAt !== lastFinished.current) {
+      toast.info("Cola finalizada", { description: data.stopReason ?? undefined });
+    }
+    if (!data.running) lastFinished.current = data.finishedAt ?? null;
+    else if (lastFinished.current === undefined) lastFinished.current = null;
   }, [data]);
 
   async function stop() {
