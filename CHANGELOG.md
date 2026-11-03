@@ -3,6 +3,20 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.12.0] - 2026-11-03
+
+### Añadido
+- **Integraciones con un clic**, sin pegar tokens:
+  - GitHub: «Conectar con GitHub» (device flow: pegas un código en github.com) y «Usar mi sesión de gh» (reutiliza el login del CLI de GitHub).
+  - Jira y Bitbucket: «Conectar» abre el login del servicio y vuelve a Agentic; el token se renueva solo.
+  - Slack: «Crear app de Slack» crea la app ya configurada con los permisos necesarios.
+  - Para GitHub, Jira y Bitbucket hay que registrar una vez una app OAuth; Agentic guía los pasos y muestra la URL de vuelta para copiar. Pegar un token sigue disponible.
+- **Contraseña de la app de Mac**: la primera vez la ventana de inicio pide crear una contraseña; después se desbloquea con ella. **Touch ID se activa en Ajustes → App de escritorio** (pide la huella para activarlo), y desde ahí también se cambia la contraseña. Ventana de desbloqueo más grande.
+
+### Seguridad
+- La vuelta del login OAuth es pública pero sólo la acepta con un `state` aleatorio de 256 bits, de un solo uso y válido 10 minutos; los tokens se intercambian en el servidor, los refresh tokens y los secretos de las apps nunca se devuelven al navegador.
+- La contraseña de la app se guarda sólo como hash scrypt (N=2^15) en `~/.agentic/desktop-lock.json` (0600); los intentos fallidos se frenan con espera exponencial.
+
 ## [0.11.1] - 2026-11-03
 
 ### Corregido

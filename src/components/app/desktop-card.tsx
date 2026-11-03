@@ -2,15 +2,29 @@
 
 import * as React from "react";
 import { useSyncExternalStore } from "react";
-import { CheckCircle2Icon, DownloadIcon, LaptopIcon } from "lucide-react";
+import { CheckCircle2Icon, DownloadIcon, FingerprintIcon, KeyRoundIcon, LaptopIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
+interface LockInfo {
+  touchIdAvailable: boolean;
+  touchIdEnabled: boolean;
+  hasPassword: boolean;
+}
 interface DesktopBridge {
   isDesktop: true;
   version: () => Promise<string | null>;
   checkForUpdates: () => Promise<string>;
+  lock?: {
+    info: () => Promise<LockInfo | null>;
+    setTouchId: (on: boolean) => Promise<(LockInfo & { ok: boolean; error?: string }) | null>;
+    changePassword: (current: string, next: string) => Promise<{ ok: boolean; error?: string } | null>;
+  };
 }
 
 const noop = () => () => {};
@@ -36,10 +50,28 @@ export function DesktopCard() {
   const [version, setVersion] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [checkedAt, setCheckedAt] = React.useState<Date | null>(null);
+  const [lock, setLock] = React.useState<LockInfo | null>(null);
+  const [lockBusy, setLockBusy] = React.useState(false);
+  const [changing, setChanging] = React.useState(false);
 
   React.useEffect(() => {
     desktop?.version().then(setVersion, () => {});
+    desktop?.lock?.info().then(setLock, () => {});
   }, [desktop]);
+
+  async function toggleTouchId(on: boolean) {
+    if (!desktop?.lock) return;
+    setLockBusy(true);
+    try {
+      const r = await desktop.lock.setTouchId(on);
+      if (!r) return;
+      setLock(r);
+      if (r.ok) toast.success(on ? "Touch ID activado: la próxima vez desbloquearás con tu huella" : "Touch ID desactivado: se pedirá la contraseña");
+      else toast.error(r.error ?? "No se ha verificado Touch ID");
+    } finally {
+      setLockBusy(false);
+    }
+  }
 
   if (!desktop) return null;
 
@@ -77,7 +109,77 @@ export function DesktopCard() {
         <Row k="Verificación">
           <CheckCircle2Icon className="size-4 text-success" /> SHA-512 y firma del bundle
         </Row>
+        {lock && (
+          <>
+            <Row k="Desbloquear con Touch ID">
+              {!lock.touchIdAvailable && <span className="text-xs text-muted-foreground">no disponible en este Mac</span>}
+              <FingerprintIcon className="size-4 text-muted-foreground" />
+              <Switch aria-label="Desbloquear con Touch ID" checked={lock.touchIdEnabled} disabled={lockBusy || (!lock.touchIdAvailable && !lock.touchIdEnabled)} onCheckedChange={toggleTouchId} />
+            </Row>
+            <Row k="Contraseña de la app">
+              <Button size="sm" variant="outline" onClick={() => setChanging(true)}>
+                <KeyRoundIcon /> Cambiar contraseña
+              </Button>
+            </Row>
+          </>
+        )}
       </CardContent>
+      {changing && desktop.lock && <ChangePasswordDialog change={desktop.lock.changePassword} onClose={() => setChanging(false)} />}
     </Card>
+  );
+}
+
+function ChangePasswordDialog({ change, onClose }: { change: (current: string, next: string) => Promise<{ ok: boolean; error?: string } | null>; onClose: () => void }) {
+  const [current, setCurrent] = React.useState("");
+  const [next, setNext] = React.useState("");
+  const [again, setAgain] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (next !== again) return toast.error("Las contraseñas nuevas no coinciden");
+    setBusy(true);
+    try {
+      const r = await change(current, next);
+      if (r?.ok) {
+        toast.success("Contraseña cambiada");
+        onClose();
+      } else toast.error(r?.error ?? "No se pudo cambiar");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-sm">
+        <form onSubmit={submit} className="grid gap-4" autoComplete="off">
+          <DialogHeader>
+            <DialogTitle>Cambiar contraseña</DialogTitle>
+            <DialogDescription>Es la contraseña que desbloquea la app de Mac. Se guarda cifrada (scrypt) sólo en este Mac.</DialogDescription>
+          </DialogHeader>
+          {(
+            [
+              ["pw-current", "Contraseña actual", current, setCurrent],
+              ["pw-next", "Nueva contraseña (mín. 8)", next, setNext],
+              ["pw-again", "Repite la nueva", again, setAgain],
+            ] as const
+          ).map(([id, label, value, set]) => (
+            <div key={id} className="grid gap-1.5">
+              <Label htmlFor={id}>{label}</Label>
+              <Input id={id} type="password" value={value} required minLength={id === "pw-current" ? 1 : 8} onChange={(e) => set(e.target.value)} />
+            </div>
+          ))}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={busy}>
+              Guardar
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

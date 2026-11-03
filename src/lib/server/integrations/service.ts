@@ -3,7 +3,7 @@ import { git } from "../git";
 import type { JsonStore } from "../store";
 import type { Task, TaskService } from "../tasks";
 import { HttpError, parse, text } from "../util";
-import { IntegrationError, request, safeBaseUrl } from "./http";
+import { allowInsecure, IntegrationError, request, safeBaseUrl } from "./http";
 
 interface SlackRawMessage {
   ts: string;
@@ -26,10 +26,20 @@ export function slackTs(ts: string) {
   return ts;
 }
 
+/** Atlassian's API gateway (overridable only together with the insecure test switch). */
+export const atlassianApi = () => (allowInsecure() && process.env.AGENTIC_ATLASSIAN_API_URL) || "https://api.atlassian.com";
+
 export const PROVIDERS = ["slack", "github", "jira", "bitbucket"] as const;
 export type Provider = (typeof PROVIDERS)[number];
 
 const secret = z.string().max(4096).refine((s) => !/[\r\n\0]/.test(s), "caracteres no válidos");
+
+// OAuth-connected providers keep a refresh token and renew the access token on use.
+const oauthFields = {
+  auth: z.enum(["basic", "oauth"]).default("basic"),
+  refreshToken: secret.optional(),
+  expiresAt: z.number().optional(),
+};
 
 const schemas = {
   slack: z.object({
@@ -41,17 +51,22 @@ const schemas = {
   github: z.object({
     token: secret.optional(),
     apiUrl: z.string().max(500).default("https://api.github.com"),
+    // How the token was obtained: pasted, from the GitHub CLI, or "Conectar con GitHub".
+    source: z.enum(["token", "gh", "oauth"]).default("token"),
   }),
   jira: z.object({
     siteUrl: z.string().max(500),
-    email: text(320).min(3),
+    email: text(320).default(""),
     token: secret.optional(),
     defaultJql: text(2000).default("assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"),
+    ...oauthFields,
+    cloudId: z.string().regex(/^[\w-]{0,100}$/).default(""),
   }),
   bitbucket: z.object({
     username: text(320).default(""),
     token: secret.optional(),
     apiUrl: z.string().max(500).default("https://api.bitbucket.org/2.0"),
+    ...oauthFields,
   }),
 };
 
@@ -111,7 +126,7 @@ export class IntegrationService {
       PROVIDERS.map((p) => {
         const cfg = c[p] as Record<string, unknown> | undefined;
         if (!cfg) return [p, { configured: false }];
-        const { [SECRET_FIELD[p]]: s, ...rest } = cfg;
+        const { [SECRET_FIELD[p]]: s, refreshToken: _r, ...rest } = cfg; // eslint-disable-line @typescript-eslint/no-unused-vars
         if (typeof rest.webhookUrl === "string") rest.webhookUrl = rest.webhookUrl ? mask(rest.webhookUrl) : "";
         return [p, { configured: !!s, secretHint: mask(s as string | undefined), ...rest }];
       }),
@@ -133,6 +148,7 @@ export class IntegrationService {
     if (p === "github") safeBaseUrl(String(data.apiUrl), "apiUrl");
     if (p === "bitbucket") safeBaseUrl(String(data.apiUrl), "apiUrl");
     if (p === "jira") data.siteUrl = safeBaseUrl(String(data.siteUrl), "siteUrl").origin;
+    if (p === "jira" && data.auth !== "oauth" && String(data.email).trim().length < 3) throw new HttpError(400, "email es obligatorio");
     this.store.update<Config>(F, {}, (c) => {
       (c as Record<string, unknown>)[p] = { ...data, updatedAt: new Date().toISOString() };
     });
@@ -144,6 +160,39 @@ export class IntegrationService {
     this.store.update<Config>(F, {}, (c) => {
       delete c[p];
     });
+  }
+
+  /** Store credentials obtained by an OAuth / CLI flow (already validated by the caller). */
+  saveConnection(p: Provider, data: Record<string, unknown>) {
+    this.store.update<Config>(F, {}, (c) => {
+      const prev = ((c as Record<string, unknown>)[p] ?? {}) as Record<string, unknown>;
+      (c as Record<string, unknown>)[p] = { ...prev, ...data, updatedAt: new Date().toISOString() };
+    });
+    return this.status()[p];
+  }
+
+  /** Raw stored config (server-side only; includes secrets). */
+  connection<P extends Provider>(p: P): Config[P] {
+    return this.config()[p];
+  }
+
+  /** Renews expiring OAuth access tokens; set by the OAuth service. */
+  refresher: ((p: "jira" | "bitbucket") => Promise<void>) | null = null;
+  private refreshing = new Map<string, Promise<void>>();
+
+  private async fresh<P extends "jira" | "bitbucket">(p: P): Promise<NonNullable<Config[P]>> {
+    const cfg = this.need(p);
+    if (cfg.auth === "oauth" && cfg.expiresAt && cfg.expiresAt - 60_000 < Date.now() && this.refresher) {
+      // One refresh at a time per provider: refresh tokens rotate.
+      let pending = this.refreshing.get(p);
+      if (!pending) {
+        pending = this.refresher(p).finally(() => this.refreshing.delete(p));
+        this.refreshing.set(p, pending);
+      }
+      await pending;
+      return this.need(p);
+    }
+    return cfg;
   }
 
   private provider(p: string): Provider {
@@ -345,15 +394,19 @@ export class IntegrationService {
   }
 
   async jira<T>(path: string, init?: Parameters<typeof request>[3]) {
-    const cfg = this.need("jira");
+    const cfg = await this.fresh("jira");
+    if (cfg.auth === "oauth") {
+      // OAuth (3LO) apps call Jira through the API gateway, scoped to the site's cloud id.
+      return request<T>("Jira", new URL(atlassianApi()), `/ex/jira/${encodeURIComponent(cfg.cloudId)}${path}`, { ...init, headers: { authorization: `Bearer ${cfg.token}` } });
+    }
     const auth = Buffer.from(`${cfg.email}:${cfg.token}`).toString("base64");
     return request<T>("Jira", safeBaseUrl(cfg.siteUrl, "siteUrl"), path, { ...init, headers: { authorization: `Basic ${auth}` } });
   }
 
   async bb<T>(path: string, init?: Parameters<typeof request>[3]) {
-    const cfg = this.need("bitbucket");
+    const cfg = await this.fresh("bitbucket");
     const base = safeBaseUrl(cfg.apiUrl.endsWith("/") ? cfg.apiUrl : `${cfg.apiUrl}/`, "apiUrl");
-    const authorization = cfg.username ? `Basic ${Buffer.from(`${cfg.username}:${cfg.token}`).toString("base64")}` : `Bearer ${cfg.token}`;
+    const authorization = cfg.username && cfg.auth !== "oauth" ? `Basic ${Buffer.from(`${cfg.username}:${cfg.token}`).toString("base64")}` : `Bearer ${cfg.token}`;
     return request<T>("Bitbucket", base, path.replace(/^\//, ""), { ...init, headers: { authorization } });
   }
 

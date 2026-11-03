@@ -124,8 +124,8 @@ export function TouchIdCard() {
           <div className="flex items-start gap-2 rounded-md border bg-inset px-3 py-2 text-xs text-muted-foreground">
             <FingerprintIcon className="mt-0.5 size-4 shrink-0 text-success" />
             <span>
-              <span className="font-medium text-foreground">En la app de Mac, Touch ID es nativo:</span> se pide cada vez que la abres
-              {currentMethod === "desktop" ? " y esta sesión ya está verificada" : ""}. Las passkeys de abajo sólo sirven para entrar desde el navegador; regístralas desde el navegador.
+              <span className="font-medium text-foreground">En la app de Mac</span> se desbloquea con tu contraseña o, si lo activas en «App de escritorio», con Touch ID
+              {currentMethod === "desktop" ? "; esta sesión ya está verificada" : ""}. Las passkeys de abajo sólo sirven para entrar desde el navegador; regístralas desde el navegador.
             </span>
           </div>
         )}

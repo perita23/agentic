@@ -361,7 +361,15 @@ try {
 
   // Integrations: connect Slack through the UI, then read and reply from Mensajes.
   await page.goto(`${base}/integrations`);
-  await page.locator("main").getByRole("button", { name: "Conectar" }).first().click();
+  // One-click connections: OAuth buttons, gh CLI reuse and Slack's app manifest.
+  for (const name of ["Conectar con GitHub", "Usar mi sesión de gh", "Conectar con Jira", "Conectar con Bitbucket", "Crear app de Slack"]) await page.getByRole("button", { name }).waitFor();
+  await page.getByRole("button", { name: "Conectar con Jira" }).click();
+  await page.getByText("Activar «Conectar con Jira»").waitFor();
+  check(await page.getByText(`localhost:${port}/api/integrations/oauth/callback`).isVisible(), "OAuth setup shows the callback URL to register");
+  await page.keyboard.press("Escape");
+  const cbRes = await fetch(`${base}/api/integrations/oauth/callback?state=forged&code=x`);
+  check(cbRes.status === 400 && (await cbRes.text()).includes("caducó"), "OAuth callback is reachable without a session but rejects unknown states");
+  await page.locator("main").getByRole("button", { name: "Pegar token" }).click();
   await page.getByLabel("Bot token").fill("xoxb-smoke-token");
   await page.getByRole("button", { name: "Guardar y probar" }).click();
   await page.getByText("agentic @ Smoke").waitFor();

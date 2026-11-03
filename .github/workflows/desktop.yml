@@ -37,23 +37,43 @@ jobs:
           APP=$(ls -d desktop/dist/mac-arm64/*.app 2>/dev/null || ls -d desktop/dist/mac/*.app)
           codesign --verify --deep --strict --verbose=2 "$APP"
           export AGENTIC_HOME="$RUNNER_TEMP/agentic-home"
-          "$APP/Contents/MacOS/Agentic" > "$RUNNER_TEMP/app.log" 2>&1 &
-          PID=$!
-          ok=0
-          for i in $(seq 1 60); do
-            if curl -fsS -o /dev/null "http://127.0.0.1:4317/login"; then ok=1; echo "server up after ${i}s"; break; fi
-            sleep 1
-          done
-          echo "---- app log ----"; cat "$RUNNER_TEMP/app.log" || true
-          if [ "$ok" != 1 ]; then
-            echo "---- bundled server ----"
-            ls -la "$APP/Contents/Resources/app-server" || true
-            ls -la "$APP/Contents/Resources/app-server/.next" || true
-            kill $PID || true
-            exit 1
-          fi
+          launch() {
+            "$APP/Contents/MacOS/Agentic" > "$RUNNER_TEMP/app.log" 2>&1 &
+            PID=$!
+            ok=0
+            for i in $(seq 1 60); do
+              if curl -fsS -o /dev/null "http://127.0.0.1:4317/login"; then ok=1; echo "server up after ${i}s"; break; fi
+              sleep 1
+            done
+            echo "---- app log ----"; cat "$RUNNER_TEMP/app.log" || true
+            if [ "$ok" != 1 ]; then
+              echo "---- bundled server ----"
+              ls -la "$APP/Contents/Resources/app-server" || true
+              ls -la "$APP/Contents/Resources/app-server/.next" || true
+              kill $PID || true
+              exit 1
+            fi
+          }
+          stop() { kill $PID || true; for i in $(seq 1 20); do kill -0 $PID 2>/dev/null || break; sleep 0.5; done; }
+
+          # 1) First launch: the server starts but the app stays locked on
+          #    "create a password", so no session may exist yet.
+          launch
+          sleep 3
+          if grep -qs '"userAgent": "Agentic Desktop"' "$AGENTIC_HOME/auth.json"; then echo "opened a session without unlocking"; exit 1; fi
+          echo "locked on first launch: OK"
+          stop
+
+          # 2) With a password set (as the lock window does), unlocking with it
+          #    opens the desktop session.
+          node -e "require('./desktop/lib/lock.cjs').createPassword(process.env.AGENTIC_HOME, 'ci-password-123')"
+          export AGENTIC_DESKTOP_CI_PASSWORD=ci-password-123
+          launch
+          for i in $(seq 1 20); do grep -qs '"userAgent": "Agentic Desktop"' "$AGENTIC_HOME/auth.json" && break; sleep 1; done
           grep -q '"userAgent": "Agentic Desktop"' "$AGENTIC_HOME/auth.json"
-          kill $PID || true
+          grep -q 'desktop-password' "$AGENTIC_HOME/audit.log"
+          echo "unlocked with the password: OK"
+          stop
       - uses: actions/upload-artifact@v4
         with:
           name: agentic-macos

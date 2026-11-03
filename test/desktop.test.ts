@@ -131,3 +131,54 @@ describe("update sources", () => {
     expect(calls.find((c) => c.url.endsWith("/agentic/releases/latest"))?.auth).toBe("Bearer secret");
   });
 });
+
+describe("desktop app lock", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const lock = require("../desktop/lib/lock.cjs");
+
+  it("creates the password once, stores only a scrypt hash and verifies it", () => {
+    const d = tmpDir();
+    expect(lock.hasPassword(d)).toBe(false);
+    expect(() => lock.createPassword(d, "corta")).toThrow(/al menos 8/);
+    lock.createPassword(d, "contraseña-larga");
+    expect(lock.hasPassword(d)).toBe(true);
+    const raw = fs.readFileSync(path.join(d, "desktop-lock.json"), "utf8");
+    expect(raw).not.toContain("contraseña-larga");
+    expect(fs.statSync(path.join(d, "desktop-lock.json")).mode & 0o777).toBe(0o600);
+    expect(lock.verifyPassword(d, "contraseña-larga")).toBe(true);
+    expect(lock.verifyPassword(d, "otra-cosa-123")).toBe(false);
+    expect(() => lock.createPassword(d, "sobrescribir-123")).toThrow(/Ya hay/);
+  });
+
+  it("changes the password only with the current one and toggles Touch ID", () => {
+    const d = tmpDir();
+    expect(() => lock.setTouchId(d, true)).toThrow(/contraseña/);
+    lock.createPassword(d, "primera-clave");
+    expect(() => lock.changePassword(d, "mal", "segunda-clave")).toThrow(/actual/);
+    lock.changePassword(d, "primera-clave", "segunda-clave");
+    expect(lock.verifyPassword(d, "segunda-clave")).toBe(true);
+    expect(lock.touchIdEnabled(d)).toBe(false);
+    lock.setTouchId(d, true);
+    expect(lock.touchIdEnabled(d)).toBe(true);
+    expect(lock.verifyPassword(d, "segunda-clave")).toBe(true);
+  });
+
+  it("slows down repeated wrong guesses", () => {
+    const l = lock.createLimiter();
+    for (let i = 0; i < 4; i++) l.fail();
+    expect(() => l.check()).not.toThrow();
+    l.fail();
+    expect(() => l.check()).toThrow(/Espera/);
+    l.reset();
+    expect(() => l.check()).not.toThrow();
+  });
+
+  it("opens a desktop session after a password unlock even when Touch ID is required", () => {
+    const d = tmpDir();
+    fs.writeFileSync(path.join(d, "auth.json"), JSON.stringify({ userId: "u", requirePasskey: true, sessions: [], passkeys: [] }));
+    const sid = createDesktopSession(d, { touchId: false, password: true });
+    expect(validateSession(d, sid)?.method).toBe("desktop");
+    expect(fs.readFileSync(path.join(d, "audit.log"), "utf8")).toContain("desktop-password");
+    expect(() => createDesktopSession(d, { touchId: false })).toThrow(/obligatorio/);
+  });
+});

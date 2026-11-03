@@ -53,3 +53,14 @@ Las alertas moderadas restantes (`minimatch`) están sólo en la cadena de ESLin
 ## Instalación de herramientas
 
 `POST /api/system/install` sólo acepta `{"tool": "tmux" | "claude"}` y ejecuta una receta fija con el gestor detectado (`brew install tmux`, `brew install --cask claude-code` o `npm install -g @anthropic-ai/claude-code`): ningún dato del usuario llega a la línea de comandos, sin shell, stdin cerrado (`NONINTERACTIVE=1`), una instalación a la vez, 15 minutos como máximo y salida limitada a 64 KB. Requiere sesión como el resto de la API y queda en el registro de auditoría.
+
+## Integraciones con OAuth
+
+- GitHub usa el *device flow* (sin secreto ni redirección) o el token del CLI `gh`, validado contra la API antes de guardarlo.
+- Jira (Atlassian 3LO) y Bitbucket usan *authorization code* con redirección a `http://localhost:PUERTO/api/integrations/oauth/callback`. Esa ruta no exige sesión (la cookie es `SameSite=Strict` y no viaja en la redirección), pero sólo acepta un `state` aleatorio de 256 bits creado por un «Conectar» autenticado, de un solo uso y con 10 minutos de validez. El código se canjea en el servidor.
+- Client ID/Secret de las apps OAuth, access y refresh tokens se guardan en `~/.agentic` (0600) y la API nunca los devuelve. Los refresh tokens rotan y se renuevan de uno en uno.
+
+## Bloqueo de la app de Mac
+
+- Contraseña elegida en el primer arranque, guardada sólo como hash scrypt con sal aleatoria en `~/.agentic/desktop-lock.json` (0600); comparación en tiempo constante y espera exponencial tras 5 fallos.
+- Touch ID sólo se activa tras verificar la huella; cambiar la contraseña exige la actual. Ambas acciones sólo las acepta el proceso principal desde páginas del servidor local.
