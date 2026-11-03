@@ -2,6 +2,7 @@ import { z } from "zod";
 import { git } from "../git";
 import type { ProjectService } from "../projects";
 import { HttpError, parse, text } from "../util";
+import type { IntegrationError } from "./http";
 import { parseRemote, type IntegrationService } from "./service";
 
 export type PrProvider = "github" | "bitbucket";
@@ -170,7 +171,14 @@ export class PullService {
         const { method, expectedHeadSha } = parse(prActionSchemas.merge, body);
         if (gh) {
           // GitHub refuses the merge if the head moved since the user looked at it.
-          await i.gh(`/repos/${slug}/pulls/${number}/merge`, { method: "PUT", body: { merge_method: method, sha: expectedHeadSha } });
+          try {
+            await i.gh(`/repos/${slug}/pulls/${number}/merge`, { method: "PUT", body: { merge_method: method, sha: expectedHeadSha } });
+          } catch (e) {
+            const st = (e as IntegrationError).upstreamStatus;
+            if (st === 409) throw new HttpError(409, "La PR ha cambiado desde que la abriste; recarga antes de mergear");
+            if (st === 405) throw new HttpError(409, "GitHub no permite mergear esta PR ahora (checks requeridos, reviews o protección de rama)");
+            throw e;
+          }
         } else {
           const pr = await i.bb<Gh>(`/repositories/${slug}/pullrequests/${number}`);
           const head = String(pr.source?.commit?.hash ?? "");

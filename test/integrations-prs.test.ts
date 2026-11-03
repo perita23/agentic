@@ -124,7 +124,10 @@ describe("PullService", () => {
     await expect(c.pulls.action("github", "acme", "web", 7, "review", { event: "REQUEST_CHANGES", body: "" })).rejects.toMatchObject({ status: 400 });
     await c.pulls.action("github", "acme", "web", 7, "review", { event: "APPROVE" });
     await c.pulls.action("github", "acme", "web", 7, "merge", { method: "squash", expectedHeadSha: HEAD });
-    await expect(c.pulls.action("github", "acme", "web", 7, "merge", { method: "squash", expectedHeadSha: "0000000" })).rejects.toMatchObject({ status: 502 });
+    await expect(c.pulls.action("github", "acme", "web", 7, "merge", { method: "squash", expectedHeadSha: "0000000" })).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining("ha cambiado"),
+    });
     await c.pulls.action("github", "acme", "web", 7, "close", {});
     const writes = calls.filter((x) => x.method !== "GET").map((x) => `${x.method} ${x.path} ${JSON.stringify(x.body)}`);
     expect(writes).toEqual([
