@@ -168,6 +168,11 @@ try {
   await page.waitForTimeout(800);
   const tasks = await (await fetch(base + "/api/tasks", { headers: { authorization: `Bearer ${token}` } })).json();
   check(tasks.tasks.find((t) => t.title === "Documentar la API")?.status === "done", "drag & drop moves task to Done (persisted)");
+  // Regression: moving a task must not wipe its other fields.
+  const bug = tasks.tasks.find((t) => t.title.startsWith("Bug: el login"));
+  await fetch(base + `/api/tasks/${bug.id}`, { method: "PATCH", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ status: "review", order: 0 }) });
+  const after = await (await fetch(base + `/api/tasks/${bug.id}`, { headers: { authorization: `Bearer ${token}` } })).json();
+  check(after.status === "review" && after.labels.includes("bug") && after.checklist.length === 4 && after.prompt.length > 0, "moving a task keeps labels, checklist and prompt");
   await shot("04-tasks");
 
   // Agents

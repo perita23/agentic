@@ -28,6 +28,17 @@ describe("TaskService", () => {
     expect(moved.order).toBe(d.order + 1);
   });
 
+  it("PATCH only changes the given fields (regression: zod defaults in partial)", () => {
+    const s = svc();
+    const a = s.create({ title: "a", description: "desc", labels: ["x"], prompt: "p", status: "review", priority: "urgent", checklist: [{ text: "c" }] });
+    const moved = s.update(a.id, { status: "done", order: 3 });
+    expect(moved).toMatchObject({ title: "a", description: "desc", labels: ["x"], prompt: "p", status: "done", priority: "urgent", order: 3 });
+    expect(moved.checklist).toHaveLength(1);
+    const p = s.update(a.id, { priority: "low" });
+    expect(p).toMatchObject({ status: "done", description: "desc", priority: "low" });
+    expect(() => s.update(a.id, { runIds: [] })).toThrow();
+  });
+
   it("rejects unknown fields on update (no mass-assignment of id/createdAt)", () => {
     const s = svc();
     const a = s.create({ title: "a" });

@@ -95,7 +95,7 @@ function EventView({ e }: { e: Ev }) {
 function HeadlessLog({ run }: { run: Run }) {
   const [events, setEvents] = React.useState<Ev[]>([]);
   const offset = React.useRef(0);
-  const bottom = React.useRef<HTMLDivElement>(null);
+  const scroller = React.useRef<HTMLDivElement>(null);
   const [follow, setFollow] = React.useState(true);
 
   React.useEffect(() => {
@@ -127,7 +127,8 @@ function HeadlessLog({ run }: { run: Run }) {
   }, [run.id]);
 
   React.useEffect(() => {
-    if (follow) bottom.current?.scrollIntoView({ block: "end" });
+    // Scroll only the log container, never the whole window.
+    if (follow && scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
   }, [events, follow]);
 
   return (
@@ -140,7 +141,7 @@ function HeadlessLog({ run }: { run: Run }) {
           <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} className="accent-primary" /> Seguir
         </label>
       </CardHeader>
-      <CardContent className="max-h-[65vh] min-h-64 overflow-y-auto bg-inset p-4">
+      <CardContent ref={scroller} className="max-h-[65vh] min-h-64 overflow-y-auto bg-inset p-4">
         <div className="flex flex-col gap-3">
           {events.map((e, i) => (
             <EventView key={i} e={e} />
@@ -150,7 +151,6 @@ function HeadlessLog({ run }: { run: Run }) {
               <StatusDot status="running" /> Claude está trabajando…
             </div>
           )}
-          <div ref={bottom} />
         </div>
       </CardContent>
     </Card>

@@ -25,11 +25,20 @@ const taskFields = {
 };
 
 export const taskCreateSchema = z.object(taskFields);
+// No `.default()` here: in zod 4 defaults still apply inside `.partial()`, which
+// would silently reset omitted fields on every PATCH (e.g. kanban drag & drop).
 export const taskUpdateSchema = z
   .object({
-    ...taskFields,
-    order: z.number().finite().optional(),
-    runIds: z.array(z.uuid()).max(200).optional(),
+    title: text(200).trim().min(1),
+    description: text(20_000),
+    status: z.enum(TASK_STATUSES),
+    priority: z.enum(PRIORITIES),
+    projectPath: absPath.nullable(),
+    labels: z.array(text(40).trim().min(1)).max(20),
+    checklist: z.array(checklistItem).max(100),
+    prompt: text(50_000),
+    dueDate: z.iso.date().nullable(),
+    order: z.number().finite(),
   })
   .partial()
   .strict();

@@ -95,6 +95,13 @@ describe("API", () => {
     expect(o.data.counts.activeSessions).toBe(1);
   });
 
+  it("refuses to start a run for a missing task", async () => {
+    const before = c.runs.list().length;
+    const r = await call(runsRoute.POST, { body: { projectPath: projectDir, prompt: "x", taskId: "11111111-1111-4111-8111-111111111111" } });
+    expect(r.status).toBe(404);
+    expect(c.runs.list().length).toBe(before);
+  });
+
   it("instantiates templates", async () => {
     const r = await call(instantiateRoute.POST, { method: "POST", params: { id: "tpl-feature" }, body: { values: { feature: "dark mode" } } });
     expect(r.status).toBe(201);
