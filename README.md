@@ -51,6 +51,20 @@ npm run dev
 
 ¿Perdiste el enlace? `npm run url`. Sesiones y passkeys se gestionan en Ajustes → Seguridad.
 
+### App para macOS
+
+Descarga `Agentic-<versión>-arm64.dmg` (Apple Silicon) o `Agentic-<versión>.dmg` (Intel) de la [última Release](https://github.com/perita23/agentic/releases/latest), arrástrala a Aplicaciones y ábrela. Pide Touch ID al abrir y se actualiza sola: comprueba si hay versión nueva cada vez que entras, o desde el menú «Buscar actualizaciones…» / Ajustes.
+
+> Mientras no esté firmada con un Developer ID de Apple, la primera vez macOS pedirá confirmación: clic derecho → **Abrir** (o `xattr -dr com.apple.quarantine /Applications/Agentic.app`). Las actualizaciones posteriores ya no lo piden.
+
+Compilarla en local (en un Mac):
+
+```bash
+npm run desktop:dist
+```
+
+Para firmarla y notarizarla, define en el repositorio los secretos `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` y `APPLE_TEAM_ID`.
+
 ### Configuración (variables de entorno)
 
 | Variable | Por defecto | Descripción |

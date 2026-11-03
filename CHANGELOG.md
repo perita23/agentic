@@ -3,6 +3,15 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.10.0] - 2026-11-03
+
+### Añadido
+- **App para macOS** (Apple Silicon e Intel, macOS 13 o superior, incluido macOS 27): la misma interfaz dentro de una ventana nativa con barra de título integrada. Incluye su propio servidor (Next.js standalone ejecutado con el Node de Electron): no hace falta instalar Node.
+- **Touch ID al abrir la app** (nativo) que abre una sesión «desktop»; funciona también con «Exigir Touch ID» activado.
+- **Actualizaciones desde la propia app**, sin reinstalar: se comprueban cada vez que entras (al abrir, al volver a la app; como mucho cada 10 minutos), en el menú «Buscar actualizaciones…» y en Ajustes → App de escritorio. Descarga el zip de tu arquitectura con progreso en el Dock, **verifica su SHA-512** contra `latest-mac.yml`, valida la firma del bundle, sustituye la app y la reinicia. Funciona sin certificado de Apple y con repositorios privados (usa el token de GitHub de Integraciones).
+- La app hereda el `PATH` de tu shell de login, así encuentra `claude`, `git` y `tmux` de Homebrew aunque se abra desde el Dock.
+- CI: workflow `Desktop` que compila y **arranca** la `.app` en un runner macOS; la release adjunta `.dmg`, `.zip` y `latest-mac.yml`.
+
 ## [0.9.0] - 2026-11-03
 
 ### Añadido

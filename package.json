@@ -1,6 +1,6 @@
 {
   "name": "agentic-console",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/agentic.mjs dev",
@@ -14,7 +14,10 @@
     "test:watch": "vitest",
     "smoke": "node scripts/smoke.mjs",
     "check": "npm run typecheck && npm run lint && npm test",
-    "reset-auth": "node scripts/agentic.mjs url --reset-auth"
+    "reset-auth": "node scripts/agentic.mjs url --reset-auth",
+    "desktop:prepare": "AGENTIC_STANDALONE=1 next build && node desktop/scripts/prepare.cjs",
+    "desktop:dev": "npm run desktop:prepare && npm --prefix desktop start",
+    "desktop:dist": "npm run desktop:prepare && npm --prefix desktop run dist"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

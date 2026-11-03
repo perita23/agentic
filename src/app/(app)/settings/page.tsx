@@ -7,6 +7,7 @@ import { setNotificationsEnabled, useNotificationPref } from "@/lib/notify";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CopyButton, PageHeader } from "@/components/app/common";
+import { DesktopCard } from "@/components/app/desktop-card";
 import { SecuritySettings } from "@/components/app/security-settings";
 import { useApi, type SystemInfo } from "@/lib/api";
 
@@ -103,6 +104,7 @@ export default function SettingsPage() {
             )}
           </CardContent>
         </Card>
+        <DesktopCard />
         <SecuritySettings />
         <NotificationsCard />
         <Card className="lg:col-span-2">

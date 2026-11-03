@@ -44,3 +44,7 @@ next-env.d.ts
 /.agentic/
 /test-results/
 /smoke-shots/
+
+# desktop app
+/desktop/node_modules/
+/desktop/dist/

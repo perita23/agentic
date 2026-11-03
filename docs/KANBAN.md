@@ -58,9 +58,10 @@ Leyenda: ✅ hecho · 🔄 en curso · ⏳ pendiente
 | # | Tarea | Versión | Estado |
 |---|-------|---------|--------|
 | 34 | Streaming por SSE en lugar de polling | v0.8.0 | ✅ |
-| 50 | Hardening: sesiones de servidor, rate limit, audit log, permisos | v0.9.0 | 🔄 |
-| 51 | Login con Touch ID (passkeys) y «exigir Touch ID» | v0.9.0 | 🔄 |
-| 52 | App de macOS (Electron: misma UI, Node incluido, Touch ID nativo), compilada y publicada por CI en runner macOS | v0.10.0 | ⏳ |
+| 50 | Hardening: sesiones de servidor, rate limit, audit log, permisos | v0.9.0 | ✅ |
+| 51 | Login con Touch ID (passkeys) y «exigir Touch ID» | v0.9.0 | ✅ |
+| 52 | App de macOS (Electron: misma UI, Node incluido, Touch ID nativo), compilada y publicada por CI en runner macOS | v0.10.0 | 🔄 |
+| 52b | Actualizaciones desde la app (al entrar y con botón), verificadas por SHA-512 | v0.10.0 | 🔄 |
 | 53 | Asistente local con Ollama (resúmenes, títulos, descripciones de PR, tareas desde Slack/Jira) | v0.11.0 | ⏳ |
 | 54 | Dictado por voz local (Whisper / dictado de macOS, sin nube) | v0.12.0 | ⏳ |
 
