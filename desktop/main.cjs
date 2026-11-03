@@ -138,6 +138,10 @@ function unlock() {
     wc.setWindowOpenHandler(() => ({ action: "deny" }));
     wc.on("will-navigate", (e) => e.preventDefault());
     wc.once("did-finish-load", () => {
+      // CI only: unlock with a password that must still match the stored hash
+      // (the same as typing it), so the launch test can reach the main window.
+      const ciPassword = process.env.CI === "true" ? process.env.AGENTIC_DESKTOP_CI_PASSWORD : undefined;
+      if (!first && ciPassword && appLock.verifyPassword(DATA_DIR, ciPassword)) return done("password");
       if (first) send({ state: "setup" });
       else if (useTouch()) promptTouch();
       else send({ state: "password" });
