@@ -19,23 +19,24 @@ Leyenda: ✅ hecho · 🔄 en curso · ⏳ pendiente
 | 12 | Tareas (kanban) + plantillas con variables + "ejecutar con Claude" | 4 |
 | 13 | Proyectos: descubrimiento, registro, ficha git/CLAUDE.md/scripts | 5 |
 | 14 | API REST completa (Route Handlers) | 1-5 |
-| 15 | Tests backend (store, security, sessions, agents, tasks, runs, projects, API) | 7 |
-
-## 🔄 In progress
-| # | Tarea | Fase |
-|---|-------|------|
-| 16 | UI: shell (sidebar, tema oscuro, paleta Ctrl+K) | 6 |
-
-## ⏳ To do
-| # | Tarea | Fase |
-|---|-------|------|
+| 15 | Tests backend (store, security, sessions, agents, tasks, runs, projects, API) — 47 tests | 7 |
+| 16 | UI: shell (sidebar animada, tema oscuro GitHub, paleta Ctrl+K, atajo N) | 6 |
 | 17 | UI: Dashboard | 6 |
 | 18 | UI: Sesiones + visor de transcripción | 6 |
-| 19 | UI: Ejecuciones (lanzar, log en vivo, tmux) | 6 |
+| 19 | UI: Ejecuciones (lanzar, log en vivo, consola tmux) | 6 |
 | 20 | UI: Agentes | 6 |
 | 21 | UI: Kanban con drag & drop + plantillas | 6 |
 | 22 | UI: Proyectos + ficha | 6 |
 | 23 | UI: Ajustes / sistema | 6 |
-| 24 | Smoke test E2E en navegador (Playwright) | 7 |
+| 24 | Smoke test E2E en navegador (Playwright, 24 comprobaciones, estable 3/3) | 7 |
 | 25 | Build de producción + lint + typecheck | 7 |
-| 26 | `SECURITY.md` + README | 7 |
+| 26 | `SECURITY.md` + README + `npm audit` | 7 |
+
+## ⏳ Backlog (siguientes iteraciones)
+| # | Tarea |
+|---|-------|
+| 27 | Notificaciones de escritorio al terminar una ejecución |
+| 28 | Cola de tareas / ejecución programada |
+| 29 | Diff git por ejecución (qué cambió Claude) |
+| 30 | Streaming por SSE en lugar de polling |
+| 31 | Empaquetado como app de escritorio (Tauri) |

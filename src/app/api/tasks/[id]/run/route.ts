@@ -8,7 +8,8 @@ export const POST = route(async ({ c, params, body }) => {
   const projectPath = (opts.projectPath as string) || task.projectPath;
   if (!projectPath) throw new HttpError(400, "La tarea no tiene proyecto asociado");
   const checklist = task.checklist.length ? `\n\nChecklist:\n${task.checklist.map((i) => `- [${i.done ? "x" : " "}] ${i.text}`).join("\n")}` : "";
-  const prompt = task.prompt.trim() || `${task.title}\n\n${task.description}${checklist}`.trim();
+  const given = typeof opts.prompt === "string" ? opts.prompt.trim() : "";
+  const prompt = given || task.prompt.trim() || `${task.title}\n\n${task.description}${checklist}`.trim();
   const run = await c.runs.start({ ...opts, projectPath, prompt, taskId: task.id });
   c.tasks.attachRun(task.id, run.id);
   return Response.json(run, { status: 201 });

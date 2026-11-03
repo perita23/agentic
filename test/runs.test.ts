@@ -12,7 +12,7 @@ function mgr(over: Partial<ConstructorParameters<typeof RunManager>[1]> = {}) {
   const m = new RunManager(store, { dataDir, claudeBin: FAKE_CLAUDE, maxConcurrent: 2, maxLogBytes: 1024 * 1024, onFinished: (r) => finished.push(r), ...over });
   return { m, store, dataDir, finished };
 }
-const done = (m: RunManager, id: string) => waitFor(() => (m.get(id).status !== "running" ? m.get(id) : null));
+const done = (m: RunManager, id: string): Promise<Run> => waitFor(() => (m.get(id).status !== "running" ? m.get(id) : null)) as Promise<Run>;
 
 describe("buildClaudeArgs", () => {
   it("puts the prompt after -- and only adds set flags", () => {
