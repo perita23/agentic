@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useSyncExternalStore } from "react";
-import { CheckCircle2Icon, DownloadIcon, FingerprintIcon, KeyRoundIcon, LaptopIcon } from "lucide-react";
+import { CheckCircle2Icon, DownloadIcon, FingerprintIcon, FolderLockIcon, KeyRoundIcon, LaptopIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,7 @@ interface DesktopBridge {
   isDesktop: true;
   version: () => Promise<string | null>;
   checkForUpdates: () => Promise<string>;
+  openPrivacySettings?: () => Promise<boolean>;
   lock?: {
     info: () => Promise<LockInfo | null>;
     setTouchId: (on: boolean) => Promise<(LockInfo & { ok: boolean; error?: string }) | null>;
@@ -116,6 +117,13 @@ export function DesktopCard() {
               <FingerprintIcon className="size-4 text-muted-foreground" />
               <Switch aria-label="Desbloquear con Touch ID" checked={lock.touchIdEnabled} disabled={lockBusy || (!lock.touchIdAvailable && !lock.touchIdEnabled)} onCheckedChange={toggleTouchId} />
             </Row>
+            {desktop.openPrivacySettings && (
+              <Row k="Permisos de carpetas">
+                <Button size="sm" variant="outline" onClick={() => desktop.openPrivacySettings?.()} title="Ajustes del Sistema → Privacidad y seguridad → Acceso total al disco → activa Agentic">
+                  <FolderLockIcon /> Dar acceso total al disco
+                </Button>
+              </Row>
+            )}
             <Row k="Contraseña de la app">
               <Button size="sm" variant="outline" onClick={() => setChanging(true)}>
                 <KeyRoundIcon /> Cambiar contraseña

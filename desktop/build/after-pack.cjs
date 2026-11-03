@@ -4,6 +4,10 @@
 //  2. Without a Developer ID, ad-hoc sign the WHOLE bundle so that
 //     `codesign --verify --deep --strict` passes (required on Apple Silicon and
 //     by the in-app updater, which refuses bundles with a broken signature).
+//  3. Give the app a stable designated requirement (its bundle identifier).
+//     An ad-hoc signature's implicit requirement is the exact code hash, which
+//     changes with every build, so macOS forgot folder permissions (Documents,
+//     Desktop, Downloads… ) after each update and asked again.
 "use strict";
 
 const { execFileSync } = require("node:child_process");
@@ -22,5 +26,11 @@ exports.default = async function afterPack(context) {
 
   if (process.env.CSC_LINK) return; // electron-builder signs with the Developer ID next
   execFileSync("/usr/bin/codesign", ["--force", "--deep", "--sign", "-", "--timestamp=none", app], { stdio: "inherit" });
+  // Re-sign only the outer app (helpers keep their own identifiers and signatures).
+  const id = context.packager.appInfo.id;
+  if (!/^[\w.-]+$/.test(id)) throw new Error(`Unexpected bundle id: ${id}`);
+  execFileSync("/usr/bin/codesign", ["--force", "--sign", "-", "--timestamp=none", `-r=designated => identifier "${id}"`, app], { stdio: "inherit" });
+  const dr = execFileSync("/usr/bin/codesign", ["-d", "-r-", app], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  if (!dr.includes(`identifier "${id}"`)) throw new Error(`Designated requirement not applied:\n${dr}`);
   execFileSync("/usr/bin/codesign", ["--verify", "--deep", "--strict", "--verbose=2", app], { stdio: "inherit" });
 };

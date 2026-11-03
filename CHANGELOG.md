@@ -3,6 +3,15 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.12.1] - 2026-11-03
+
+### Corregido
+- La app de Mac volvía a pedir permiso para leer carpetas (Documentos, Escritorio, Descargas…) al entrar en Agentes después de cada actualización: la firma ad-hoc identificaba la app por el hash exacto de su código, que cambia en cada versión, y macOS olvidaba el permiso. Ahora la app se identifica de forma estable por su bundle id (`dev.agentic.console`) y macOS recuerda los permisos entre actualizaciones. Tras instalar esta versión puede pedirlo **una última vez**.
+
+### Añadido
+- El aviso de macOS explica por qué Agentic necesita cada carpeta.
+- Ajustes → App de escritorio → «Dar acceso total al disco»: abre directamente el panel de privacidad para conceder acceso de una vez a todas las carpetas.
+
 ## [0.12.0] - 2026-11-03
 
 ### Añadido

@@ -37,6 +37,12 @@ module.exports = {
     extendInfo: {
       LSApplicationCategoryType: "public.app-category.developer-tools",
       NSHumanReadableCopyright: "Agentic Console — MIT",
+      // Shown by macOS when Agentic first reads a project in these folders.
+      NSDocumentsFolderUsageDescription: "Agentic lee tus proyectos y los agentes de Claude Code (.claude) que están en Documentos.",
+      NSDesktopFolderUsageDescription: "Agentic lee tus proyectos y los agentes de Claude Code (.claude) que están en el Escritorio.",
+      NSDownloadsFolderUsageDescription: "Agentic lee tus proyectos y los agentes de Claude Code (.claude) que están en Descargas.",
+      NSRemovableVolumesUsageDescription: "Agentic lee tus proyectos guardados en discos externos.",
+      NSNetworkVolumesUsageDescription: "Agentic lee tus proyectos guardados en volúmenes de red.",
     },
   },
   dmg: { title: "Agentic ${version}", backgroundColor: "#0a0a0a" },
