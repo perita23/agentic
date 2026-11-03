@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld("agenticDesktop", {
   version: () => ipcRenderer.invoke("agentic:version"),
   checkForUpdates: () => ipcRenderer.invoke("agentic:check-for-updates"),
   openPrivacySettings: () => ipcRenderer.invoke("agentic:open-privacy"),
+  copyText: (text) => ipcRenderer.invoke("agentic:copy", String(text)),
   lock: {
     info: () => ipcRenderer.invoke("agentic:lock-info"),
     setTouchId: (on) => ipcRenderer.invoke("agentic:set-touch-id", !!on),
