@@ -56,6 +56,20 @@ describe("run diff", () => {
     expect(execFileSync("git", ["stash", "list"], { cwd: dir }).toString()).toBe("");
   });
 
+  it("does not misattribute files when the untracked set is huge", async () => {
+    const { dir } = repo();
+    const big = path.join(dir, "vendor");
+    fs.mkdirSync(big);
+    for (let i = 0; i < 5001; i++) fs.writeFileSync(path.join(big, `f${i}`), "");
+    const m = mgr();
+    const r = await m.start({ projectPath: dir, prompt: "EDIT" });
+    expect(r.git).toMatchObject({ untrackedUnknown: true, preUntracked: [] });
+    await done(m, r.id);
+    const d = await m.diff(r.id);
+    expect(d.newFiles).toEqual([]);
+    expect(d.files.some((f) => f.file === "tracked.txt")).toBe(true);
+  });
+
   it("reports runs outside a git repository as unavailable", async () => {
     const m = mgr();
     const r = await m.start({ projectPath: tmpDir(), prompt: "x" });

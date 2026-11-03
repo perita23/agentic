@@ -11,7 +11,7 @@ import { EmptyState } from "./common";
 interface RunDiff {
   available: boolean;
   reason?: string;
-  baseline?: { head: string; branch: string | null };
+  baseline?: { head: string; branch: string | null; untrackedUnknown?: boolean };
   commits: { hash: string; subject: string }[];
   files: { file: string; status: string; additions: number | null; deletions: number | null; preExisting: boolean }[];
   newFiles: { file: string; content: string | null }[];
@@ -157,6 +157,11 @@ export function RunDiffView({ runId, live }: { runId: string; live: boolean }) {
           )}
         </FileBlock>
       ))}
+      {data.baseline?.untrackedUnknown && (
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <InfoIcon className="size-3.5" /> El repositorio tenía demasiados ficheros sin seguimiento para distinguir los nuevos; sólo se muestran cambios en ficheros versionados.
+        </p>
+      )}
       {data.truncated && <p className="text-xs text-warning">El diff es muy grande y se ha truncado a 512 KB.</p>}
     </div>
   );

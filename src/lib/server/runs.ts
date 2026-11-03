@@ -44,6 +44,8 @@ export interface GitBaseline {
   branch: string | null;
   preDirty: string[];
   preUntracked: string[];
+  /** The untracked list could not be read (e.g. huge unignored folders): don't attribute new files to the run. */
+  untrackedUnknown?: boolean;
 }
 
 export interface RunDiff {
@@ -59,6 +61,8 @@ export interface RunDiff {
 
 const MAX_PATCH = 512 * 1024;
 const MAX_LIST = 2000;
+const MAX_UNTRACKED = 5000;
+const UNTRACKED_OPTS = { maxBuffer: 32 * 1024 * 1024, timeout: 15_000 };
 
 const lines = (s: string | null) => (s ?? "").split("\n").filter(Boolean);
 
@@ -69,14 +73,19 @@ export async function captureBaseline(cwd: string): Promise<GitBaseline | null> 
   const [branch, status, untracked] = await Promise.all([
     git(cwd, ["rev-parse", "--abbrev-ref", "HEAD"]),
     git(cwd, ["status", "--porcelain=v1", "-z", "--untracked-files=no"]),
-    git(cwd, ["ls-files", "-z", "--others", "--exclude-standard"]),
+    git(cwd, ["ls-files", "-z", "--others", "--exclude-standard"], UNTRACKED_OPTS),
   ]);
   const z = (s: string | null) => (s ?? "").split("\0").filter(Boolean);
+  const pre = z(untracked);
+  // Huge or unreadable untracked sets (e.g. an unignored node_modules) are not stored:
+  // runs.json is rewritten often, and a truncated list would misattribute files to the run.
+  const unknown = untracked === null || pre.length > MAX_UNTRACKED;
   return {
     head,
     branch: branch?.trim() || null,
     preDirty: z(status).map((l) => l.slice(3)).slice(0, MAX_LIST),
-    preUntracked: z(untracked).slice(0, MAX_LIST),
+    preUntracked: unknown ? [] : pre,
+    ...(unknown ? { untrackedUnknown: true } : {}),
   };
 }
 
@@ -443,7 +452,7 @@ export class RunManager {
       git(cwd, ["diff", ...SAFE_DIFF, "--numstat", "-z", base, "--"]),
       git(cwd, ["diff", ...SAFE_DIFF, "--name-status", "-z", base, "--"]),
       git(cwd, ["log", "--format=%h%x1f%s", `${base}..HEAD`, "-n", "100"]),
-      git(cwd, ["ls-files", "-z", "--others", "--exclude-standard"]),
+      git(cwd, ["ls-files", "-z", "--others", "--exclude-standard"], UNTRACKED_OPTS),
       git(cwd, ["diff", ...SAFE_DIFF, base, "--"], { maxBuffer: 8 * 1024 * 1024 }),
     ]);
 
@@ -480,7 +489,7 @@ export class RunManager {
     }
 
     const preUntracked = new Set(run.git.preUntracked);
-    const added = (untracked ?? "").split("\0").filter((f) => f && !preUntracked.has(f)).slice(0, 200);
+    const added = run.git.untrackedUnknown ? [] : (untracked ?? "").split("\0").filter((f) => f && !preUntracked.has(f)).slice(0, 200);
     const newFiles = added.map((file) => {
       const full = path.join(cwd, file);
       let content: string | null = null;
