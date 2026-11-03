@@ -13,6 +13,9 @@ const fs = require("node:fs");
 const { createDesktopSession } = require("./lib/session.cjs");
 const { loginShellPath, pickPort, waitForPort } = require("./lib/env.cjs");
 const updater = require("./lib/updater.cjs");
+const appLock = require("./lib/lock.cjs");
+
+const limiter = appLock.createLimiter();
 
 const DATA_DIR = process.env.AGENTIC_HOME || path.join(os.homedir(), ".agentic");
 let server = null;
@@ -28,17 +31,20 @@ app.on("second-instance", () => {
 });
 
 /**
- * Small lock window that asks for Touch ID (with "Reintentar" / "Salir" when it
- * fails). Resolves once verified with { touchId, close } so the lock stays on
- * screen ("Abriendo…") until the main window is ready. Without Touch ID it
- * resolves immediately with touchId false.
+ * Small lock window shown before anything else:
+ *  - first launch: choose an app password (Touch ID is enabled later in Ajustes);
+ *  - later: Touch ID if enabled (with "Usar contraseña"), otherwise the password.
+ * Resolves once verified with { touchId, password, close } so the lock stays on
+ * screen ("Abriendo…") until the main window is ready.
  */
 function unlock() {
-  if (process.platform !== "darwin" || !systemPreferences.canPromptTouchID()) return Promise.resolve({ touchId: false, close() {} });
+  const canTouch = process.platform === "darwin" && systemPreferences.canPromptTouchID();
+  const first = !appLock.hasPassword(DATA_DIR);
+  const useTouch = () => canTouch && appLock.touchIdEnabled(DATA_DIR);
   return new Promise((resolve) => {
     const lock = new BrowserWindow({
-      width: 340,
-      height: 360,
+      width: 460,
+      height: first ? 600 : 540,
       resizable: false,
       minimizable: false,
       maximizable: false,
@@ -60,41 +66,70 @@ function unlock() {
     let verified = false;
     let prompting = false;
     const send = (state) => {
-      if (!lock.isDestroyed()) wc.send("agentic-lock:state", state);
+      if (!lock.isDestroyed()) wc.send("agentic-lock:state", { canTouch: useTouch(), ...state });
     };
-    const onRetry = (e) => {
-      if (e.sender === wc) prompt();
+    const done = (via) => {
+      verified = true;
+      cleanup();
+      send({ state: "ok" });
+      resolve({
+        touchId: via === "touchid",
+        password: via === "password",
+        close: () => {
+          if (!lock.isDestroyed()) lock.destroy();
+        },
+      });
     };
-    const onQuit = (e) => {
-      if (e.sender === wc) app.exit(0);
-    };
-    const cleanup = () => {
-      ipcMain.removeListener("agentic-lock:retry", onRetry);
-      ipcMain.removeListener("agentic-lock:quit", onQuit);
-    };
-    async function prompt() {
-      if (prompting || verified) return;
+    async function promptTouch() {
+      if (prompting || verified || !useTouch()) return;
       prompting = true;
-      send("waiting");
+      send({ state: "touchid" });
       try {
         await systemPreferences.promptTouchID("desbloquear Agentic");
-        verified = true;
-        cleanup();
-        send("ok");
-        resolve({
-          touchId: true,
-          close: () => {
-            if (!lock.isDestroyed()) lock.destroy();
-          },
-        });
+        done("touchid");
       } catch {
-        send("error");
+        send({ state: "password", message: "No se ha verificado Touch ID. Usa tu contraseña." });
       } finally {
         prompting = false;
       }
     }
-    ipcMain.on("agentic-lock:retry", onRetry);
-    ipcMain.on("agentic-lock:quit", onQuit);
+    const handlers = {
+      "agentic-lock:create": (e, pw, confirm) => {
+        if (e.sender !== wc || verified) return;
+        if (typeof pw !== "string" || pw !== confirm) return send({ state: "setup", message: "Las contraseñas no coinciden." });
+        try {
+          appLock.createPassword(DATA_DIR, pw);
+          done("password");
+        } catch (err) {
+          send({ state: "setup", message: err.message });
+        }
+      },
+      "agentic-lock:password": (e, pw) => {
+        if (e.sender !== wc || verified) return;
+        try {
+          limiter.check();
+        } catch (err) {
+          return send({ state: "password", message: err.message });
+        }
+        if (appLock.verifyPassword(DATA_DIR, pw)) {
+          limiter.reset();
+          done("password");
+        } else {
+          limiter.fail();
+          send({ state: "password", message: "Contraseña incorrecta." });
+        }
+      },
+      "agentic-lock:touchid": (e) => {
+        if (e.sender === wc) promptTouch();
+      },
+      "agentic-lock:quit": (e) => {
+        if (e.sender === wc) app.exit(0);
+      },
+    };
+    const cleanup = () => {
+      for (const [ch, fn] of Object.entries(handlers)) ipcMain.removeListener(ch, fn);
+    };
+    for (const [ch, fn] of Object.entries(handlers)) ipcMain.on(ch, fn);
     // Closing the lock window before unlocking quits the app.
     lock.on("closed", () => {
       cleanup();
@@ -102,10 +137,14 @@ function unlock() {
     });
     wc.setWindowOpenHandler(() => ({ action: "deny" }));
     wc.on("will-navigate", (e) => e.preventDefault());
+    wc.once("did-finish-load", () => {
+      if (first) send({ state: "setup" });
+      else if (useTouch()) promptTouch();
+      else send({ state: "password" });
+    });
     lock.once("ready-to-show", () => {
       lock.show();
       lock.focus();
-      prompt();
     });
     lock.loadFile(path.join(__dirname, "lock.html"));
   });
@@ -331,7 +370,7 @@ app.whenReady().then(async () => {
     serverReady.catch(() => {});
     const lock = await unlock();
     origin = await serverReady;
-    const sid = createDesktopSession(DATA_DIR, { touchId: lock.touchId });
+    const sid = createDesktopSession(DATA_DIR, { touchId: lock.touchId, password: lock.password });
     await session.defaultSession.cookies.set({
       url: origin,
       name: "agentic_session",
@@ -351,6 +390,39 @@ app.whenReady().then(async () => {
     };
     ipcMain.handle("agentic:version", (e) => (fromApp(e) ? app.getVersion() : null));
     ipcMain.handle("agentic:check-for-updates", (e) => (fromApp(e) ? checkForUpdates(true) : "denied"));
+    // App lock settings (Ajustes): Touch ID is only enabled after a successful
+    // Touch ID prompt; changing the password needs the current one.
+    const lockInfo = () => ({
+      touchIdAvailable: process.platform === "darwin" && systemPreferences.canPromptTouchID(),
+      touchIdEnabled: appLock.touchIdEnabled(DATA_DIR),
+      hasPassword: appLock.hasPassword(DATA_DIR),
+    });
+    ipcMain.handle("agentic:lock-info", (e) => (fromApp(e) ? lockInfo() : null));
+    ipcMain.handle("agentic:set-touch-id", async (e, on) => {
+      if (!fromApp(e)) return null;
+      try {
+        if (on) {
+          if (!lockInfo().touchIdAvailable) throw new Error("Este Mac no tiene Touch ID disponible.");
+          await systemPreferences.promptTouchID("activar el desbloqueo con Touch ID");
+        }
+        appLock.setTouchId(DATA_DIR, !!on);
+        return { ok: true, ...lockInfo() };
+      } catch (err) {
+        return { ok: false, error: err && err.message ? err.message : "No se ha verificado Touch ID.", ...lockInfo() };
+      }
+    });
+    ipcMain.handle("agentic:change-password", (e, current, next) => {
+      if (!fromApp(e)) return null;
+      try {
+        limiter.check();
+        appLock.changePassword(DATA_DIR, String(current ?? ""), String(next ?? ""));
+        limiter.reset();
+        return { ok: true };
+      } catch (err) {
+        if (/actual no es correcta/.test(err.message)) limiter.fail();
+        return { ok: false, error: err.message };
+      }
+    });
     createWindow(() => lock.close());
     // Check every time the user enters the app: at launch, and when it is
     // activated or a window regains focus (throttled to every 10 minutes).
