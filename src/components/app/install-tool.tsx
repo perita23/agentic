@@ -88,7 +88,7 @@ export function InstallTool({ tool }: { tool: Tool }) {
               Instalar {LABEL[tool]}
             </DialogTitle>
             <DialogDescription>
-              Se ejecuta en esta máquina: <code className="rounded bg-secondary px-1 font-mono text-xs">{command}</code>
+              Se ejecuta en este dispositivo: <code className="rounded bg-secondary px-1 font-mono text-xs">{command}</code>
             </DialogDescription>
           </DialogHeader>
           <pre ref={logRef} aria-label="Salida de la instalación" className="max-h-80 min-h-40 overflow-auto rounded-md border bg-inset p-3 font-mono text-xs whitespace-pre-wrap text-muted-foreground">

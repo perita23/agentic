@@ -135,7 +135,7 @@ function ConfigureDialog({ provider, current, onClose }: { provider: (typeof PRO
             <DialogTitle className="flex items-center gap-2">
               <ProviderIcon provider={provider.id} className="size-4" /> Conectar {provider.name}
             </DialogTitle>
-            <DialogDescription>Las credenciales se guardan sólo en tu máquina (~/.agentic, permisos 0600) y nunca se envían al navegador.</DialogDescription>
+            <DialogDescription>Las credenciales se guardan sólo en tu dispositivo (~/.agentic, permisos 0600) y nunca se envían al navegador.</DialogDescription>
           </DialogHeader>
           <p className="rounded-md border bg-inset p-3 text-xs leading-relaxed text-muted-foreground [&_code]:font-mono [&_code]:text-foreground">{provider.help}</p>
           {provider.fields.map((f) => (
@@ -242,14 +242,14 @@ export default function IntegrationsPage() {
     }
   }
   async function disconnect(id: string, name: string) {
-    if (!confirm(`¿Desconectar ${name}? Se borrarán sus credenciales de esta máquina.`)) return;
+    if (!confirm(`¿Desconectar ${name}? Se borrarán sus credenciales de este dispositivo.`)) return;
     await api("DELETE", `/api/integrations/${id}`);
     refresh("/api/integrations");
   }
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader icon={PlugIcon} title="Integraciones" description="Conecta Slack, GitHub, Bitbucket y Jira. Todo pasa por tu servidor local; nada sale de tu máquina salvo las llamadas a esos servicios." />
+      <PageHeader icon={PlugIcon} title="Integraciones" description="Conecta Slack, GitHub, Bitbucket y Jira. Todo pasa por tu servidor local; nada sale de tu dispositivo salvo las llamadas a esos servicios." />
       <div className="grid gap-4 md:grid-cols-2">
         {PROVIDERS.map((p) => {
           const st = data?.[p.id];

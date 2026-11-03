@@ -11,6 +11,7 @@ import { DesktopCard } from "@/components/app/desktop-card";
 import { InstallTool } from "@/components/app/install-tool";
 import { AuditCard, SessionsCard, TouchIdCard } from "@/components/app/security-settings";
 import { useApi, type SystemInfo } from "@/lib/api";
+import { useDeviceName } from "@/lib/use-device";
 
 function Row({ k, v, mono, copy }: { k: string; v: React.ReactNode; mono?: boolean; copy?: string }) {
   return (
@@ -58,6 +59,7 @@ function NotificationsCard() {
 
 export default function SettingsPage() {
   const { data } = useApi<SystemInfo>("/api/system");
+  const device = useDeviceName();
   return (
     <div className="flex flex-col gap-5">
       <PageHeader icon={SettingsIcon} title="Ajustes" description="Configuración del entorno local. Se cambia con variables de entorno al arrancar." />
@@ -73,7 +75,7 @@ export default function SettingsPage() {
           <CardHeader>
             <div>
               <CardTitle>Sistema</CardTitle>
-              <CardDescription>Dependencias detectadas en esta máquina.</CardDescription>
+              <CardDescription>Dependencias detectadas en {device}.</CardDescription>
             </div>
           </CardHeader>
           <CardContent>
@@ -133,7 +135,7 @@ export default function SettingsPage() {
               <CardTitle className="flex items-center gap-2">
                 <ShieldCheckIcon className="size-4 text-success" /> Seguridad
               </CardTitle>
-              <CardDescription>Agentic puede ejecutar Claude Code en tu máquina, así que está protegido aunque sólo escuche en local.</CardDescription>
+              <CardDescription>Agentic puede ejecutar Claude Code en tu dispositivo, así que está protegido aunque sólo escuche en local.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">

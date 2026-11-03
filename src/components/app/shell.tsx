@@ -102,7 +102,7 @@ function Sidebar({ overview }: { overview?: Overview }) {
       </nav>
       <div className="border-t p-3 text-[11px] text-muted-foreground">
         <div className="flex items-center gap-1.5">
-          <span className="size-1.5 rounded-full bg-success" /> Todo se ejecuta en tu máquina
+          <span className="size-1.5 rounded-full bg-success" /> Todo se ejecuta en tu dispositivo
           <span className="ml-auto font-mono">v{process.env.NEXT_PUBLIC_APP_VERSION}</span>
         </div>
       </div>

@@ -12,6 +12,7 @@ import { RunRow } from "@/components/app/run-row";
 import { SessionRow } from "@/components/app/session-row";
 import { useApi, type Overview } from "@/lib/api";
 import { baseName, shortPath } from "@/lib/utils";
+import { useDeviceName } from "@/lib/use-device";
 
 const COLUMNS = [
   { key: "backlog", label: "Backlog", color: "bg-muted-foreground" },
@@ -23,6 +24,7 @@ const COLUMNS = [
 
 export default function DashboardPage() {
   const { data, error } = useApi<Overview>("/api/overview", { refreshInterval: 5000 });
+  const device = useDeviceName();
   const launcher = useLauncher();
   const c = data?.counts;
   const totalTasks = c?.tasks || 0;
@@ -32,7 +34,7 @@ export default function DashboardPage() {
       <PageHeader
         icon={LayoutDashboardIcon}
         title="Dashboard"
-        description="Visión general de tu actividad con Claude Code en esta máquina."
+        description={`Visión general de tu actividad con Claude Code en ${device}.`}
       />
       {error && <p className="text-sm text-destructive">Error cargando datos: {error.message}</p>}
 
@@ -129,7 +131,7 @@ export default function DashboardPage() {
           <CardContent className="px-0">
             {data && data.recentSessions.length === 0 ? (
               <div className="px-4">
-                <EmptyState icon={MessagesSquareIcon} title="Sin sesiones todavía" description="Cuando uses Claude Code en esta máquina aparecerán aquí." />
+                <EmptyState icon={MessagesSquareIcon} title="Sin sesiones todavía" description={`Cuando uses Claude Code en ${device} aparecerán aquí.`} />
               </div>
             ) : (
               <div className="scroll-area divide-y border-y">{data?.recentSessions.map((s) => <SessionRow key={s.id} s={s} />)}</div>

@@ -147,7 +147,7 @@ function AppDialog({ provider, info, onClose, onSaved }: { provider: OAuthProvid
               />
             </div>
           )}
-          <p className="text-xs text-muted-foreground">Se guardan sólo en tu máquina (~/.agentic, 0600) y nunca se envían al navegador.</p>
+          <p className="text-xs text-muted-foreground">Se guardan sólo en tu dispositivo (~/.agentic, 0600) y nunca se envían al navegador.</p>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               Cancelar
