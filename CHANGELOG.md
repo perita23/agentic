@@ -3,6 +3,14 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.18.0] - 2026-11-03
+
+### Cambiado
+- **Nuevo inicio de sesión** a pantalla completa: a la izquierda, sobre negro, el acceso con Touch ID; a la derecha, una animación con las piezas del logo y su degradado (se detiene si tienes activado «reducir movimiento»).
+
+### Añadido
+- **Distintivo de seguridad** en Ajustes y en la página de descarga: «Diseñada según OWASP ASVS 5.0 (nivel 1) y la lista de seguridad de Electron», con enlace a los controles. Es una revisión propia, no una auditoría externa.
+
 ## [0.17.0] - 2026-11-03
 
 ### Añadido

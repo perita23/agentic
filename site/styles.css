@@ -278,3 +278,17 @@ footer {
     justify-content: center;
   }
 }
+.badge {
+  max-width: 760px;
+  margin: 0 auto 16px;
+  padding: 10px 14px;
+  border: 1px solid rgb(62 207 142 / 0.35);
+  border-radius: 10px;
+  background: rgb(62 207 142 / 0.06);
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+.badge strong {
+  color: var(--fg);
+}
