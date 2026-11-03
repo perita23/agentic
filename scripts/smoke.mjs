@@ -202,6 +202,17 @@ try {
   check(true, "project view shows git history");
   await shot("07-project");
 
+  await page.goto(`${base}/analytics`);
+  await page.getByText("Tokens por día").waitFor();
+  const bars = page.locator("main button[aria-label$='tokens']");
+  await bars.last().hover();
+  await page.getByText("Caché escritura").waitFor();
+  check((await bars.last().getAttribute("aria-label")).includes("1.5k"), "analytics: today's bar reflects transcript tokens");
+  await shot("10-analytics");
+  await page.getByRole("button", { name: "Tabla" }).click();
+  await page.locator("main table").waitFor();
+  check(true, "analytics: table view available");
+
   await page.goto(`${base}/settings`);
   await page.getByText("9.9.9 (Fake Claude)").waitFor();
   const appVersion = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
