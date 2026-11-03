@@ -154,6 +154,15 @@ try {
   await shot("03b-run-diff");
   await shot("03-run");
 
+  // Stop a long-running run from the UI (regression: body-less POSTs were rejected with 415).
+  const longRun = await (
+    await fetch(base + "/api/runs", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ projectPath: project, prompt: "SLEEP" }) })
+  ).json();
+  await page.goto(`${base}/runs/${longRun.id}`);
+  await page.getByRole("button", { name: "Detener" }).click();
+  await page.locator("main").getByText("detenida", { exact: true }).waitFor({ timeout: 15000 });
+  check(true, "stop a running run from the UI");
+
   // Tasks: create from template, then see it on the board.
   await page.goto(`${base}/tasks`);
   await page.getByRole("button", { name: "Desde plantilla" }).click();
