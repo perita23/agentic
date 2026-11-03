@@ -42,7 +42,7 @@ export async function request<T>(
   provider: string,
   base: URL,
   path: string,
-  init: { method?: string; headers?: Record<string, string>; body?: unknown; timeoutMs?: number } = {},
+  init: { method?: string; headers?: Record<string, string>; body?: unknown; form?: Record<string, string>; timeoutMs?: number } = {},
 ): Promise<T> {
   let url = new URL(path, base);
   if (url.origin !== base.origin) throw new IntegrationError(provider, 0, "destino no permitido");
@@ -54,8 +54,13 @@ export async function request<T>(
     for (let hops = 0; ; hops++) {
       res = await fetch(url, {
         method: init.method ?? "GET",
-        headers: { accept: "application/json", "user-agent": "agentic-console", ...(init.body !== undefined ? { "content-type": "application/json" } : {}), ...init.headers },
-        body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+        headers: {
+          accept: "application/json",
+          "user-agent": "agentic-console",
+          ...(init.form ? { "content-type": "application/x-www-form-urlencoded" } : init.body !== undefined ? { "content-type": "application/json" } : {}),
+          ...init.headers,
+        },
+        body: init.form ? new URLSearchParams(init.form).toString() : init.body !== undefined ? JSON.stringify(init.body) : undefined,
         redirect: "manual",
         signal: ctrl.signal,
       });

@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { errorMessage, PageHeader } from "@/components/app/common";
 import { ProviderIcon } from "@/components/app/provider-icon";
+import { ConnectActions } from "@/components/app/oauth-connect";
 import { api, refresh, useApi } from "@/lib/api";
 
 type Status = Record<string, { configured: boolean; secretHint?: string | null; updatedAt?: string } & Record<string, unknown>>;
@@ -43,8 +44,8 @@ const PROVIDERS: {
     ],
     help: (
       <>
-        Crea una app en api.slack.com/apps, añade los scopes de bot <code>channels:read</code>, <code>channels:history</code>, <code>groups:read</code>,{" "}
-        <code>groups:history</code>, <code>chat:write</code> y <code>users:read</code>, instálala en tu workspace e invita al bot a los canales.
+        Con «Crear app de Slack» la app se crea ya con los permisos correctos: pulsa <em>Install to Workspace</em>, copia el <em>Bot User OAuth Token</em>{" "}
+        (<code>xoxb-…</code>) de «OAuth &amp; Permissions» e invita al bot a tus canales (<code>/invite @Agentic</code>).
       </>
     ),
   },
@@ -144,7 +145,7 @@ function ConfigureDialog({ provider, current, onClose }: { provider: (typeof PRO
                 className="font-mono"
                 placeholder={f.secret && current?.configured ? `${current.secretHint} (déjalo vacío para mantenerlo)` : f.placeholder}
                 value={values[f.name]}
-                required={f.required && !(f.secret && current?.configured)}
+                required={f.required && !(f.secret && current?.configured) && !(current?.auth === "oauth" && f.name === "email")}
                 onChange={(e) => setValues({ ...values, [f.name]: e.target.value })}
               />
             </div>
@@ -180,7 +181,28 @@ function ConfigureDialog({ provider, current, onClose }: { provider: (typeof PRO
 }
 
 export default function IntegrationsPage() {
-  const { data } = useApi<Status>("/api/integrations");
+  // While a browser login (Jira / Bitbucket) is in progress, poll until it lands.
+  const [waiting, setWaiting] = React.useState(false);
+  const { data } = useApi<Status>("/api/integrations", { refreshInterval: waiting ? 2000 : 0 });
+  const seen = React.useRef<Record<string, string | undefined> | null>(null);
+  React.useEffect(() => {
+    if (!data) return;
+    const now = Object.fromEntries(PROVIDERS.map((p) => [p.id, data[p.id]?.configured ? String(data[p.id]?.updatedAt) : undefined]));
+    if (waiting && seen.current) {
+      for (const p of PROVIDERS) {
+        if (now[p.id] && now[p.id] !== seen.current[p.id]) {
+          toast.success(`${p.name} conectado`);
+          setWaiting(false);
+        }
+      }
+    }
+    seen.current = now;
+  }, [data, waiting]);
+  React.useEffect(() => {
+    if (!waiting) return;
+    const t = setTimeout(() => setWaiting(false), 10 * 60_000);
+    return () => clearTimeout(t);
+  }, [waiting]);
   const [editing, setEditing] = React.useState<(typeof PROVIDERS)[number] | null>(null);
   const [testing, setTesting] = React.useState<string | null>(null);
 
@@ -232,12 +254,17 @@ export default function IntegrationsPage() {
                 </div>
               </CardHeader>
               <CardContent className="flex flex-wrap items-center gap-2">
-                {st?.configured && <span className="mr-auto font-mono text-xs text-muted-foreground">{st.secretHint}</span>}
-                <Button size="sm" variant={st?.configured ? "outline" : "default"} onClick={() => setEditing(p)}>
-                  {st?.configured ? "Editar" : "Conectar"}
-                </Button>
+                {!st?.configured && <ConnectActions provider={p.id} onManual={() => setEditing(p)} onWaiting={setWaiting} />}
                 {st?.configured && (
                   <>
+                    <span className="mr-auto flex items-center gap-2 font-mono text-xs text-muted-foreground">
+                      {st.secretHint}
+                      {(st.auth === "oauth" || st.source === "oauth") && <Badge>OAuth</Badge>}
+                      {st.source === "gh" && <Badge>gh CLI</Badge>}
+                    </span>
+                    <Button size="sm" variant="outline" onClick={() => setEditing(p)}>
+                      Editar
+                    </Button>
                     <Button size="sm" variant="outline" disabled={testing === p.id} onClick={() => test(p.id, p.name)}>
                       <PlugZapIcon /> Probar
                     </Button>
