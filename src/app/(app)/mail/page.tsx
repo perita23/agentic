@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangleIcon, CheckIcon, InboxIcon, MailIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
+import { AlertTriangleIcon, CheckIcon, InboxIcon, MailIcon, MailOpenIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,12 +15,13 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState, errorMessage, PageHeader } from "@/components/app/common";
 import { api, refresh, useApi, type ProjectListItem } from "@/lib/api";
 import { MAIL_CATEGORIES, MAIL_CATEGORY_LABEL, type MailCategory } from "@/lib/mail";
-import type { MailItem } from "@/lib/server/mail";
+import type { MailBody, MailItem } from "@/lib/server/mail";
+import { linkify } from "@/components/app/linkify";
 import { cn, timeAgo } from "@/lib/utils";
 
 interface Overview {
   accounts: { id: string; label: string; host: string; user: string; lastSyncAt: string | null; lastError: string | null }[];
-  settings: { enabled: boolean; intervalMin: number; days: number; lastRunAt: string | null };
+  settings: { enabled: boolean; intervalMin: number; days: number; syncSeen: boolean; lastRunAt: string | null };
   running: boolean;
   items: MailItem[];
 }
@@ -109,34 +110,65 @@ function ConnectDialog({ onClose }: { onClose: () => void }) {
 }
 
 function MailRow({ m, projects }: { m: MailItem; projects: ProjectListItem[] }) {
-  async function patch(body: object) {
+  const [open, setOpen] = React.useState(false);
+  const { data: body, error: bodyError, isLoading } = useApi<MailBody>(open ? `/api/mail/items/${m.id}/body` : null, { revalidateOnFocus: false, shouldRetryOnError: false });
+  async function patch(b: object) {
     try {
-      await api("PATCH", `/api/mail/items/${m.id}`, body);
+      await api("PATCH", `/api/mail/items/${m.id}`, b);
       refresh("/api/mail");
     } catch (e) {
       toast.error("No se pudo guardar", { description: errorMessage(e) });
     }
   }
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && m.unread) void patch({ read: true }); // opening a message reads it
+  }
+  const chip = "flex h-7 cursor-pointer items-center gap-1 rounded-md border px-2 text-xs text-muted-foreground hover:text-foreground";
   return (
-    <li className={cn("flex items-start gap-3 px-4 py-2.5", m.done && "opacity-50")} title={m.reason}>
+    <li className={cn("flex items-start gap-3 px-3 py-2.5 sm:px-4", m.done && "opacity-50")} title={m.reason}>
       <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", m.unread ? "bg-primary" : "bg-transparent")} aria-label={m.unread ? "Sin leer" : "Leído"} />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 text-sm">
-          <span className={cn("truncate", m.unread && "font-semibold")}>{m.fromName || m.fromAddress}</span>
-          <span className={cn("shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium", CAT_TONE[m.category])}>{MAIL_CATEGORY_LABEL[m.category]}</span>
-          <span className="ml-auto shrink-0 text-xs text-muted-foreground">{timeAgo(m.date)}</span>
-        </div>
-        <div className={cn("truncate text-sm", m.unread ? "text-foreground" : "text-muted-foreground")}>{m.subject}</div>
-        {m.snippet && <div className="truncate text-xs text-muted-foreground">{m.snippet}</div>}
+        <button type="button" onClick={toggle} aria-expanded={open} className="block w-full min-w-0 cursor-pointer text-left">
+          <div className="flex min-w-0 items-center gap-2 text-sm">
+            <span className={cn("min-w-0 truncate", m.unread && "font-semibold")}>{m.fromName || m.fromAddress}</span>
+            <span className={cn("shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium", CAT_TONE[m.category])}>{MAIL_CATEGORY_LABEL[m.category]}</span>
+            <span className="ml-auto shrink-0 text-xs text-muted-foreground">{timeAgo(m.date)}</span>
+          </div>
+          <div className={cn("text-sm break-words", open ? "" : "truncate", m.unread ? "text-foreground" : "text-muted-foreground")}>{m.subject}</div>
+          {!open && m.snippet && <div className="truncate text-xs text-muted-foreground">{m.snippet}</div>}
+        </button>
+        {open && (
+          <div className="mt-2 rounded-md border bg-inset p-3 text-sm">
+            <div className="mb-2 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
+              <span className="break-all">De: {m.fromName ? `${m.fromName} <${m.fromAddress}>` : m.fromAddress}</span>
+              {body?.to && <span className="break-all">Para: {body.to}</span>}
+            </div>
+            {isLoading && <p className="text-xs text-muted-foreground">Cargando el mensaje…</p>}
+            {bodyError && <p className="text-xs text-destructive">{errorMessage(bodyError)}</p>}
+            {body && (
+              <>
+                <div className="max-h-96 overflow-auto leading-relaxed break-words whitespace-pre-wrap">{body.text ? linkify(body.text) : <span className="text-muted-foreground">(El mensaje no tiene texto)</span>}</div>
+                {body.truncated && <p className="mt-1 text-xs text-muted-foreground">Mensaje recortado por su tamaño.</p>}
+                {body.attachments.length > 0 && <p className="mt-2 text-xs text-muted-foreground">Adjuntos (no se descargan): {body.attachments.map((x) => x.name).join(", ")}</p>}
+                <p className="mt-2 text-[11px] text-muted-foreground">Texto sin formato: no se cargan imágenes ni contenido externo.</p>
+              </>
+            )}
+          </div>
+        )}
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
-          <select aria-label={`Proyecto de «${m.subject}»`} value={m.projectPath ?? ""} onChange={(e) => void patch({ projectPath: e.target.value || null })} className="h-7 max-w-48 rounded-md border bg-inset px-1.5 text-xs">
+          <select aria-label={`Proyecto de «${m.subject}»`} value={m.projectPath ?? ""} onChange={(e) => void patch({ projectPath: e.target.value || null })} className="h-7 w-full max-w-44 rounded-md border bg-inset px-1.5 text-xs sm:w-auto">
             <option value="">Sin proyecto</option>
             {projects.map((p) => <option key={p.path} value={p.path}>{p.name}</option>)}
           </select>
-          <select aria-label={`Categoría de «${m.subject}»`} value={m.category} onChange={(e) => void patch({ category: e.target.value })} className="h-7 rounded-md border bg-inset px-1.5 text-xs">
+          <select aria-label={`Categoría de «${m.subject}»`} value={m.category} onChange={(e) => void patch({ category: e.target.value })} className="h-7 max-w-40 rounded-md border bg-inset px-1.5 text-xs">
             {MAIL_CATEGORIES.map((c) => <option key={c} value={c}>{MAIL_CATEGORY_LABEL[c]}</option>)}
           </select>
-          <button type="button" onClick={() => void patch({ done: !m.done })} className="flex h-7 cursor-pointer items-center gap-1 rounded-md border px-2 text-xs text-muted-foreground hover:text-foreground">
+          <button type="button" onClick={() => void patch({ read: m.unread })} className={chip}>
+            {m.unread ? <MailOpenIcon className="size-3" /> : <MailIcon className="size-3" />} {m.unread ? "Marcar leído" : "Marcar sin leer"}
+          </button>
+          <button type="button" onClick={() => void patch({ done: !m.done })} className={chip}>
             <CheckIcon className="size-3" /> {m.done ? "Reabrir" : "Hecho"}
           </button>
         </div>
@@ -199,7 +231,7 @@ export default function MailPage() {
       : MAIL_CATEGORIES.map((c) => ({ key: c, title: MAIL_CATEGORY_LABEL[c], items: items.filter((m) => m.category === c) }));
 
   return (
-    <div className="grid gap-5">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
       <PageHeader
         icon={MailIcon}
         title="Correo"
@@ -237,9 +269,13 @@ export default function MailPage() {
                 </label>
                 <span className="text-xs text-muted-foreground">{data.settings.lastRunAt ? `Última vez ${timeAgo(data.settings.lastRunAt)}` : "Aún no se ha ejecutado"}</span>
               </div>
+              <label className="flex items-start gap-2 text-xs text-muted-foreground">
+                <Switch checked={data.settings.syncSeen} onCheckedChange={(v) => void setSettings({ syncSeen: v })} aria-label="Marcar leído también en el correo" />
+                <span>Marcar leído también en tu correo. Desactivado, Agentic no cambia nada en tu bandeja (sólo recuerda aquí lo que has leído).</span>
+              </label>
               <ul className="grid gap-1.5">
                 {data.accounts.map((a) => (
-                  <li key={a.id} className="flex items-center gap-2 text-xs">
+                  <li key={a.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
                     <MailIcon className="size-3.5 text-muted-foreground" />
                     <span className="font-medium">{a.label}</span>
                     <span className="text-muted-foreground">{a.host}</span>
@@ -250,6 +286,7 @@ export default function MailPage() {
                   </li>
                 ))}
               </ul>
+              <Button variant="outline" size="sm" className="w-fit" onClick={() => setConnecting(true)}><PlusIcon /> Añadir otra cuenta</Button>
             </CardContent>
           </Card>
 

@@ -39,7 +39,19 @@ export interface MailItem {
   /** The user set category/project by hand: sync never changes it. */
   manual: boolean;
   done: boolean;
+  /** Read/unread chosen by the user here; sync does not overwrite it. */
+  userRead?: boolean;
 }
+
+export interface MailBody {
+  text: string;
+  to: string;
+  attachments: { name: string; size: number }[];
+  truncated: boolean;
+}
+
+export type MailBodyFetcher = (account: MailAccount, uid: number) => Promise<MailBody>;
+export type MailSeenSetter = (account: MailAccount, uid: number, seen: boolean) => Promise<void>;
 
 export interface RawMail {
   uid: number;
@@ -56,6 +68,8 @@ export interface MailSettings {
   enabled: boolean;
   intervalMin: number;
   days: number;
+  /** Also mark messages read/unread on the mail server (off by default: Agentic then never changes your mailbox). */
+  syncSeen: boolean;
   senderRules: Record<string, string>;
   lastRunAt: string | null;
 }
@@ -66,7 +80,7 @@ const ACCOUNTS = "mail-accounts";
 const ITEMS = "mail-items";
 const SETTINGS = "mail-settings";
 const MAX_ITEMS = 1000;
-const DEFAULTS: MailSettings = { enabled: true, intervalMin: 15, days: 7, senderRules: {}, lastRunAt: null };
+const DEFAULTS: MailSettings = { enabled: true, intervalMin: 15, days: 7, syncSeen: false, senderRules: {}, lastRunAt: null };
 
 export const MAIL_STORES = [ACCOUNTS, ITEMS];
 
@@ -82,11 +96,13 @@ const settingsSchema = z.object({
   enabled: z.boolean().optional(),
   intervalMin: z.number().int().min(5).max(240).optional(),
   days: z.number().int().min(1).max(30).optional(),
+  syncSeen: z.boolean().optional(),
 });
 const patchSchema = z.object({
   projectPath: z.string().max(1000).nullable().optional(),
   category: z.enum(["urgente", "reuniones", "facturas", "desarrollo", "seguridad", "newsletters", "personal"]).optional(),
   done: z.boolean().optional(),
+  read: z.boolean().optional(),
   /** Remember "mail from this sender goes to this project" for future messages. */
   remember: z.boolean().default(true),
 });
@@ -105,6 +121,7 @@ export class MailService {
     private projects: () => ProjectRef[],
     private fetcher: MailFetcher,
     private verify: (a: Pick<MailAccount, "host" | "port" | "user" | "password">) => Promise<void>,
+    private io: { body?: MailBodyFetcher; setSeen?: MailSeenSetter } = {},
   ) {}
 
   private accounts() {
@@ -159,6 +176,15 @@ export class MailService {
     return { ...this.settings(), senderRules: undefined };
   }
 
+  /** The full text of one message, fetched on demand (never stored). Text only: no HTML, no remote images. */
+  async body(id: string): Promise<MailBody> {
+    const m = this.items().find((x) => x.id === id);
+    const account = m && this.accounts().find((a) => a.id === m.accountId);
+    if (!m || !account) throw new HttpError(404, "Mensaje no encontrado");
+    if (!this.io.body) throw new HttpError(501, "No disponible");
+    return this.io.body(account, m.uid);
+  }
+
   /** Move a message by hand; by default remember it for the sender. */
   patchItem(id: string, body: unknown) {
     const p = parse(patchSchema, body);
@@ -179,9 +205,17 @@ export class MailService {
         m.reason = "Categoría elegida por ti";
       }
       if (p.done !== undefined) m.done = p.done;
+      if (p.read !== undefined) {
+        m.userRead = p.read;
+        m.unread = !p.read;
+      }
       out = m;
     });
     if (!out) throw new HttpError(404, "Mensaje no encontrado");
+    if (p.read !== undefined && this.settings().syncSeen && this.io.setSeen) {
+      const account = this.accounts().find((a) => a.id === out!.accountId);
+      if (account) void this.io.setSeen(account, out.uid, p.read).catch(() => {}); // best effort: the local state is what counts
+    }
     if (p.remember && typeof p.projectPath === "string") {
       const address = out.fromAddress.toLowerCase();
       this.store.update<Partial<MailSettings>>(SETTINGS, {}, (s) => void (s.senderRules = { ...(s.senderRules ?? {}), [address]: p.projectPath as string }));
@@ -235,7 +269,7 @@ export class MailService {
         const id = `${account.id}:${r.uid}`;
         const prev = byId.get(id);
         if (prev) {
-          prev.unread = r.unread; // read elsewhere
+          if (prev.userRead === undefined) prev.unread = r.unread; // read elsewhere
           continue;
         }
         const like = { ...r, fromName: r.fromName, fromAddress: r.fromAddress };

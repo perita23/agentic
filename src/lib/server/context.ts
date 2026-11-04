@@ -4,7 +4,7 @@ import { getConfig, type Config } from "./config";
 import { queueMessage, runMessage } from "./integrations/messages";
 import { ProjectService } from "./projects";
 import { MailService, MAIL_STORES } from "./mail";
-import { fetcher as mailFetcher, verify as mailVerify } from "./mail-imap";
+import { fetcher as mailFetcher, verify as mailVerify, bodyFetcher as mailBody, seenSetter as mailSeen } from "./mail-imap";
 import { JiraService } from "./integrations/jira";
 import { OAuthService } from "./integrations/oauth";
 import { Installer } from "./install";
@@ -88,7 +88,7 @@ export function createContext(config: Config): Context {
   const schedules = new ScheduleService(store, runs, (p) => projects.isKnown(p));
   const budgets = new BudgetService(store, runs, sessions, (msg, over) => integrations.notify("budget", msg, over));
   schedules.guard = queue.guard = () => budgets.assertAutomationAllowed();
-  const mail = new MailService(store, () => projects.list().filter((x) => x.registered || x.sessionCount > 0).map((x) => ({ path: x.path, name: x.name })), mailFetcher, mailVerify);
+  const mail = new MailService(store, () => projects.list().filter((x) => x.registered || x.sessionCount > 0).map((x) => ({ path: x.path, name: x.name })), mailFetcher, mailVerify, { body: mailBody, setSeen: mailSeen });
   if (process.env.NODE_ENV !== "test" && process.env.AGENTIC_MAIL_ROUTINE !== "0") mail.startRoutine();
   return {
     config,

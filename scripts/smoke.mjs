@@ -155,7 +155,7 @@ const port = 4400 + Math.floor(Math.random() * 500);
 const base = `http://localhost:${port}`;
 const mailFixture = path.join(tmp, "mail.json");
 fs.writeFileSync(mailFixture, JSON.stringify([
-  { uid: 1, fromName: "Ana", fromAddress: "ana@cliente.com", subject: "Bug en demo-app al pagar", snippet: "No funciona el checkout", date: new Date().toISOString(), unread: true, listUnsubscribe: false },
+  { uid: 1, fromName: "Ana", fromAddress: "ana@cliente.com", subject: "Bug en demo-app al pagar", snippet: "No funciona el checkout", body: "Texto completo del correo de Ana.\nSegunda línea.", date: new Date().toISOString(), unread: true, listUnsubscribe: false },
   { uid: 2, fromName: "Facturación", fromAddress: "billing@proveedor.com", subject: "Factura de octubre", snippet: "", date: new Date().toISOString(), unread: true, listUnsubscribe: false },
 ]));
 const env = { ...process.env, AGENTIC_MAIL_FIXTURE: mailFixture, AGENTIC_HOME: dataDir, CLAUDE_HOME: claudeHome, CLAUDE_BIN: path.join(root, "test/fixtures/fake-claude.mjs"), PORT: String(port), HOST: "127.0.0.1", AGENTIC_ALLOW_INSECURE_INTEGRATIONS: "1", AGENTIC_SLACK_API_URL: slackUrl };
@@ -560,6 +560,25 @@ try {
   const mailOverview = JSON.stringify(await (await fetch(base + "/api/mail", { headers: authH })).json());
   check(!mailOverview.includes("app-pass-123"), "the mail password is never returned by the API");
   check((await page.getByRole("heading", { name: /demo-app/ }).count()) + (await page.getByText("demo-app", { exact: true }).count()) > 0 && (await page.getByText("Factura de octubre").count()) === 1, "mail is filed under the project named in the subject");
+  // Open a message: its text shows and it is marked read; mark it unread again by hand.
+  await page.getByRole("button", { name: /Bug en demo-app al pagar/ }).click();
+  await page.getByText("Texto completo del correo de Ana.").waitFor();
+  await page.getByRole("button", { name: "Marcar sin leer" }).first().waitFor();
+  check(true, "opening a mail shows its text and marks it read");
+  await page.getByRole("button", { name: "Marcar sin leer" }).first().click();
+  await page.getByRole("button", { name: "Marcar leído" }).first().waitFor();
+  // A second account can be added.
+  await page.getByRole("button", { name: "Añadir otra cuenta" }).click();
+  await page.getByLabel("Correo", { exact: true }).fill("trabajo@empresa.com");
+  await page.getByLabel("Contraseña de aplicación").fill("otra-pass");
+  await page.getByRole("button", { name: "Conectar", exact: true }).click();
+  await page.getByText("trabajo@empresa.com").first().waitFor();
+  check(((await (await fetch(base + "/api/mail", { headers: authH })).json()).accounts ?? []).length === 2, "more than one mail account can be connected");
+  // Phone width: nothing spills out of the screen.
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.waitForTimeout(300);
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "the mail page fits a phone screen (no horizontal overflow)");
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole("tab", { name: "Por tipo" }).click();
   await page.getByText("Facturas y pagos").first().waitFor();
   check(!fs.readFileSync(path.join(dataDir, "mail-accounts.json"), "utf8").includes("app-pass-123"), "the mail password is encrypted at rest");

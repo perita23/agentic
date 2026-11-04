@@ -55,6 +55,32 @@ describe("MailService", () => {
     expect(svc.overview().items.find((m) => m.id === id)).toMatchObject({ done: true, projectPath: "/w/zeta", manual: true });
   });
 
+  it("reads on demand and remembers what you marked read, even after the next sync", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentic-mail-"));
+    const messages = [raw(1, { subject: "Hola" })];
+    const seen: [number, boolean][] = [];
+    const svc = new MailService(new JsonStore(dir, new Set(MAIL_STORES)), () => [], async () => messages, async () => {}, {
+      body: async (_a, uid) => ({ text: `cuerpo ${uid}`, to: "me@example.com", attachments: [], truncated: false }),
+      setSeen: async (_a, uid, v) => void seen.push([uid, v]),
+    });
+    await svc.addAccount(acct);
+    await svc.sync();
+    const id = svc.overview().items[0].id;
+    expect(await svc.body(id)).toMatchObject({ text: "cuerpo 1" });
+    await expect(svc.body("nope")).rejects.toThrow(/no encontrado/);
+    svc.patchItem(id, { read: true });
+    expect(svc.overview().items[0].unread).toBe(false);
+    await svc.sync(); // the server still says unread
+    expect(svc.overview().items[0].unread).toBe(false);
+    svc.patchItem(id, { read: false });
+    expect(svc.overview().items[0].unread).toBe(true);
+    expect(seen).toEqual([]); // the mailbox is untouched unless the user opts in
+    svc.updateSettings({ syncSeen: true });
+    svc.patchItem(id, { read: true });
+    await Promise.resolve();
+    expect(seen).toEqual([[1, true]]);
+  });
+
   it("removing an account removes its messages; sync errors are reported, not thrown", async () => {
     const { svc } = setup([raw(1)]);
     const a = await svc.addAccount(acct);

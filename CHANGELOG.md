@@ -3,6 +3,16 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.35.1] - 2026-11-04
+
+### Añadido
+- **Abrir un correo y leerlo.** Al pulsar un mensaje se despliega su contenido (texto sin formato, sin imágenes ni contenido externo; los adjuntos sólo se listan) y queda marcado como leído.
+- **Marcar leído / sin leer a mano**, con un botón en cada mensaje. Agentic recuerda lo que marcas aunque el servidor siga diciendo otra cosa. Opcional: «Marcar leído también en tu correo» (desactivado por defecto: así Agentic no cambia nada de tu bandeja).
+- **Más de una cuenta**: botón «Añadir otra cuenta» dentro de la sección de Correo.
+
+### Corregido
+- La página de Correo ya se adapta al ancho de la pantalla (antes se salía por los lados y escondía botones).
+
 ## [0.35.0] - 2026-11-04
 
 ### Añadido
