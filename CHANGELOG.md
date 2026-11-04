@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.31.1] - 2026-11-04
+
+### Cambiado
+- La tarjeta «Claude trabajando» del menú lateral ya sólo aparece cuando no estás viendo la ejecución o el chat (que ya muestran su propia bola).
+
 ## [0.31.0] - 2026-11-04
 
 ### Añadido

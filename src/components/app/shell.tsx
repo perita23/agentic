@@ -156,7 +156,8 @@ function Sidebar({ overview }: { overview?: Overview }) {
         </button>
         {editing && hidden.length > 0 && <p className="px-2.5 text-[11px] text-muted-foreground">Lo oculto sigue disponible con Ctrl K.</p>}
       </nav>
-      {overview?.activity && (
+      {/* The live card is for when you are elsewhere: a run or chat page already shows its own orb. */}
+      {overview?.activity && !pathname.startsWith("/runs/") && !pathname.startsWith("/chat") && (
         <Link href={`/runs/${overview.activity.runId}`} className="mx-2 mb-2 flex items-center gap-2.5 rounded-lg border bg-card px-2.5 py-2 text-xs transition-colors hover:border-border-strong" aria-live="polite">
           <LiquidOrb state={overview.activity.state} size={30} />
           <span className="min-w-0">
