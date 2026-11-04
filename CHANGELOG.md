@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.35.4] - 2026-11-04
+
+### Corregido
+- **El chat ya no se queda colgado cuando Claude lee una imagen.** Una captura llegaba como una línea de varios MB: la salida de Claude se cortaba a la mitad (el resultado se perdía) y el lector del registro se atascaba en ella: la pantalla se quedaba en «Leyendo ficheros…» mientras Claude seguía trabajando por dentro. Ahora las imágenes se guardan aparte (se ven igualmente en el chat), el lector sabe avanzar aunque una línea sea enorme, y el resultado final del turno se registra siempre, incluso si el registro llega a su tamaño máximo.
+
 ## [0.35.3] - 2026-11-04
 
 ### Añadido

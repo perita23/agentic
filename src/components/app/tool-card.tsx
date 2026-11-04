@@ -44,8 +44,10 @@ export function resultParts(content: unknown): { text: string; images: { src: st
       if (typeof b === "string") text.push(b);
       else if (b?.type === "text" && typeof b.text === "string") text.push(b.text);
       else if (b?.type === "image") {
-        const s = b.source as { type?: string; media_type?: string; data?: string } | undefined;
+        const s = b.source as { type?: string; media_type?: string; data?: string; id?: string } | undefined;
         if (s?.type === "base64" && s.data && /^image\/(png|jpeg|gif|webp)$/.test(s.media_type ?? "")) images.push({ src: `data:${s.media_type};base64,${s.data}` });
+        // Pictures are kept in the uploads store (the log stays small).
+        else if (s?.type === "upload" && typeof s.id === "string" && /^[0-9a-f-]{36}$/.test(s.id)) images.push({ src: `/api/uploads/${s.id}` });
       }
     }
   }

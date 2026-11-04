@@ -1,3 +1,4 @@
+import { saveUpload } from "./uploads";
 import { spawn, execFile, type ChildProcess } from "node:child_process";
 import { findUpload, uploadsDir } from "./uploads";
 import crypto from "node:crypto";
@@ -125,6 +126,35 @@ export interface RunOptions {
 
 const R = "runs";
 const MAX_RUN_HISTORY = 500;
+/** Largest single stream-json line (event) we accept from claude. */
+const MAX_EVENT_LINE = 48 * 1024 * 1024;
+
+/**
+ * Keep the run log small: a screenshot read by Claude arrives as megabytes of base64 inside one line. Pictures
+ * are moved to the uploads store (the chat shows them from there) and the heavy duplicate in `tool_use_result`
+ * is dropped, so a few images can never fill the log or make a single line too big to stream.
+ */
+export function slimLogEvent(o: Record<string, unknown>, dataDir: string): Record<string, unknown> {
+  if (o.type !== "user") return o;
+  const message = o.message as { content?: unknown } | undefined;
+  if (Array.isArray(message?.content)) {
+    for (const block of message!.content as Record<string, unknown>[]) {
+      if (block?.type !== "tool_result" || !Array.isArray(block.content)) continue;
+      block.content = (block.content as Record<string, unknown>[]).map((part) => {
+        const src = part?.type === "image" ? (part.source as { type?: string; media_type?: string; data?: string } | undefined) : undefined;
+        if (!src || src.type !== "base64" || typeof src.data !== "string") return part;
+        try {
+          const saved = saveUpload(dataDir, { mime: src.media_type, data: src.data });
+          return { type: "image", source: { type: "upload", id: saved.id, media_type: saved.mime } };
+        } catch {
+          return { type: "text", text: "[imagen demasiado grande o no válida: no se ha guardado]" };
+        }
+      });
+    }
+  }
+  if (o.tool_use_result && JSON.stringify(o.tool_use_result).length > 20_000) delete o.tool_use_result;
+  return o;
+}
 
 /** Build the argv passed to `claude` (never through a shell). */
 export function buildClaudeArgs(input: RunInput): string[] {
@@ -289,9 +319,11 @@ export class RunManager {
     let bytes = 0;
     let truncatedLog = false;
     const writeLog = (obj: unknown) => {
-      if (truncatedLog) return;
+      const isResult = (obj as { type?: string } | null)?.type === "result";
+      // Past the cap only the final result is still written: the run must never look unfinished.
+      if (truncatedLog && !isResult) return;
       const line = JSON.stringify(obj) + "\n";
-      if (bytes + line.length > this.opts.maxLogBytes) {
+      if (!truncatedLog && !isResult && bytes + line.length > this.opts.maxLogBytes) {
         truncatedLog = true;
         log.write(JSON.stringify({ type: "agentic", subtype: "log_truncated" }) + "\n");
         return;
@@ -328,7 +360,7 @@ export class RunManager {
         writeLog({ type: "stdout", text: line.slice(0, 10_000) });
         return;
       }
-      writeLog(o);
+      writeLog(slimLogEvent(o, this.opts.dataDir));
       if (o.type === "system" && o.subtype === "init" && typeof o.session_id === "string") this.patch(run.id, { sessionId: o.session_id });
       if (o.type === "result") {
         this.patch(run.id, {
@@ -342,17 +374,23 @@ export class RunManager {
       }
     };
     child.stdout!.setEncoding("utf8");
+    // One event can be huge (a screenshot read by Claude is megabytes of base64): lines are only cut at a very
+    // high limit, and a line over it is skipped up to its end instead of being parsed in pieces.
+    let skipping = false;
     child.stdout!.on("data", (chunk: string) => {
       buf += chunk;
       let i: number;
       while ((i = buf.indexOf("\n")) >= 0) {
-        onLine(buf.slice(0, i));
+        const line = buf.slice(0, i);
         buf = buf.slice(i + 1);
+        if (skipping) skipping = false; // end of the oversized line
+        else onLine(line);
       }
-      if (buf.length > 1_000_000) {
-        onLine(buf);
-        buf = "";
+      if (!skipping && buf.length > MAX_EVENT_LINE) {
+        writeLog({ type: "agentic", subtype: "event_too_large" });
+        skipping = true;
       }
+      if (skipping) buf = "";
     });
     child.stderr!.setEncoding("utf8");
     child.stderr!.on("data", (chunk: string) => writeLog({ type: "stderr", text: chunk.slice(0, 10_000) }));
@@ -433,19 +471,23 @@ export class RunManager {
     }
     try {
       const size = fs.fstatSync(fd).size;
-      const start = Math.max(0, size - bytes);
-      const buf = Buffer.alloc(size - start);
-      fs.readSync(fd, buf, 0, buf.length, start);
-      let text = buf.toString("utf8");
-      if (start > 0) text = text.slice(text.indexOf("\n") + 1); // drop the partial first line
-      return text.split("\n").flatMap((l) => {
-        if (!l) return [];
-        try {
-          return [JSON.parse(l)];
-        } catch {
-          return [];
-        }
-      });
+      // Widen the window while it holds no complete line (a huge last line would otherwise hide the live state).
+      for (let window = bytes; ; window *= 4) {
+        const start = Math.max(0, size - window);
+        const buf = Buffer.alloc(size - start);
+        fs.readSync(fd, buf, 0, buf.length, start);
+        let text = buf.toString("utf8");
+        if (start > 0) text = text.slice(text.indexOf("\n") + 1); // drop the partial first line
+        const events = text.split("\n").flatMap((l) => {
+          if (!l) return [];
+          try {
+            return [JSON.parse(l)];
+          } catch {
+            return [];
+          }
+        });
+        if (events.length || start === 0 || window > 256 * 1024 * 1024) return events;
+      }
     } finally {
       fs.closeSync(fd);
     }
@@ -484,17 +526,24 @@ export class RunManager {
       return { events: [], nextOffset: 0, status: run.status, run };
     }
     const start = Math.max(0, Math.min(offset, size));
-    const len = Math.min(maxBytes, size - start);
-    const buf = Buffer.alloc(len);
-    if (len > 0) {
-      const fd = fs.openSync(f, "r");
-      try {
-        fs.readSync(fd, buf, 0, len, start);
-      } finally {
-        fs.closeSync(fd);
+    let buf = Buffer.alloc(0);
+    let lastNl = -1;
+    // A single line can be bigger than the window (a pasted image, a huge tool result): widen it until a whole
+    // line fits, otherwise the reader would never get past it.
+    for (let window = maxBytes; ; window *= 4) {
+      const len = Math.min(window, size - start);
+      buf = Buffer.alloc(len);
+      if (len > 0) {
+        const fd = fs.openSync(f, "r");
+        try {
+          fs.readSync(fd, buf, 0, len, start);
+        } finally {
+          fs.closeSync(fd);
+        }
       }
+      lastNl = buf.lastIndexOf(0x0a);
+      if (lastNl >= 0 || len >= size - start || window > 512 * 1024 * 1024) break;
     }
-    const lastNl = buf.lastIndexOf(0x0a);
     const usable = lastNl >= 0 ? buf.subarray(0, lastNl + 1) : Buffer.alloc(0);
     const events = usable
       .toString("utf8")

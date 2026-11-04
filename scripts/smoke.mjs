@@ -370,6 +370,14 @@ try {
   await page.getByText("GET /health 200").waitFor();
   check(true, "docker logs render as a tool card with its output, not a bare Bash");
 
+  // A reply whose tool result is a big screenshot must not stall the chat: the picture shows, and Claude's next message arrives.
+  await page.waitForFunction(() => !document.querySelector("textarea[aria-label='Responder a Claude']")?.disabled, null, { timeout: 15000 });
+  await page.getByLabel("Responder a Claude").fill("BIGIMG mira la captura");
+  await page.getByRole("button", { name: "Enviar", exact: true }).click();
+  await page.getByText("he visto la imagen").waitFor({ timeout: 15000 });
+  await page.locator("main img[alt='Imagen de Claude']").first().waitFor({ timeout: 15000 });
+  check(true, "a big screenshot in a tool result does not stall the chat: the picture shows and the conversation continues");
+
   // A plan renders as Markdown with three ways to answer it.
   await page.waitForFunction(() => !document.querySelector("textarea[aria-label='Responder a Claude']")?.disabled, null, { timeout: 15000 });
   await page.getByLabel("Responder a Claude").fill("/plan PLAN dame un plan");

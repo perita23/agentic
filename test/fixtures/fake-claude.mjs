@@ -29,6 +29,13 @@ if (prompt.includes("EDIT")) {
   out({ type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", id: "t1", name: "Write", input: { file_path: path.join(process.cwd(), "created-by-claude.txt"), content: "hello from claude\n" } }] } });
   if (fs.existsSync("old-name.txt")) fs.renameSync("old-name.txt", "new-name.txt");
 }
+if (prompt.includes("BIGIMG")) {
+  // A screenshot read by Claude: one huge line of base64 (twice, like the real CLI), then more events.
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(700_000, 7)]).toString("base64");
+  out({ type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", id: "img1", name: "Read", input: { file_path: "/tmp/shot.png" } }] } });
+  out({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "img1", content: [{ type: "image", source: { type: "base64", media_type: "image/png", data: png } }] }] }, tool_use_result: { type: "image", file: { base64: png } } });
+  out({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "he visto la imagen" }] } });
+}
 if (prompt.includes("PLAN")) {
   out({ type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", id: "plan1", name: "ExitPlanMode", input: { plan: "## Plan de prueba\n\n1. Paso uno\n2. **Paso dos** con `codigo`\n\n| a | b |\n|---|---|\n| 1 | 2 |" } }] } });
 }
