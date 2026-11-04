@@ -27,6 +27,8 @@ function NewPrDialog({ onClose }: { onClose: () => void }) {
   const [headSel, setHeadSel] = React.useState<string | null>(null);
   const [baseSel, setBaseSel] = React.useState<string | null>(null);
   const [titleSel, setTitleSel] = React.useState<string | null>(null);
+  const [reviewersSel, setReviewersSel] = React.useState<string[] | null>(null);
+  const [reviewerFilter, setReviewerFilter] = React.useState("");
   const [body, setBody] = React.useState("");
   const [draft, setDraft] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
@@ -34,6 +36,11 @@ function NewPrDialog({ onClose }: { onClose: () => void }) {
 
   const project = projectSel ?? repos[0]?.projectPath ?? "";
   const { data: info, error: infoError } = useApi<Branches>(project ? `/api/prs/branches?project=${encodeURIComponent(project)}` : null);
+
+  const { data: rdata } = useApi<{ reviewers: { id: string; name: string; isDefault: boolean }[] }>(project ? `/api/prs/reviewers?project=${encodeURIComponent(project)}` : null, { revalidateOnFocus: false });
+  const candidates = rdata?.reviewers ?? [];
+  // Default reviewers of the repository start selected.
+  const reviewers = reviewersSel ?? candidates.filter((r) => r.isDefault).map((r) => r.id);
 
   // Defaults: the current branch if it has work, else the newest branch that does.
   const withWork = info?.branches.filter((b) => b.ahead > 0) ?? [];
@@ -48,9 +55,10 @@ function NewPrDialog({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setError("");
     try {
-      const pr = await api<{ provider: "github" | "bitbucket"; number: number; url: string }>("POST", "/api/prs", { projectPath: project, head, base, title, body, draft });
+      const pr = await api<{ provider: "github" | "bitbucket"; number: number; url: string; reviewerError?: string }>("POST", "/api/prs", { projectPath: project, head, base, title, body, draft, reviewers });
       refresh("/api/prs");
       toast.success(`PR #${pr.number} creada`, { description: `${head} → ${base}`, action: pr.url ? { label: "Abrir", onClick: () => window.open(pr.url, "_blank", "noopener,noreferrer") } : undefined });
+      if (pr.reviewerError) toast.warning("La PR se creó, pero no se pudieron añadir los revisores", { description: pr.reviewerError });
       onClose();
     } catch (err) {
       setError(errorMessage(err));
@@ -75,7 +83,7 @@ function NewPrDialog({ onClose }: { onClose: () => void }) {
           <form onSubmit={create} className="grid gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="pr-project">Proyecto</Label>
-              <select id="pr-project" className={select} value={project} onChange={(e) => { setProjectSel(e.target.value); setHeadSel(null); setBaseSel(null); setTitleSel(null); }}>
+              <select id="pr-project" className={select} value={project} onChange={(e) => { setProjectSel(e.target.value); setHeadSel(null); setBaseSel(null); setTitleSel(null); setReviewersSel(null); }}>
                 {repos.map((r) => (
                   <option key={r.projectPath} value={r.projectPath}>
                     {baseName(r.projectPath)} · {r.owner}/{r.repo}
@@ -119,6 +127,21 @@ function NewPrDialog({ onClose }: { onClose: () => void }) {
                   <Label htmlFor="pr-body">Descripción</Label>
                   <textarea id="pr-body" value={body} onChange={(e) => setBody(e.target.value)} rows={5} className="w-full resize-y rounded-md border bg-inset p-2.5 text-sm" placeholder="Qué cambia y por qué (Markdown)" />
                 </div>
+                {candidates.length > 0 && (
+                  <fieldset className="grid gap-1.5">
+                    <legend className="mb-1 flex items-center gap-2 text-sm font-medium">Revisores <span className="text-xs font-normal text-muted-foreground">{reviewers.length ? `${reviewers.length} elegidos` : "ninguno"}</span></legend>
+                    {candidates.length > 6 && <Input aria-label="Buscar revisor" placeholder="Buscar persona…" value={reviewerFilter} onChange={(e) => setReviewerFilter(e.target.value)} className="h-8" />}
+                    <div className="grid max-h-36 gap-0.5 overflow-y-auto rounded-md border bg-inset p-1.5">
+                      {candidates.filter((r) => r.name.toLowerCase().includes(reviewerFilter.toLowerCase())).map((r) => (
+                        <label key={r.id} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-accent/50">
+                          <input type="checkbox" className="accent-primary" checked={reviewers.includes(r.id)} onChange={(e) => setReviewersSel(e.target.checked ? [...reviewers, r.id] : reviewers.filter((x) => x !== r.id))} />
+                          <span className="min-w-0 truncate">{r.name}</span>
+                          {r.isDefault && <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">por defecto</span>}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                )}
                 <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={draft} onChange={(e) => setDraft(e.target.checked)} className="accent-primary" /> Crear como borrador</label>
               </>
             )}

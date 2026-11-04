@@ -28,6 +28,7 @@ import { AttachButton, AttachmentBar, useAttachments } from "@/components/app/at
 import { Markdown } from "@/components/app/markdown";
 import { PlanCard } from "@/components/app/plan-card";
 import { ToolCard, type ToolResult } from "@/components/app/tool-card";
+import { extractPlan } from "@/lib/plan";
 import { changedFiles } from "@/lib/changed-files";
 
 type Ev = RunLog["events"][number];
@@ -38,7 +39,7 @@ function contentText(c: unknown): string {
   return "";
 }
 
-function EventView({ e, run, results, finished, paired, planId }: { e: Ev; run: Run; results: Map<string, ToolResult>; finished: boolean; paired: Set<string>; planId: string | null }) {
+function EventView({ e, run, results, finished, paired, planId, planText }: { e: Ev; run: Run; results: Map<string, ToolResult>; finished: boolean; paired: Set<string>; planId: string | null; planText: string }) {
   const jira = (text: string) => <JiraCommentButton text={text} hints={[run.prompt, run.resultText]} taskId={run.taskId} />;
   if (e.type === "agentic" && e.subtype === "start")
     return <div className="font-mono text-xs text-muted-foreground">$ {(e.args as string[]).join(" ")}</div>;
@@ -66,8 +67,8 @@ function EventView({ e, run, results, finished, paired, planId }: { e: Ev; run: 
                 <div className="mt-1 flex">{jira(String(b.text ?? ""))}</div>
               </div>
             </div>
-          ) : b.type === "tool_use" && b.name === "ExitPlanMode" && typeof b.input?.plan === "string" ? (
-            <div key={i} className="ml-6"><PlanCard plan={b.input.plan} run={run} actionable={planId === String(b.id) && run.status !== "running"} /></div>
+          ) : b.type === "tool_use" && b.name === "ExitPlanMode" && (typeof b.input?.plan === "string" || planText) ? (
+            <div key={i} className="ml-6"><PlanCard plan={typeof b.input?.plan === "string" && b.input.plan ? b.input.plan : planText} run={run} actionable={planId === String(b.id) && run.status !== "running"} /></div>
           ) : b.type === "tool_use" ? (
             <ToolCard key={i} name={String(b.name)} input={b.input} result={results.get(String(b.id))} finished={finished} />
           ) : null,
@@ -210,16 +211,10 @@ function Segment({ run, index, latest, onEvents }: { run: Run; index: number; la
     return { results, paired: new Set([...results.keys()].filter((k) => used.has(k))) };
   }, [events]);
   const finished = run.status !== "running";
-  // Only the last plan of the latest turn can still be answered.
-  const planId = React.useMemo(() => {
-    if (!latest) return null;
-    let id: string | null = null;
-    for (const e of events) {
-      const blocks: Ev[] = e.type === "assistant" && Array.isArray(e.message?.content) ? e.message.content : [];
-      for (const b of blocks) if (b.type === "tool_use" && b.name === "ExitPlanMode" && b.id) id = String(b.id);
-    }
-    return id;
-  }, [events, latest]);
+  // The plan of this turn (from ExitPlanMode or from the plan file Claude wrote). Only the latest turn's can be answered.
+  const found = React.useMemo(() => extractPlan(events), [events]);
+  const planId = latest ? (found?.id ?? null) : null;
+  const planText = found?.plan ?? "";
   return (
     <>
       {index > 0 && (
@@ -238,8 +233,14 @@ function Segment({ run, index, latest, onEvents }: { run: Run; index: number; la
         </div>
       )}
       {shown.map((e, i) => (
-        <EventView key={i} e={e} run={run} results={results} finished={finished} paired={paired} planId={planId} />
+        <EventView key={i} e={e} run={run} results={results} finished={finished} paired={paired} planId={planId} planText={planText} />
       ))}
+      {/* Plan written to a plan file without calling ExitPlanMode: still offer it as a plan. */}
+      {found && found.id === null && (
+        <div className="ml-6">
+          <PlanCard plan={found.plan} run={run} actionable={latest && finished} />
+        </div>
+      )}
     </>
   );
 }

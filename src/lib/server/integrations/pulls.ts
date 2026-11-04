@@ -66,6 +66,8 @@ const createSchema = z.object({
   title: text(250).trim().min(1, "Falta el título"),
   body: text(60_000).default(""),
   draft: z.boolean().default(false),
+  /** Bitbucket account uuids / GitHub logins. */
+  reviewers: z.array(z.string().regex(/^[\w{}@.-]{1,80}$/, "Revisor no válido")).max(20).default([]),
 });
 
 export const prActionSchemas = {
@@ -146,12 +148,45 @@ export class PullService {
     const dirty = ((await git(projectPath, ["status", "--porcelain"])) ?? "").split("\n").filter(Boolean).length;
     const branches = await Promise.all(
       list.map(async (name) => {
-        const ahead = name === base ? 0 : Number((await git(projectPath, ["rev-list", "--count", `${base}..${name}`]))?.trim() || 0);
+        // Against the remote's copy of the base when it exists: that is what the PR will be compared with.
+        const baseRef = (await git(projectPath, ["rev-parse", "--verify", "-q", `refs/remotes/origin/${base}`])) ? `origin/${base}` : base;
+        const ahead = name === base ? 0 : Number((await git(projectPath, ["rev-list", "--count", `${baseRef}..${name}`]))?.trim() || 0);
         const subject = (await git(projectPath, ["log", "-1", "--format=%s", name]))?.trim() ?? "";
         return { name, ahead, subject };
       }),
     );
     return { repo: { provider: repo.provider, owner: repo.owner, repo: repo.repo }, branches, current, base, dirty };
+  }
+
+  /** People who can be asked to review: default reviewers first, then members/collaborators (best effort). */
+  async reviewerCandidates(projectPath: string): Promise<{ id: string; name: string; isDefault: boolean }[]> {
+    const repo = await this.repoFor(projectPath);
+    const slug = `${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}`;
+    const out = new Map<string, { id: string; name: string; isDefault: boolean }>();
+    const safe = async <T,>(f: () => Promise<T>): Promise<T | null> => {
+      try {
+        return await f();
+      } catch {
+        return null;
+      }
+    };
+    if (repo.provider === "bitbucket") {
+      type U = { uuid?: string; display_name?: string };
+      const me = await safe(() => this.integrations.bb<U>("/user"));
+      const defaults = await safe(() => this.integrations.bb<{ values?: U[] }>(`/repositories/${slug}/default-reviewers?pagelen=50`));
+      for (const u of defaults?.values ?? []) if (u.uuid && u.uuid !== me?.uuid) out.set(u.uuid, { id: u.uuid, name: u.display_name || u.uuid, isDefault: true });
+      const members = await safe(() => this.integrations.bb<{ values?: { user?: U }[] }>(`/workspaces/${encodeURIComponent(repo.owner)}/members?pagelen=100`));
+      for (const m of members?.values ?? []) {
+        const u = m.user;
+        if (u?.uuid && u.uuid !== me?.uuid && !out.has(u.uuid)) out.set(u.uuid, { id: u.uuid, name: u.display_name || u.uuid, isDefault: false });
+      }
+    } else {
+      type U = { login?: string };
+      const me = await safe(() => this.integrations.gh<U>("/user"));
+      const people = await safe(() => this.integrations.gh<U[]>(`/repos/${slug}/collaborators?per_page=100`));
+      for (const u of Array.isArray(people) ? people : []) if (u.login && u.login !== me?.login) out.set(u.login, { id: u.login, name: u.login, isDefault: false });
+    }
+    return [...out.values()];
   }
 
   /** Push a branch of the project and open a pull request from it. */
@@ -168,16 +203,32 @@ export class PullService {
   }
 
   /** Open a pull request from `head` into `base`. */
-  async create(projectPath: string, input: { head: string; base: string; title: string; body: string; draft: boolean }): Promise<{ provider: PrProvider; number: number; url: string }> {
+  async create(projectPath: string, input: { head: string; base: string; title: string; body: string; draft: boolean; reviewers?: string[] }): Promise<{ provider: PrProvider; number: number; url: string; reviewerError?: string }> {
     const r = await this.repoFor(projectPath);
     const slug = `${encodeURIComponent(r.owner)}/${encodeURIComponent(r.repo)}`;
     if (r.provider === "github") {
       const p = await this.integrations.gh<Gh>(`/repos/${slug}/pulls`, { method: "POST", body: { title: input.title, head: input.head, base: input.base, body: input.body, draft: input.draft } });
-      return { provider: "github", number: p.number, url: p.html_url };
+      let reviewerError: string | undefined;
+      if (input.reviewers?.length) {
+        // The PR exists already: a failure here is reported, not fatal.
+        try {
+          await this.integrations.gh(`/repos/${slug}/pulls/${p.number}/requested_reviewers`, { method: "POST", body: { reviewers: input.reviewers } });
+        } catch (e) {
+          reviewerError = (e as Error).message;
+        }
+      }
+      return { provider: "github", number: p.number, url: p.html_url, ...(reviewerError ? { reviewerError } : {}) };
     }
     const p = await this.integrations.bb<Gh>(`/repositories/${slug}/pullrequests`, {
       method: "POST",
-      body: { title: input.title, description: input.body, source: { branch: { name: input.head } }, destination: { branch: { name: input.base } }, draft: input.draft },
+      body: {
+        title: input.title,
+        description: input.body,
+        source: { branch: { name: input.head } },
+        destination: { branch: { name: input.base } },
+        ...(input.draft ? { draft: true } : {}),
+        ...(input.reviewers?.length ? { reviewers: input.reviewers.map((uuid) => ({ uuid })) } : {}),
+      },
     });
     return { provider: "bitbucket", number: p.id, url: p.links?.html?.href ?? "" };
   }

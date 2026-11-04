@@ -3,6 +3,15 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.35.3] - 2026-11-04
+
+### Añadido
+- **Revisores al crear una PR.** El asistente de «Nueva PR» lista las personas que pueden revisar (los revisores por defecto del repositorio de Bitbucket ya vienen marcados; en GitHub, los colaboradores) y los añade a la PR al crearla.
+
+### Corregido
+- **El plan de Claude vuelve a mostrarse como plan.** Cuando Claude escribía el plan en su archivo de planes (`~/.claude/plans/…`) en vez de mandarlo en la llamada, la tarjeta con Markdown y los botones Aceptar / Rechazar / Hablar con Claude no salía. Ahora se lee de ese archivo (con sus ediciones) y se ofrece igualmente.
+- **Bitbucket «error 400» al crear una PR.** Ahora se muestra el motivo real que da Bitbucket o GitHub (por ejemplo, «no hay cambios entre las ramas» o el campo que falla), y los commits «por delante» se cuentan contra la rama destino remota, que es con la que se compara la PR. El campo de borrador sólo se envía si lo marcas.
+
 ## [0.35.2] - 2026-11-04
 
 ### Añadido

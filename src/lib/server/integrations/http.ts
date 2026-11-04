@@ -21,6 +21,22 @@ export function safeBaseUrl(raw: string, field: string): URL {
   return u;
 }
 
+/** The reason the provider gave for a rejected request (GitHub and Bitbucket error shapes), short and single-line. */
+export function upstreamDetail(text: string): string {
+  try {
+    const j = JSON.parse(text) as { message?: unknown; errors?: unknown; error?: { message?: unknown; detail?: unknown; fields?: Record<string, unknown> } };
+    const parts: string[] = [];
+    if (typeof j.error?.message === "string") parts.push(j.error.message);
+    if (typeof j.error?.detail === "string") parts.push(j.error.detail);
+    if (j.error?.fields) for (const [k, v] of Object.entries(j.error.fields)) parts.push(`${k}: ${Array.isArray(v) ? v.join(", ") : String(v)}`);
+    if (typeof j.message === "string") parts.push(j.message);
+    if (Array.isArray(j.errors)) for (const e of j.errors) parts.push(typeof e === "string" ? e : typeof (e as { message?: string }).message === "string" ? (e as { message: string }).message : "");
+    return parts.filter(Boolean).join(" · ").replace(/\s+/g, " ").slice(0, 300);
+  } catch {
+    return "";
+  }
+}
+
 export class IntegrationError extends HttpError {
   upstreamStatus: number;
   constructor(
@@ -83,7 +99,9 @@ export async function request<T>(
   if (text.length > MAX_RESPONSE) throw new IntegrationError(provider, res.status, "respuesta demasiado grande");
   if (!res.ok) {
     const hint = res.status === 401 ? "credenciales no válidas" : res.status === 403 ? "sin permisos" : res.status === 404 ? "no encontrado" : `error ${res.status}`;
-    throw new IntegrationError(provider, res.status, hint);
+    // For rejected requests (400/409/422) the provider's own reason is what the user needs to fix the problem.
+    const detail = [400, 409, 422].includes(res.status) ? upstreamDetail(text) : "";
+    throw new IntegrationError(provider, res.status, detail ? `${hint}: ${detail}` : hint);
   }
   if (!text) return undefined as T;
   try {
