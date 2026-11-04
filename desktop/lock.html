@@ -20,19 +20,86 @@
         user-select: none;
       }
       body {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 16px;
-        padding: 48px 44px 28px;
-        box-sizing: border-box;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
         text-align: center;
         -webkit-app-region: drag;
       }
+      .pane {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 56px 48px 32px;
+        min-width: 0;
+      }
+      .inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        width: 100%;
+        max-width: 360px;
+      }
+      /* Right half: liquid gradients (logo colours) behind a glass card. */
+      .art {
+        position: relative;
+        overflow: hidden;
+        background: #050505;
+        border-left: 1px solid #1c1c1c;
+      }
+      .blob {
+        position: absolute;
+        aspect-ratio: 1;
+        filter: blur(46px);
+        mix-blend-mode: screen;
+        will-change: transform, border-radius;
+        animation: morph 9s ease-in-out infinite, drift 16s ease-in-out infinite alternate;
+      }
+      .b1 { width: 62%; left: -8%; top: 2%; background: radial-gradient(circle at 35% 30%, #f2f2f2 0%, #a78bfa 52%, transparent 72%); }
+      .b2 { width: 70%; right: -14%; top: 26%; background: radial-gradient(circle at 60% 40%, #a78bfa 0%, #6d4ae0 50%, transparent 72%); animation-duration: 11s, 19s; animation-direction: normal, alternate-reverse; }
+      .b3 { width: 56%; left: 12%; bottom: -10%; background: radial-gradient(circle at 50% 40%, #ff8a5b 0%, #e0553f 48%, transparent 72%); animation-duration: 8s, 14s; }
+      .grain {
+        position: absolute;
+        inset: 0;
+        opacity: 0.18;
+        mix-blend-mode: overlay;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      }
+      .glass {
+        position: absolute;
+        left: 9%;
+        right: 9%;
+        bottom: 8%;
+        padding: 20px 24px;
+        text-align: left;
+        border-radius: 20px;
+        background: rgb(255 255 255 / 0.07);
+        border: 1px solid rgb(255 255 255 / 0.16);
+        -webkit-backdrop-filter: blur(26px) saturate(150%);
+        backdrop-filter: blur(26px) saturate(150%);
+        box-shadow: 0 20px 60px rgb(0 0 0 / 0.35);
+      }
+      .glass strong { display: block; font-size: 18px; font-weight: 600; color: #fff; }
+      .glass span { display: block; margin-top: 4px; font-size: 13px; color: rgb(255 255 255 / 0.7); }
+      @keyframes morph {
+        0%, 100% { border-radius: 42% 58% 63% 37% / 45% 41% 59% 55%; }
+        33% { border-radius: 63% 37% 41% 59% / 38% 62% 38% 62%; }
+        66% { border-radius: 38% 62% 54% 46% / 60% 40% 60% 40%; }
+      }
+      @keyframes drift {
+        from { transform: translate(0, 0) rotate(0deg) scale(1); }
+        to { transform: translate(16%, 14%) rotate(55deg) scale(1.14); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .blob { animation: none; }
+      }
+      @media (max-width: 760px) {
+        body { grid-template-columns: 1fr; }
+        .art { display: none; }
+      }
       .logo {
-        width: 96px;
-        height: 96px;
+        width: 84px;
+        height: 84px;
         filter: drop-shadow(0 8px 24px rgb(167 139 250 / 0.25));
       }
       h1 {
@@ -124,6 +191,7 @@
     <script src="lock.js" defer></script>
   </head>
   <body data-state="">
+    <main class="pane"><div class="inner">
     <svg class="logo" viewBox="100 100 824 824" aria-hidden="true">
       <defs>
         <linearGradient id="g" x1="230" y1="0" x2="800" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#f2f2f2" /><stop offset=".55" stop-color="#a78bfa" /><stop offset="1" stop-color="#ff8a5b" /></linearGradient>
@@ -168,5 +236,11 @@
     </div>
 
     <p id="error" class="error" role="alert"></p>
+    </div></main>
+    <aside class="art" aria-hidden="true">
+      <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+      <div class="grain"></div>
+      <div class="glass"><strong>Claude Code, bajo tu control.</strong><span>Todo se ejecuta en tu dispositivo. Nada sale de él.</span></div>
+    </aside>
   </body>
 </html>

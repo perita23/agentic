@@ -5,7 +5,7 @@
 //   external links open in the default browser, minimal permissions.
 "use strict";
 
-const { app, BrowserWindow, clipboard, dialog, ipcMain, safeStorage, shell, session, systemPreferences, utilityProcess, Menu } = require("electron");
+const { app, BrowserWindow, clipboard, dialog, ipcMain, safeStorage, shell, session, systemPreferences, utilityProcess, Menu, screen } = require("electron");
 const crypto = require("node:crypto");
 const os = require("node:os");
 const path = require("node:path");
@@ -58,14 +58,17 @@ function unlock() {
   const first = !appLock.hasPassword(DATA_DIR);
   const useTouch = () => canTouch && appLock.touchIdEnabled(DATA_DIR);
   return new Promise((resolve) => {
+    // Big split screen (form | animated art) covering the work area.
+    const area = screen.getPrimaryDisplay().workArea;
     const lock = new BrowserWindow({
-      width: 460,
-      height: first ? 600 : 540,
+      x: area.x,
+      y: area.y,
+      width: area.width,
+      height: area.height,
       resizable: false,
       minimizable: false,
       maximizable: false,
       fullscreenable: false,
-      center: true,
       title: "Desbloquear Agentic",
       backgroundColor: "#0a0a0a",
       titleBarStyle: "hiddenInset",
