@@ -1,4 +1,5 @@
 import { spawn, execFile, type ChildProcess } from "node:child_process";
+import { findUpload, uploadsDir } from "./uploads";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -26,6 +27,8 @@ export interface Run {
   taskId: string | null;
   /** Set on replies: id of the first run of the conversation (the run page shows the whole thread). */
   threadId: string | null;
+  /** Images attached to the prompt (upload ids). */
+  images?: string[];
   status: RunStatus;
   pid: number | null;
   tmuxSession: string | null;
@@ -106,9 +109,11 @@ export const runCreateSchema = z
     /** Continue the conversation of this run (same page, same Claude session). */
     continueRunId: z.uuid().optional(),
     maxBudgetUsd: z.number().positive().max(1000).optional(),
+    /** Uploaded images (ids from /api/uploads) Claude should look at. */
+    images: z.array(z.uuid()).max(6).optional(),
   })
   .refine((r) => r.mode === "tmux" || r.prompt.trim().length > 0, { message: "prompt is required for headless runs", path: ["prompt"] });
-export type RunInput = z.infer<typeof runCreateSchema>;
+export type RunInput = z.infer<typeof runCreateSchema> & { addDirs?: string[] };
 
 export interface RunOptions {
   dataDir: string;
@@ -127,6 +132,7 @@ export function buildClaudeArgs(input: RunInput): string[] {
   if (input.mode === "headless") args.push("-p", "--output-format", "stream-json", "--verbose");
   if (input.model) args.push("--model", input.model);
   if (input.agent) args.push("--agent", input.agent);
+  for (const d of input.addDirs ?? []) args.push("--add-dir", d);
   if (input.permissionMode && input.permissionMode !== "default") args.push("--permission-mode", input.permissionMode);
   if (input.resumeSessionId) args.push("--resume", input.resumeSessionId);
   if (input.mode === "headless" && input.maxBudgetUsd) args.push("--max-budget-usd", String(input.maxBudgetUsd));
@@ -251,7 +257,15 @@ export class RunManager {
       endedAt: null,
       logBytes: 0,
     };
-    const args = buildClaudeArgs(input);
+    // Attached images live in ~/.agentic/uploads: Claude gets their paths (and access to that folder).
+    let claudeInput: RunInput = input;
+    if (input.images?.length) {
+      const files = input.images.map((id) => findUpload(this.opts.dataDir, id)?.path);
+      if (files.some((f) => !f)) throw new HttpError(400, "Una imagen adjunta ya no existe: vuelve a adjuntarla");
+      claudeInput = { ...input, prompt: `${input.prompt}\n\n[Imágenes adjuntas: míralas con la herramienta Read]\n${files.join("\n")}`, addDirs: [uploadsDir(this.opts.dataDir)] };
+      run.images = input.images;
+    }
+    const args = buildClaudeArgs(claudeInput);
     run.git = await captureBaseline(cwd);
 
     if (input.mode === "tmux") {
