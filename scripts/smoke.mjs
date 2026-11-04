@@ -155,7 +155,7 @@ const port = 4400 + Math.floor(Math.random() * 500);
 const base = `http://localhost:${port}`;
 const mailFixture = path.join(tmp, "mail.json");
 fs.writeFileSync(mailFixture, JSON.stringify([
-  { uid: 1, fromName: "Ana", fromAddress: "ana@cliente.com", subject: "Bug en demo-app al pagar", snippet: "No funciona el checkout", date: new Date().toISOString(), unread: true, listUnsubscribe: false },
+  { uid: 1, fromName: "Ana", fromAddress: "ana@cliente.com", subject: "Bug en demo-app al pagar", snippet: "No funciona el checkout", body: "Texto completo del correo de Ana.\nSegunda línea.", date: new Date().toISOString(), unread: true, listUnsubscribe: false },
   { uid: 2, fromName: "Facturación", fromAddress: "billing@proveedor.com", subject: "Factura de octubre", snippet: "", date: new Date().toISOString(), unread: true, listUnsubscribe: false },
 ]));
 const env = { ...process.env, AGENTIC_MAIL_FIXTURE: mailFixture, AGENTIC_HOME: dataDir, CLAUDE_HOME: claudeHome, CLAUDE_BIN: path.join(root, "test/fixtures/fake-claude.mjs"), PORT: String(port), HOST: "127.0.0.1", AGENTIC_ALLOW_INSECURE_INTEGRATIONS: "1", AGENTIC_SLACK_API_URL: slackUrl };
@@ -369,6 +369,19 @@ try {
   await page.getByText("Leyendo logs · api").click();
   await page.getByText("GET /health 200").waitFor();
   check(true, "docker logs render as a tool card with its output, not a bare Bash");
+
+  // A plan renders as Markdown with three ways to answer it.
+  await page.waitForFunction(() => !document.querySelector("textarea[aria-label='Responder a Claude']")?.disabled, null, { timeout: 15000 });
+  await page.getByLabel("Responder a Claude").fill("/plan PLAN dame un plan");
+  await page.getByRole("button", { name: "Enviar", exact: true }).click();
+  await page.getByRole("heading", { name: "Plan de prueba" }).waitFor({ timeout: 15000 });
+  check((await page.locator("main strong", { hasText: "Paso dos" }).count()) >= 1 && (await page.locator("main table").count()) >= 1, "the plan is rendered as Markdown (bold, table), not raw text");
+  for (const name of ["Aceptar y ejecutar", "Rechazar", "Hablar con Claude"]) await page.getByRole("button", { name }).waitFor();
+  check(true, "the plan offers Accept, Reject and Talk to Claude");
+  await page.getByRole("button", { name: "Aceptar y ejecutar" }).click();
+  await page.getByText("done: Apruebo el plan. Ejecútalo.").waitFor({ timeout: 15000 });
+  const approved = (await (await fetch(base + "/api/runs", { headers: authH })).json()).runs.find((r) => r.prompt === "Apruebo el plan. Ejecútalo.");
+  check(approved?.permissionMode === "acceptEdits", "accepting the plan continues the conversation with permission to edit");
   const withImg = (await (await fetch(base + "/api/runs", { headers: authH })).json()).runs.find((r) => r.prompt.includes("TOOLS mira esto"));
   check(withImg?.images?.length === 1 && withImg.prompt.includes("linea pegada 29"), "the message carries the image and the pasted text");
   check((await fetch(base + `/api/uploads/${withImg.images[0]}`, { headers: authH })).headers.get("content-type") === "image/png", "attached images are served back");
@@ -547,6 +560,25 @@ try {
   const mailOverview = JSON.stringify(await (await fetch(base + "/api/mail", { headers: authH })).json());
   check(!mailOverview.includes("app-pass-123"), "the mail password is never returned by the API");
   check((await page.getByRole("heading", { name: /demo-app/ }).count()) + (await page.getByText("demo-app", { exact: true }).count()) > 0 && (await page.getByText("Factura de octubre").count()) === 1, "mail is filed under the project named in the subject");
+  // Open a message: its text shows and it is marked read; mark it unread again by hand.
+  await page.getByRole("button", { name: /Bug en demo-app al pagar/ }).click();
+  await page.getByText("Texto completo del correo de Ana.").waitFor();
+  await page.getByRole("button", { name: "Marcar sin leer" }).first().waitFor();
+  check(true, "opening a mail shows its text and marks it read");
+  await page.getByRole("button", { name: "Marcar sin leer" }).first().click();
+  await page.getByRole("button", { name: "Marcar leído" }).first().waitFor();
+  // A second account can be added.
+  await page.getByRole("button", { name: "Añadir otra cuenta" }).click();
+  await page.getByLabel("Correo", { exact: true }).fill("trabajo@empresa.com");
+  await page.getByLabel("Contraseña de aplicación").fill("otra-pass");
+  await page.getByRole("button", { name: "Conectar", exact: true }).click();
+  await page.getByText("trabajo@empresa.com").first().waitFor();
+  check(((await (await fetch(base + "/api/mail", { headers: authH })).json()).accounts ?? []).length === 2, "more than one mail account can be connected");
+  // Phone width: nothing spills out of the screen.
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.waitForTimeout(300);
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "the mail page fits a phone screen (no horizontal overflow)");
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole("tab", { name: "Por tipo" }).click();
   await page.getByText("Facturas y pagos").first().waitFor();
   check(!fs.readFileSync(path.join(dataDir, "mail-accounts.json"), "utf8").includes("app-pass-123"), "the mail password is encrypted at rest");
@@ -644,6 +676,21 @@ try {
     "approve and merge a PR from the app (merge pinned to the reviewed head SHA)",
   );
 
+  // New PR from the UI: pick a branch with commits, the app pushes it and opens the PR.
+  execFileSync("git", ["checkout", "-q", "-b", "feat/nueva"], { cwd: project });
+  execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "Nueva desde la UI"], { cwd: project });
+  execFileSync("git", ["checkout", "-q", "main"], { cwd: project });
+  await page.goto(`${base}/pulls`);
+  await page.getByRole("button", { name: "Nueva PR" }).click();
+  await page.getByLabel("Título").waitFor();
+  await page.waitForFunction(() => document.querySelector("#pr-title")?.value === "Nueva desde la UI");
+  check((await page.locator("#pr-head").inputValue()) === "feat/nueva", "new PR dialog proposes the branch that has commits and its last commit as the title");
+  await page.getByRole("button", { name: "Crear pull request" }).click();
+  await page.getByText("PR #13 creada").waitFor();
+  const uiPr = ghWrites.find((w) => w.method === "POST" && w.path === "/repos/acme/demo/pulls" && w.body.head === "feat/nueva");
+  check(uiPr?.body.base === "main" && uiPr.body.title === "Nueva desde la UI" && execFileSync("git", ["branch", "--list", "feat/nueva"], { cwd: bareRemote, encoding: "utf8" }).includes("feat/nueva"), "new PR from the Pull requests page: branch pushed and PR opened");
+  await page.getByText("PR #13 creada").waitFor({ state: "detached", timeout: 15000 });
+
   // Jira: search, open an issue, move it, comment and import it as a task.
   await fetch(base + "/api/integrations/jira", { method: "PUT", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ siteUrl: jiraUrl, email: "ana@acme.test", token: "jira-smoke" }) });
   await page.goto(`${base}/jira`);
@@ -684,7 +731,7 @@ try {
   await page.getByRole("button", { name: "Crear PR" }).click();
   await page.getByRole("button", { name: "Crear PR" }).last().click();
   await page.getByText("PR #13 creada").waitFor();
-  const prCall = ghWrites.find((w) => w.method === "POST" && w.path === "/repos/acme/demo/pulls");
+  const prCall = ghWrites.find((w) => w.method === "POST" && w.path === "/repos/acme/demo/pulls" && w.body.head !== "feat/nueva");
   check(prCall?.body.head === wtTask.worktree.branch && prCall?.body.base === "main" && execFileSync("git", ["log", "--format=%s", "-1", wtTask.worktree.branch], { cwd: bareRemote, encoding: "utf8" }).trim() === "Aislar en rama", "task worktree: commit, push and open a PR from the app");
   await page.keyboard.press("Escape");
 

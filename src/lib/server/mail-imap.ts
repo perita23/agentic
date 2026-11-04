@@ -1,4 +1,4 @@
-import type { MailAccount, MailFetcher, RawMail } from "./mail";
+import type { MailAccount, MailBody, MailBodyFetcher, MailFetcher, MailSeenSetter, RawMail } from "./mail";
 import fs from "node:fs";
 import { allowInsecure } from "./integrations/http";
 import { HttpError } from "./util";
@@ -97,4 +97,58 @@ export const fetcher: MailFetcher = async (account, opts) => {
   const f = fixturePath();
   if (f) return JSON.parse(fs.readFileSync(f, "utf8")) as RawMail[];
   return imapFetch(account, opts);
+};
+
+const MAX_BODY_CHARS = 60_000;
+
+/** One message in full, on demand: plain text only (HTML is converted, never rendered), attachments are only listed. */
+const imapBody: MailBodyFetcher = async (account, uid) => {
+  const { simpleParser } = await import("mailparser");
+  const client = await connect(account);
+  try {
+    const lock = await client.getMailboxLock("INBOX", { readOnly: true });
+    try {
+      const msg = await client.fetchOne(String(uid), { uid: true, source: { maxLength: 2 * 1024 * 1024 } }, { uid: true });
+      if (!msg || !msg.source) throw new HttpError(404, "El mensaje ya no está en el servidor");
+      const parsed = await simpleParser(msg.source);
+      const full = (parsed.text || "").replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+      const to = (Array.isArray(parsed.to) ? parsed.to : parsed.to ? [parsed.to] : []).map((t) => t.text).join(", ");
+      return { text: full.slice(0, MAX_BODY_CHARS), truncated: full.length > MAX_BODY_CHARS, to, attachments: (parsed.attachments ?? []).slice(0, 20).map((a) => ({ name: a.filename || "adjunto", size: a.size })) } satisfies MailBody;
+    } finally {
+      lock.release();
+    }
+  } catch (e) {
+    throw e instanceof HttpError ? e : friendly(e);
+  } finally {
+    await client.logout().catch(() => {});
+  }
+};
+
+/** Only used when the user turned on "mark as read on the server". */
+const imapSetSeen: MailSeenSetter = async (account, uid, seen) => {
+  const client = await connect(account);
+  try {
+    const lock = await client.getMailboxLock("INBOX");
+    try {
+      if (seen) await client.messageFlagsAdd(String(uid), ["\\Seen"], { uid: true });
+      else await client.messageFlagsRemove(String(uid), ["\\Seen"], { uid: true });
+    } finally {
+      lock.release();
+    }
+  } finally {
+    await client.logout().catch(() => {});
+  }
+};
+
+export const bodyFetcher: MailBodyFetcher = async (account, uid) => {
+  const f = fixturePath();
+  if (f) {
+    const m = (JSON.parse(fs.readFileSync(f, "utf8")) as (RawMail & { body?: string })[]).find((x) => x.uid === uid);
+    return { text: m?.body ?? m?.snippet ?? "", to: account.user, attachments: [], truncated: false };
+  }
+  return imapBody(account, uid);
+};
+export const seenSetter: MailSeenSetter = async (account, uid, seen) => {
+  if (fixturePath()) return;
+  return imapSetSeen(account, uid, seen);
 };

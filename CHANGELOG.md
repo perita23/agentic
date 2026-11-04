@@ -3,6 +3,27 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.35.1] - 2026-11-04
+
+### Añadido
+- **Abrir un correo y leerlo.** Al pulsar un mensaje se despliega su contenido (texto sin formato, sin imágenes ni contenido externo; los adjuntos sólo se listan) y queda marcado como leído.
+- **Marcar leído / sin leer a mano**, con un botón en cada mensaje. Agentic recuerda lo que marcas aunque el servidor siga diciendo otra cosa. Opcional: «Marcar leído también en tu correo» (desactivado por defecto: así Agentic no cambia nada de tu bandeja).
+- **Más de una cuenta**: botón «Añadir otra cuenta» dentro de la sección de Correo.
+
+### Corregido
+- La página de Correo ya se adapta al ancho de la pantalla (antes se salía por los lados y escondía botones).
+
+## [0.35.0] - 2026-11-04
+
+### Añadido
+- **Crear pull requests desde la sección Pull requests.** El botón «Nueva PR» abre un asistente: eliges el proyecto, la rama con los cambios (propone la actual o la más reciente que tenga commits, con cuántos commits lleva de ventaja), la rama destino, el título (por defecto el último commit) y la descripción, y puedes crearla como borrador. Agentic sube la rama a `origin` (con tu SSH/credenciales de git y, si hace falta, el token de la cuenta conectada) y abre la PR en GitHub o Bitbucket. Avisa si hay cambios sin commit, que no entran en la PR.
+
+## [0.34.0] - 2026-11-04
+
+### Añadido
+- **El plan de Claude se ve como un documento y se puede responder.** Cuando Claude propone un plan (modo plan), aparece en una tarjeta «Plan de Claude» con Markdown bonito (títulos, listas, tablas, código) y tres botones: **Aceptar y ejecutar** (Claude sigue con permiso para editar archivos), **Rechazar** (no cambia nada y espera tus indicaciones) y **Hablar con Claude** (te lleva a la caja de respuesta). Los botones sólo salen mientras el plan está pendiente.
+- **Las respuestas de Claude se muestran en Markdown** en el chat de Headless (negritas, listas, tablas, bloques de código), no como texto plano. El HTML incluido en el texto nunca se interpreta.
+
 ## [0.33.0] - 2026-11-04
 
 ### Añadido

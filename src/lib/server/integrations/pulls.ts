@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { git } from "../git";
+import { pushBranch } from "../worktrees";
 import type { ProjectService } from "../projects";
 import { HttpError, parse, text } from "../util";
 import type { IntegrationError } from "./http";
@@ -57,6 +58,15 @@ export function splitUnifiedDiff(diff: string): Map<string, string> {
   flush();
   return out;
 }
+
+const branchName = z.string().min(1).max(200).regex(/^[A-Za-z0-9][\w./-]*$/, "Nombre de rama no válido").refine((b) => !b.includes("..") && !b.endsWith("/") && !b.endsWith(".lock"), "Nombre de rama no válido");
+const createSchema = z.object({
+  head: branchName,
+  base: branchName,
+  title: text(250).trim().min(1, "Falta el título"),
+  body: text(60_000).default(""),
+  draft: z.boolean().default(false),
+});
 
 export const prActionSchemas = {
   comment: z.object({ body: text(65_000).trim().min(1) }),
@@ -124,6 +134,37 @@ export class PullService {
     const r = (await this.repos()).find((x) => x.projectPath === projectPath);
     if (!r) throw new HttpError(400, "Conecta GitHub o Bitbucket (Integraciones) y comprueba que el proyecto tiene un remoto «origin» de ese servicio");
     return r;
+  }
+
+  /** Branches of a project's repo, to start a pull request from the UI. */
+  async branches(projectPath: string) {
+    const repo = await this.repoFor(projectPath);
+    const list = (await git(projectPath, ["for-each-ref", "--sort=-committerdate", "--format=%(refname:short)", "refs/heads"]))?.split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 60) ?? [];
+    const current = (await git(projectPath, ["rev-parse", "--abbrev-ref", "HEAD"]))?.trim() || null;
+    const originHead = (await git(projectPath, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]))?.trim().replace(/^origin\//, "");
+    const base = originHead || (list.includes("main") ? "main" : list.includes("master") ? "master" : list[0] ?? "main");
+    const dirty = ((await git(projectPath, ["status", "--porcelain"])) ?? "").split("\n").filter(Boolean).length;
+    const branches = await Promise.all(
+      list.map(async (name) => {
+        const ahead = name === base ? 0 : Number((await git(projectPath, ["rev-list", "--count", `${base}..${name}`]))?.trim() || 0);
+        const subject = (await git(projectPath, ["log", "-1", "--format=%s", name]))?.trim() ?? "";
+        return { name, ahead, subject };
+      }),
+    );
+    return { repo: { provider: repo.provider, owner: repo.owner, repo: repo.repo }, branches, current, base, dirty };
+  }
+
+  /** Push a branch of the project and open a pull request from it. */
+  async createFromBranch(projectPath: string, body: unknown) {
+    const input = parse(createSchema, body);
+    if (input.head === input.base) throw new HttpError(400, "La rama de origen y la de destino son la misma");
+    const repo = await this.repoFor(projectPath);
+    const info = await this.branches(projectPath);
+    const head = info.branches.find((b) => b.name === input.head);
+    if (!head) throw new HttpError(400, `La rama «${input.head}» no existe en este proyecto`);
+    if (!head.ahead) throw new HttpError(400, `La rama «${input.head}» no tiene commits nuevos respecto a «${input.base}»`);
+    await pushBranch({ path: projectPath, branch: input.head }, () => this.integrations.gitAuthHeader(repo.provider));
+    return this.create(projectPath, input);
   }
 
   /** Open a pull request from `head` into `base`. */
