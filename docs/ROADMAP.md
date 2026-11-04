@@ -67,3 +67,27 @@ Criterio: lo que más tiempo ahorra a quien trabaja a diario con Claude Code, si
 | v0.22 | **Programar tareas** (una vez o recurrentes) | Rutinas nocturnas: dependencias, informes, limpiezas. |
 | v0.23 | **Presupuesto y alertas** de gasto/tokens por día y proyecto | Control de costes. |
 | v0.24 | **Copia de seguridad, exportar y borrar** los datos de Agentic | Portabilidad y control de los datos. |
+
+## Ideas anotadas (sin implementar)
+
+### La bola líquida como indicador de estado de la IA
+Idea del usuario (2026-11-04): que la bola líquida («morphism») de la pantalla de inicio sea también el *loader* de cuando la IA está pensando, y que cambie de animación según lo que esté haciendo en ese momento.
+
+- **Un solo componente compartido** (`<LiquidOrb state=… />`) con la misma estética que la pantalla de bloqueo, usado en:
+  - Chat (respuesta en curso).
+  - Ejecuciones headless (página de la ejecución, en vivo).
+  - Cola de tareas y programadas (ejecución activa).
+  - Sesiones activas y, en pequeño, en la barra lateral como estado global («Claude está trabajando»).
+- **Estados** (cada uno con su propia animación: ritmo, tamaño, forma y color):
+  - Inactivo: respira despacio.
+  - Pensando: pulsa y se deforma.
+  - Escribiendo la respuesta.
+  - Herramienta en curso: leyendo, editando ficheros, ejecutando un comando, buscando en la web o usando MCP.
+  - Esperando permiso o una respuesta del usuario.
+  - Completado y error.
+- **De dónde sale el estado**: de los eventos `stream-json` que ya se guardan en el log de cada ejecución (`system/init`, bloques `text` y `thinking`, `tool_use` con el nombre de la herramienta, `tool_result`, `result` con `is_error`). Hace falta una función pura `estadoDesdeEventos(eventos)` y probarla, tanto para el log en vivo (SSE) como para ejecuciones ya terminadas.
+- **A tener en cuenta**:
+  - Respetar `prefers-reduced-motion` (versión estática con cambio de color).
+  - Coste de rendimiento: el filtro «goo» de SVG es costoso a pantalla grande; para tamaños pequeños probar canvas o WebGL, o menos esferas.
+  - Accesibilidad: el estado también como texto (`aria-live`), nunca solo con animación.
+- **Cambios**: front (componente + integración en chat, runs, cola, sesiones y barra lateral) y un pequeño endpoint o campo derivado con el estado actual de cada ejecución.
