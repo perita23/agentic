@@ -306,8 +306,10 @@ try {
   check(true, "headless run launched from UI and finished with result");
   await page.getByText("Ejecución completada").waitFor({ timeout: 10000 });
   check(true, "finished run triggers a notification toast");
+  await page.getByText("Archivos modificados").first().waitFor({ timeout: 10000 });
+  check(await page.locator("main details[aria-label='Archivos modificados']").getByText("created-by-claude.txt").isVisible(), "the chat lists the files Claude changed, next to the output");
   await page.getByRole("tab", { name: "Cambios" }).click();
-  await page.locator("main").getByText("created-by-claude.txt").waitFor({ timeout: 10000 });
+  await page.locator("main [role=tabpanel][data-state=active]").getByText("created-by-claude.txt").waitFor({ timeout: 10000 });
   await page.locator("main").getByText("+hello from claude").waitFor();
   check(await page.locator("main").getByText("+2", { exact: true }).isVisible(), "diff summary counts lines of new files");
   check(true, "run diff tab shows files created by Claude");

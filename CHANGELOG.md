@@ -3,6 +3,12 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.31.0] - 2026-11-04
+
+### Añadido
+- **Archivos modificados a la vista en el chat de Headless.** Encima de la salida aparece un panel «Archivos modificados» que se va llenando en vivo con lo que Claude crea o edita (nuevo/editado, cuántas veces), y las llamadas de edición muestran el archivo en su cabecera sin abrirlas. La pestaña «Cambios» sigue igual.
+- **La bola cambia de silueta según lo que hace Claude**, para reconocer cada estado de un vistazo: escribiendo → se rompe en un enjambre de bolitas que dan vueltas; ejecutando un comando → una bolita pequeña que va de izquierda a derecha; leyendo → dos bolitas que suben y bajan; editando → tres bolitas trazando una elipse; buscando → dos bolitas en órbita ancha tipo radar; pensando → una gelatina que ondula; esperando → una bola grande que late. Cada una a su velocidad y con transiciones suaves entre formas.
+
 ## [0.30.0] - 2026-11-04
 
 ### Añadido
