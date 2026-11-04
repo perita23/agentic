@@ -138,6 +138,16 @@ export default function SettingsPage() {
               <CardDescription>Agentic puede ejecutar Claude Code en tu dispositivo, así que está protegido aunque sólo escuche en local.</CardDescription>
             </div>
           </CardHeader>
+          <div className="mx-4 mb-1 flex flex-wrap items-center gap-2 rounded-lg border border-success/30 bg-success/5 px-3 py-2 text-xs">
+            <ShieldCheckIcon className="size-4 text-success" />
+            <span>
+              <span className="font-medium text-foreground">Diseñada según OWASP ASVS 5.0 (nivel 1) y la lista de seguridad de Electron.</span>{" "}
+              <span className="text-muted-foreground">Revisión propia, sin auditoría externa.</span>
+            </span>
+            <a className="ml-auto text-link hover:underline" href="https://github.com/perita23/agentic/blob/main/docs/SECURITY.md" target="_blank" rel="noreferrer">
+              Ver controles
+            </a>
+          </div>
           <CardContent className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
             {[
               "Escucha sólo en 127.0.0.1 (loopback).",

@@ -7,6 +7,7 @@ import { JiraService } from "./integrations/jira";
 import { OAuthService } from "./integrations/oauth";
 import { Installer } from "./install";
 import { ChatService, chatDir } from "./chats";
+import { McpService } from "./mcp";
 import { PullService } from "./integrations/pulls";
 import { IntegrationService } from "./integrations/service";
 import { TaskQueue } from "./queue";
@@ -31,6 +32,7 @@ export interface Context {
   jira: JiraService;
   installer: Installer;
   chats: ChatService;
+  mcp: McpService;
   oauth: OAuthService;
 }
 
@@ -75,6 +77,7 @@ export function createContext(config: Config): Context {
     jira: new JiraService(integrations, tasks),
     installer: new Installer(),
     chats: new ChatService(store, runs, sessions, config.dataDir),
+    mcp: new McpService(config.claudeHome, config.claudeBin, projects),
     oauth: new OAuthService(store, integrations),
     queue,
     integrations,
