@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { BrandMark } from "@/components/app/brand-mark";
 import { linkify } from "@/components/app/linkify";
 import { ActivityOrb } from "@/components/app/liquid-orb";
+import { SlashList, useSlashCommands, useSlashMenu } from "@/components/app/slash-menu";
+import { MODE_LABEL, parseSlash, type PermMode } from "@/lib/slash";
 import type { Activity } from "@/lib/orb-state";
 import { errorMessage, PageHeader } from "@/components/app/common";
 import { api, refresh, useApi } from "@/lib/api";
@@ -145,23 +147,42 @@ function Bubble({ m }: { m: ChatMessage }) {
   );
 }
 
-function Composer({ onSend, busy, autoFocus, model, setModel }: { onSend: (t: string) => Promise<boolean>; busy: boolean; autoFocus?: boolean; model: string; setModel: (m: string) => void }) {
+type SendOpts = { model?: string; mode?: PermMode };
+
+function Composer({ onSend, busy, autoFocus, model, setModel, mode, setMode }: { onSend: (t: string, o: SendOpts) => Promise<boolean>; busy: boolean; autoFocus?: boolean; model: string; setModel: (m: string) => void; mode: PermMode; setMode: (m: PermMode) => void }) {
   const [text, setText] = React.useState("");
+  const commands = useSlashCommands(null);
+  const menu = useSlashMenu(text, setText, commands);
   async function send() {
     const t = text.trim();
     if (!t || busy) return;
-    if (await onSend(t)) setText("");
+    // /plan, /edits, /ask, /auto and /model are handled here; other /commands go to Claude Code.
+    const cmd = parseSlash(t);
+    if (cmd.error) {
+      toast.error(cmd.error);
+      return;
+    }
+    if (cmd.mode) setMode(cmd.mode);
+    if (cmd.model) setModel(cmd.model);
+    if (!cmd.prompt) {
+      toast.success(`Ajustado: ${cmd.applied.join(" · ")}`, { description: "Se aplica a tus próximos mensajes." });
+      setText("");
+      return;
+    }
+    if (await onSend(cmd.prompt, { model: cmd.model, mode: cmd.mode })) setText("");
   }
   return (
-    <div className="rounded-2xl border bg-inset shadow-lg shadow-black/20 transition-colors focus-within:border-border-strong">
+    <div className="relative rounded-2xl border bg-inset shadow-lg shadow-black/20 transition-colors focus-within:border-border-strong">
+      {menu.open && <SlashList items={menu.items} active={menu.active} onPick={menu.pick} className="mx-2" />}
       <Textarea
         autoFocus={autoFocus}
         rows={2}
         value={text}
-        placeholder="Escribe a Claude…"
+        placeholder="Escribe a Claude… (/ para comandos: /plan, /model…)"
         aria-label="Mensaje para Claude"
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
+          if (menu.onKeyDown(e)) return;
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             void send();
@@ -170,13 +191,22 @@ function Composer({ onSend, busy, autoFocus, model, setModel }: { onSend: (t: st
         className="max-h-60 min-h-14 resize-none border-0 bg-transparent px-4 pt-3 shadow-none focus-visible:ring-0"
       />
       <div className="flex items-center justify-between gap-2 px-3 pb-2.5">
-        <select aria-label="Modelo" value={model} onChange={(e) => setModel(e.target.value)} className="h-7 rounded-md border bg-card px-2 text-xs text-muted-foreground">
-          {MODELS.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <select aria-label="Modelo" value={model} onChange={(e) => setModel(e.target.value)} className="h-7 rounded-md border bg-card px-2 text-xs text-muted-foreground">
+            {MODELS.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+          <select aria-label="Permisos" value={mode} onChange={(e) => setMode(e.target.value as PermMode)} className="h-7 rounded-md border bg-card px-2 text-xs text-muted-foreground">
+            {(Object.keys(MODE_LABEL) as PermMode[]).map((m) => (
+              <option key={m} value={m}>
+                {MODE_LABEL[m]}
+              </option>
+            ))}
+          </select>
+        </div>
         <Button size="icon-sm" className="rounded-full" onClick={send} disabled={busy || !text.trim()} aria-label="Enviar">
           {busy ? <Loader2Icon className="animate-spin" /> : <ArrowUpIcon />}
         </Button>
@@ -190,6 +220,7 @@ export default function ChatPage() {
   const [selected, setSelected] = React.useState<string | null>(null);
   const [filter, setFilter] = React.useState("");
   const [model, setModel] = React.useState("");
+  const [mode, setMode] = React.useState<PermMode>("default");
   const [sending, setSending] = React.useState(false);
   const { data: chat } = useApi<ChatDetail>(selected ? `/api/chats/${selected}` : null, { refreshInterval: (d) => (d?.running ? 1500 : 0) });
   const bottom = React.useRef<HTMLDivElement>(null);
@@ -198,10 +229,10 @@ export default function ChatPage() {
     bottom.current?.scrollIntoView({ block: "end" });
   }, [chat?.messages.length, chat?.pendingPrompt, chat?.running, selected]);
 
-  async function newChat(prompt: string) {
+  async function newChat(prompt: string, o: SendOpts = {}) {
     setSending(true);
     try {
-      const c = await api<ChatItem>("POST", "/api/chats", { prompt, model });
+      const c = await api<ChatItem>("POST", "/api/chats", { prompt, model: o.model ?? model, permissionMode: o.mode ?? mode });
       setSelected(c.id);
       refresh("/api/chats");
       return true;
@@ -213,11 +244,11 @@ export default function ChatPage() {
     }
   }
 
-  async function reply(prompt: string) {
-    if (!selected) return newChat(prompt);
+  async function reply(prompt: string, o: SendOpts = {}) {
+    if (!selected) return newChat(prompt, o);
     setSending(true);
     try {
-      await api("POST", `/api/chats/${selected}/messages`, { prompt, model });
+      await api("POST", `/api/chats/${selected}/messages`, { prompt, model: o.model ?? model, permissionMode: o.mode ?? mode });
       refresh(`/api/chats/${selected}`, "/api/chats");
       return true;
     } catch (e) {
@@ -302,7 +333,7 @@ export default function ChatPage() {
               <BrandMark className="size-14" />
               <h2 className="text-xl font-semibold tracking-tight">¿En qué te ayudo?</h2>
               <div className="w-full max-w-2xl">
-                <Composer onSend={newChat} busy={sending} autoFocus model={model} setModel={setModel} />
+                <Composer onSend={newChat} busy={sending} autoFocus model={model} setModel={setModel} mode={mode} setMode={setMode} />
               </div>
               <div className="flex max-w-2xl flex-wrap justify-center gap-2">
                 {SUGGESTIONS.map((s) => (
@@ -333,7 +364,7 @@ export default function ChatPage() {
                 </div>
               </div>
               <div className="mx-auto w-full max-w-3xl px-4 pb-4">
-                <Composer onSend={reply} busy={sending || !!chat?.running} model={model} setModel={setModel} />
+                <Composer onSend={reply} busy={sending || !!chat?.running} model={model} setModel={setModel} mode={mode} setMode={setMode} />
               </div>
             </>
           )}

@@ -46,6 +46,8 @@ const sid = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 const lines = [
   { type: "user", cwd: project, gitBranch: "main", version: "2.1.0", timestamp: new Date().toISOString(), message: { role: "user", content: "Añade modo oscuro al dashboard" } },
   { type: "assistant", timestamp: new Date().toISOString(), message: { model: "claude-sonnet", content: [{ type: "text", text: "Claro, voy a revisar los estilos." }, { type: "tool_use", name: "Read", input: { file_path: "src/app.css" } }], usage: { input_tokens: 1200, output_tokens: 300 } } },
+  // A Claude artifact link in the conversation: the Library indexes it.
+  { type: "assistant", cwd: project, timestamp: new Date().toISOString(), message: { model: "claude-sonnet", content: [{ type: "text", text: "Comparativa de precios lista:\nhttps://claude.ai/artifact/SmokeArtifact123" }] } },
 ];
 fs.writeFileSync(path.join(claudeHome, "projects", enc, `${sid}.jsonl`), lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
 fs.writeFileSync(path.join(claudeHome, "sessions", `${process.pid}.json`), JSON.stringify({ pid: process.pid, sessionId: sid, cwd: project, status: "busy", name: "demo-app", entrypoint: "cli", startedAt: Date.now(), updatedAt: Date.now() }));
@@ -298,12 +300,17 @@ try {
   const firstRunId = page.url().split("/").pop();
   const authH = { authorization: `Bearer ${token}` };
   const firstRun = await (await fetch(base + `/api/runs/${firstRunId}`, { headers: authH })).json();
-  await page.getByLabel("Responder a Claude").fill("Sí, hazlo con TypeScript");
+  // "/" opens the command menu; /plan switches to plan mode for this message and is not sent to Claude.
+  await page.getByLabel("Responder a Claude").fill("/pl");
+  await page.getByRole("option", { name: /\/plan/ }).waitFor();
+  await page.getByLabel("Responder a Claude").press("Tab");
+  check((await page.getByLabel("Responder a Claude").inputValue()) === "/plan ", "the / menu completes a command with Tab");
+  await page.getByLabel("Responder a Claude").fill("/plan Sí, hazlo con TypeScript");
   await page.getByRole("button", { name: "Enviar", exact: true }).click();
   // The reply appears below in the SAME page (no new run page) and Claude answers it there.
   await page.getByText("done: Sí, hazlo con TypeScript").waitFor({ timeout: 15000 });
   const replyRun = (await (await fetch(base + "/api/runs", { headers: authH })).json()).runs.find((r) => r.threadId === firstRunId);
-  check(page.url().endsWith(firstRunId) && !!firstRun.sessionId && replyRun?.resumeSessionId === firstRun.sessionId && replyRun.prompt.includes("TypeScript"), "reply in Headless continues the same conversation in the same page");
+  check(page.url().endsWith(firstRunId) && !!firstRun.sessionId && replyRun?.resumeSessionId === firstRun.sessionId && replyRun.prompt === "Sí, hazlo con TypeScript" && replyRun.permissionMode === "plan", "reply in Headless continues the same conversation in the same page (/plan applied, not sent as text)");
   await shot("03e-thread");
 
   // Stop a long-running run from the UI (regression: body-less POSTs were rejected with 415).
@@ -453,6 +460,14 @@ try {
   await page.getByText("Initial commit").waitFor();
   check(true, "project view shows git history");
   await shot("07-project");
+
+  // Library: the artifact mentioned in the session is indexed, with its context and a link that opens outside.
+  await page.goto(`${base}/library`);
+  await page.getByText("Comparativa de precios lista").waitFor();
+  const openArtifact = page.getByRole("link", { name: "Abrir" }).first();
+  check((await openArtifact.getAttribute("href")) === "https://claude.ai/artifact/SmokeArtifact123" && (await openArtifact.getAttribute("target")) === "_blank", "library lists the session's artifact with a link that opens in a new tab");
+  await page.getByRole("button", { name: /^Artifacts/ }).click();
+  await shot("11-library");
 
   await page.goto(`${base}/analytics`);
   await page.getByText("Tokens por día").waitFor();

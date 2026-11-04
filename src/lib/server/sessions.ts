@@ -252,6 +252,11 @@ export class SessionIndex {
   }
 
   /** Every transcript file on disk with its stat. */
+  /** Transcript files of every session (path + stat). */
+  listFiles(): { file: string; st: fs.Stats }[] {
+    return this.files();
+  }
+
   private files(): { file: string; st: fs.Stats }[] {
     const out: { file: string; st: fs.Stats }[] = [];
     let dirs: fs.Dirent[];

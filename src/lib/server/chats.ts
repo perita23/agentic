@@ -29,6 +29,8 @@ const MAX_CHATS = 500;
 const sendSchema = z.object({
   prompt: text(50_000).trim().min(1, "Escribe un mensaje"),
   model: z.string().regex(MODEL_RE).optional().or(z.literal("").transform(() => undefined)),
+  /** Never bypassPermissions in a chat. */
+  permissionMode: z.enum(["default", "plan", "acceptEdits", "auto"]).default("default"),
 });
 const patchSchema = z.object({ title: text(120).trim().min(1).optional(), pinned: z.boolean().optional() }).strict();
 
@@ -96,7 +98,7 @@ export class ChatService {
   }
 
   async create(body: unknown) {
-    const { prompt, model } = parse(sendSchema, body);
+    const { prompt, model, permissionMode } = parse(sendSchema, body);
     const now = nowIso();
     const chat: Chat = {
       id: crypto.randomUUID(),
@@ -111,12 +113,12 @@ export class ChatService {
       chats.unshift(chat);
       chats.splice(MAX_CHATS);
     });
-    await this.send(chat.id, { prompt, model });
+    await this.send(chat.id, { prompt, model, permissionMode });
     return this.find(chat.id);
   }
 
   async send(id: string, body: unknown) {
-    const { prompt, model } = parse(sendSchema, body);
+    const { prompt, model, permissionMode } = parse(sendSchema, body);
     const chat = this.sync(this.find(id));
     const last = chat.lastRunId ? this.runs.list().find((r) => r.id === chat.lastRunId) : undefined;
     if (last?.status === "running") throw new HttpError(409, "Claude todavía está respondiendo");
@@ -129,7 +131,7 @@ export class ChatService {
       prompt,
       model: model ?? chat.model ?? undefined,
       resumeSessionId: chat.sessionId ?? undefined,
-      permissionMode: "default",
+      permissionMode,
     });
     this.save((chats) => {
       const c = chats.find((x) => x.id === id);
