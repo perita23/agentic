@@ -86,6 +86,7 @@ export interface Overview {
     projects: number;
     costUsd: number;
   };
+  activity: (import("@/lib/orb-state").Activity & { runId: string }) | null;
   tasksByStatus: Record<string, number>;
   recentSessions: SessionSummary[];
   recentRuns: Run[];

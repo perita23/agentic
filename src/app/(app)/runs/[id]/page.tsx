@@ -14,6 +14,9 @@ import { CopyButton, errorMessage, StatusDot } from "@/components/app/common";
 import { RunDiffView } from "@/components/app/diff-view";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLauncher } from "@/components/app/launcher";
+import { linkify } from "@/components/app/linkify";
+import { ActivityOrb } from "@/components/app/liquid-orb";
+import { stateFromEvents } from "@/lib/orb-state";
 import { RUN_STATUS_LABEL, RUN_STATUS_VARIANT } from "@/components/app/run-row";
 import { api, fetcher, refresh, useApi, type Run, type RunLog } from "@/lib/api";
 import { cn, shortPath, timeAgo } from "@/lib/utils";
@@ -48,7 +51,7 @@ function EventView({ e }: { e: Ev }) {
           b.type === "text" ? (
             <div key={i} className="flex gap-2">
               <BotIcon className="mt-0.5 size-4 shrink-0 text-orange" />
-              <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">{b.text}</div>
+              <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">{linkify(String(b.text ?? ""))}</div>
             </div>
           ) : b.type === "tool_use" ? (
             <details key={i} className="ml-6 rounded border bg-inset text-xs">
@@ -71,7 +74,7 @@ function EventView({ e }: { e: Ev }) {
         {results.map((r, i) => (
           <details key={i} className={cn("rounded border text-xs", r.is_error ? "border-destructive/40" : "")}>
             <summary className="cursor-pointer px-2 py-1 font-mono text-muted-foreground">↳ resultado{r.is_error ? " (error)" : ""}</summary>
-            <pre className="max-h-64 overflow-auto px-2 py-1.5 font-mono text-[11px] whitespace-pre-wrap text-muted-foreground">{contentText(r.content).slice(0, 5000)}</pre>
+            <pre className="max-h-64 overflow-auto px-2 py-1.5 font-mono text-[11px] whitespace-pre-wrap text-muted-foreground">{linkify(contentText(r.content).slice(0, 5000))}</pre>
           </details>
         ))}
       </div>
@@ -194,6 +197,9 @@ function HeadlessLog({ run }: { run: Run }) {
           <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} className="accent-primary" /> Seguir
         </label>
       </CardHeader>
+      <div className="flex items-center border-b bg-card px-4 py-3">
+        <ActivityOrb activity={run.status === "running" ? stateFromEvents(events) : run.status === "failed" ? { state: "error", label: "Ha fallado" } : stateFromEvents(events)} size={48} />
+      </div>
       <CardContent ref={scroller} className="max-h-[65vh] min-h-64 overflow-y-auto bg-inset p-4">
         <div className="flex flex-col gap-3">
           {events.map((e, i) => (
@@ -206,7 +212,73 @@ function HeadlessLog({ run }: { run: Run }) {
           )}
         </div>
       </CardContent>
+      <ReplyBox run={run} />
     </Card>
+  );
+}
+
+/**
+ * Headless runs are one-shot, so a reply continues the same Claude session
+ * (`--resume`) as a new run: send another prompt or answer a question Claude asked.
+ */
+function ReplyBox({ run }: { run: Run }) {
+  const router = useRouter();
+  const [text, setText] = React.useState("");
+  const [mode, setMode] = React.useState(run.permissionMode || "default");
+  const [busy, setBusy] = React.useState(false);
+  if (run.mode !== "headless") return null;
+  const waiting = run.status === "running";
+  const noSession = !run.sessionId;
+
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    if (!text.trim() || waiting || noSession) return;
+    setBusy(true);
+    try {
+      const next = await api<Run>("POST", "/api/runs", {
+        mode: "headless",
+        projectPath: run.projectPath,
+        prompt: text.trim(),
+        resumeSessionId: run.sessionId,
+        permissionMode: mode,
+        model: run.model || undefined,
+      });
+      refresh("/api/runs", "/api/overview");
+      toast.success("Enviado", { description: "Claude continúa la misma conversación." });
+      router.push(`/runs/${next.id}`);
+    } catch (err) {
+      toast.error("No se pudo enviar", { description: errorMessage(err) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={send} className="grid gap-2 border-t bg-card p-3">
+      <textarea
+        aria-label="Responder a Claude"
+        rows={2}
+        value={text}
+        disabled={waiting || noSession}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send(e);
+        }}
+        placeholder={waiting ? "Claude está trabajando; podrás responder cuando termine…" : noSession ? "Esta ejecución no tiene sesión que continuar." : "Responde a Claude o envía otra instrucción…"}
+        className="w-full resize-y rounded-md border bg-inset p-2.5 text-sm disabled:opacity-60"
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <select aria-label="Permisos" value={mode} onChange={(e) => setMode(e.target.value)} className="h-8 rounded-md border bg-inset px-2 text-xs" disabled={waiting || noSession}>
+          <option value="default">Permisos: preguntar</option>
+          <option value="plan">Permisos: sólo planificar</option>
+          <option value="acceptEdits">Permisos: aceptar ediciones</option>
+        </select>
+        <span className="hidden text-xs text-muted-foreground sm:inline">Ctrl/⌘ + Enter para enviar</span>
+        <Button type="submit" size="sm" className="ml-auto" disabled={busy || waiting || noSession || !text.trim()}>
+          <CornerDownLeftIcon /> {busy ? "Enviando…" : "Enviar"}
+        </Button>
+      </div>
+    </form>
   );
 }
 

@@ -30,6 +30,7 @@ import { LauncherProvider, useLauncher } from "./launcher";
 import { RunNotifier } from "./run-notifier";
 import { WhatsNew } from "./whats-new";
 import { BudgetBanner } from "./budget";
+import { LiquidOrb } from "./liquid-orb";
 import { BrandMark } from "@/components/app/brand-mark";
 
 const NAV = [
@@ -104,6 +105,15 @@ function Sidebar({ overview }: { overview?: Overview }) {
           );
         })}
       </nav>
+      {overview?.activity && (
+        <Link href={`/runs/${overview.activity.runId}`} className="mx-2 mb-2 flex items-center gap-2.5 rounded-lg border bg-card px-2.5 py-2 text-xs transition-colors hover:border-border-strong" aria-live="polite">
+          <LiquidOrb state={overview.activity.state} size={30} />
+          <span className="min-w-0">
+            <span className="block font-medium text-foreground">Claude trabajando</span>
+            <span className="block truncate text-muted-foreground">{overview.activity.label}</span>
+          </span>
+        </Link>
+      )}
       <div className="border-t p-3 text-[11px] text-muted-foreground">
         <div className="flex items-center gap-1.5">
           <span className="size-1.5 rounded-full bg-success" /> Todo se ejecuta en tu dispositivo

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { linkify } from "@/components/app/linkify";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { motion } from "motion/react";
@@ -82,7 +83,7 @@ export default function SessionPage() {
                 <span className="font-medium text-foreground">{m.role === "user" ? "Tú" : "Claude"}</span>
                 {m.timestamp && <span className="ml-auto">{new Date(m.timestamp).toLocaleString("es-ES")}</span>}
               </div>
-              {m.text && <div className="px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words">{m.text}</div>}
+              {m.text && <div className="px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words">{linkify(m.text)}</div>}
               {!!m.tools?.length && (
                 <div className="flex flex-col gap-1 px-3 pb-2">
                   {m.tools.map((t, j) => (

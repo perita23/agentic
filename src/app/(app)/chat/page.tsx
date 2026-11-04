@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { BrandMark } from "@/components/app/brand-mark";
+import { linkify } from "@/components/app/linkify";
+import { ActivityOrb } from "@/components/app/liquid-orb";
+import type { Activity } from "@/lib/orb-state";
 import { errorMessage, PageHeader } from "@/components/app/common";
 import { api, refresh, useApi } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
@@ -18,6 +21,7 @@ interface ChatItem {
   updatedAt: string;
   pinned?: boolean;
   running: boolean;
+  activity?: Activity | null;
 }
 interface ChatMessage {
   role: "user" | "assistant";
@@ -45,7 +49,7 @@ function inline(t: string, key: string): React.ReactNode[] {
   let last = 0;
   let k = 0;
   for (const m of t.matchAll(/(\*\*[^*\n]+\*\*|`[^`\n]+`)/g)) {
-    if (m.index! > last) out.push(t.slice(last, m.index));
+    if (m.index! > last) out.push(...linkify(t.slice(last, m.index), `${key}-t${k++}`));
     out.push(
       m[0].startsWith("**") ? (
         <strong key={`${key}-${k++}`} className="font-semibold">
@@ -59,7 +63,7 @@ function inline(t: string, key: string): React.ReactNode[] {
     );
     last = m.index! + m[0].length;
   }
-  if (last < t.length) out.push(t.slice(last));
+  if (last < t.length) out.push(...linkify(t.slice(last), `${key}-t${k++}`));
   return out;
 }
 
@@ -322,9 +326,7 @@ export default function ChatPage() {
                   ))}
                   {chat?.pendingPrompt && <Bubble m={{ role: "user", text: chat.pendingPrompt }} />}
                   {chat?.running && (
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                      <BrandMark className="size-7 animate-pulse" /> Claude está pensando…
-                    </div>
+                    <ActivityOrb activity={chat.activity ?? { state: "thinking", label: "Pensando…" }} size={44} />
                   )}
                   {chat?.error && !chat.running && <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{chat.error}</p>}
                   <div ref={bottom} />
