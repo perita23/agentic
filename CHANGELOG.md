@@ -3,6 +3,13 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.33.0] - 2026-11-04
+
+### Añadido
+- **Correo** (nueva sección del menú). Conecta tu correo (Gmail, Outlook, iCloud, Yahoo, Fastmail u otro IMAP) con una contraseña de aplicación. Es **sólo lectura**: Agentic nunca envía, mueve ni borra nada de tu correo; la contraseña y los mensajes se guardan **cifrados** en tu dispositivo y no viajan a ningún sitio.
+- **Rutina automática** que revisa la bandeja cada 5 min – 2 h (tú eliges) y organiza los mensajes con reglas locales, **sin IA ni gasto de tokens**: urgente, reuniones, facturas y pagos, desarrollo (GitHub, Jira, Sentry…), seguridad y códigos, newsletters y personal.
+- **Anidado por proyecto**: cada mensaje se cuelga del proyecto cuyo nombre aparece en el asunto o el texto. Si lo mueves tú a mano, Agentic aprende «los correos de este remitente van a este proyecto». Vista «Por proyecto» o «Por tipo», filtro de sin leer, marcar como hecho y «Sincronizar» al momento.
+
 ## [0.32.0] - 2026-11-04
 
 ### Añadido

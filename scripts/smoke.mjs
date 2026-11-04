@@ -153,7 +153,12 @@ const jiraUrl = `http://127.0.0.1:${jira.address().port}`;
 const port = 4400 + Math.floor(Math.random() * 500);
 // localhost (not 127.0.0.1): WebAuthn / Touch ID requires a domain.
 const base = `http://localhost:${port}`;
-const env = { ...process.env, AGENTIC_HOME: dataDir, CLAUDE_HOME: claudeHome, CLAUDE_BIN: path.join(root, "test/fixtures/fake-claude.mjs"), PORT: String(port), HOST: "127.0.0.1", AGENTIC_ALLOW_INSECURE_INTEGRATIONS: "1", AGENTIC_SLACK_API_URL: slackUrl };
+const mailFixture = path.join(tmp, "mail.json");
+fs.writeFileSync(mailFixture, JSON.stringify([
+  { uid: 1, fromName: "Ana", fromAddress: "ana@cliente.com", subject: "Bug en demo-app al pagar", snippet: "No funciona el checkout", date: new Date().toISOString(), unread: true, listUnsubscribe: false },
+  { uid: 2, fromName: "Facturación", fromAddress: "billing@proveedor.com", subject: "Factura de octubre", snippet: "", date: new Date().toISOString(), unread: true, listUnsubscribe: false },
+]));
+const env = { ...process.env, AGENTIC_MAIL_FIXTURE: mailFixture, AGENTIC_HOME: dataDir, CLAUDE_HOME: claudeHome, CLAUDE_BIN: path.join(root, "test/fixtures/fake-claude.mjs"), PORT: String(port), HOST: "127.0.0.1", AGENTIC_ALLOW_INSECURE_INTEGRATIONS: "1", AGENTIC_SLACK_API_URL: slackUrl };
 const server = spawn(process.execPath, [path.join(root, "scripts/agentic.mjs"), "start"], { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] });
 let out = "";
 server.stdout.on("data", (d) => (out += d));
@@ -526,6 +531,26 @@ try {
   check((await openArtifact.getAttribute("href")) === "https://claude.ai/artifact/SmokeArtifact123" && (await openArtifact.getAttribute("target")) === "_blank", "library lists the session's artifact with a link that opens in a new tab");
   await page.getByRole("button", { name: /^Artifacts/ }).click();
   await shot("11-library");
+
+  // Mail: connect an account (offline fixture), messages get filed by project and type, nothing leaks.
+  await page.goto(`${base}/mail`);
+  await page.getByRole("button", { name: "Conectar correo" }).first().click();
+  await page.getByLabel("Correo", { exact: true }).fill("yo@gmail.com");
+  await page.getByLabel("Contraseña de aplicación").fill("bad");
+  const mailErrorsBefore = consoleErrors.length;
+  await page.getByRole("button", { name: "Conectar", exact: true }).click();
+  await page.getByRole("alert").getByText(/contraseña de aplicación/).waitFor();
+  consoleErrors.splice(mailErrorsBefore); // the rejected wrong password is expected
+  await page.getByLabel("Contraseña de aplicación").fill("app-pass-123");
+  await page.getByRole("button", { name: "Conectar", exact: true }).click();
+  await page.getByText("Bug en demo-app al pagar").waitFor({ timeout: 15000 });
+  const mailOverview = JSON.stringify(await (await fetch(base + "/api/mail", { headers: authH })).json());
+  check(!mailOverview.includes("app-pass-123"), "the mail password is never returned by the API");
+  check((await page.getByRole("heading", { name: /demo-app/ }).count()) + (await page.getByText("demo-app", { exact: true }).count()) > 0 && (await page.getByText("Factura de octubre").count()) === 1, "mail is filed under the project named in the subject");
+  await page.getByRole("tab", { name: "Por tipo" }).click();
+  await page.getByText("Facturas y pagos").first().waitFor();
+  check(!fs.readFileSync(path.join(dataDir, "mail-accounts.json"), "utf8").includes("app-pass-123"), "the mail password is encrypted at rest");
+  await shot("12-mail");
 
   await page.goto(`${base}/analytics`);
   await page.getByText("Tokens por día").waitFor();
