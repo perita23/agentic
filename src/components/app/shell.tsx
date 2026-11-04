@@ -20,7 +20,7 @@ import {
   SearchIcon,
   SettingsIcon,
   TicketIcon,
-  EyeIcon, EyeOffIcon, SlidersHorizontalIcon, CheckIcon,
+  EyeIcon, EyeOffIcon, MailIcon, SlidersHorizontalIcon, CheckIcon,
   TerminalSquareIcon, SparklesIcon, ServerIcon, ShieldCheckIcon, AlarmClockIcon, LibraryIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
@@ -50,6 +50,7 @@ const NAV = [
   { href: "/permissions", label: "Permisos", icon: ShieldCheckIcon },
   { href: "/projects", label: "Proyectos", icon: FolderGit2Icon },
   { href: "/analytics", label: "Analítica", icon: ChartColumnIcon },
+  { href: "/mail", label: "Correo", icon: MailIcon },
   { href: "/messages", label: "Mensajes", icon: MessageCircleIcon },
   { href: "/integrations", label: "Integraciones", icon: PlugIcon },
   { href: "/settings", label: "Ajustes", icon: SettingsIcon },
