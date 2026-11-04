@@ -3,6 +3,15 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.17.0] - 2026-11-03
+
+### Añadido
+- **Chat con Claude** (nueva sección «Chat»): habla con Claude sin elegir proyecto. Cada conversación continúa la misma sesión de Claude Code, con selector de modelo, respuestas con formato (código, listas, títulos) y las herramientas que use Claude.
+- **Historial de chats**: buscar, fijar y borrar conversaciones; las que siguen respondiendo se marcan. Todo se guarda en tu dispositivo.
+
+### Corregido
+- En móvil, las tarjetas del dashboard ya no se salen de la pantalla y el buscador superior no se parte en varias líneas.
+
 ## [0.16.0] - 2026-11-03
 
 ### Cambiado

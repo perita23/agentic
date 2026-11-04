@@ -96,6 +96,8 @@ export class ProjectService {
   constructor(
     private store: JsonStore,
     private sessions: SessionIndex,
+    /** Folders Agentic uses internally (e.g. the chat folder): never listed as projects. */
+    private hidden: string[] = [],
   ) {}
 
   stored(): StoredProject[] {
@@ -110,7 +112,7 @@ export class ProjectService {
       map.set(p.path, { ...p, registered: true, exists: fs.existsSync(p.path), sessionCount: 0, activeSessions: 0, lastActivity: null });
     }
     for (const s of this.sessions.list()) {
-      if (!s.cwd) continue;
+      if (!s.cwd || this.hidden.some((h) => s.cwd === h || s.cwd!.startsWith(h + path.sep))) continue;
       let item = map.get(s.cwd);
       if (!item) {
         item = {
