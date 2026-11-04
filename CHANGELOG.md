@@ -6,7 +6,7 @@ Cada versión se etiqueta y publica automáticamente como GitHub Release cuando 
 ## [0.25.2] - 2026-11-04
 
 ### Cambiado
-- **App de Mac: la pantalla de inicio es ahora la de pantalla completa, dividida 50/50.** A la izquierda, sobre negro, crear contraseña o desbloquear (con Touch ID si lo activaste); a la derecha, gradientes líquidos animados con los colores del logo y una tarjeta de cristal. Antes salía una ventana pequeña. En ventanas estrechas se oculta la parte animada y se respeta «reducir movimiento».
+- **App de Mac: la pantalla de inicio es ahora la de pantalla completa, dividida 50/50.** A la izquierda, sobre negro, crear contraseña o desbloquear (con Touch ID si lo activaste); a la derecha, un líquido animado con los colores del logo (esferas que se funden y se separan, con brillo) y una tarjeta de cristal. Antes salía una ventana pequeña. En ventanas estrechas se oculta la parte animada y se respeta «reducir movimiento».
 
 ## [0.25.1] - 2026-11-04
 
