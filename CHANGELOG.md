@@ -13,6 +13,9 @@ Cada versión se etiqueta y publica automáticamente como GitHub Release cuando 
 ### Seguridad
 - Sólo se modifica el bloque `permissions` de `settings.json`; el resto de tus ajustes se conserva. Si el fichero no es JSON válido, Agentic no lo toca.
 
+### Corregido
+- Al terminar una ejecución, su registro ya está completo: antes podían faltar las últimas líneas si lo abrías justo al acabar.
+
 ## [0.19.0] - 2026-11-04
 
 ### Añadido
