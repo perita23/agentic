@@ -126,7 +126,7 @@ export async function baseBranch(wt: TaskWorktree): Promise<string> {
  * credential helper); for https remotes it can retry with the connected
  * account's token, passed through the environment, never the command line.
  */
-export async function pushBranch(wt: TaskWorktree, authHeader?: () => Promise<string>) {
+export async function pushBranch(wt: Pick<TaskWorktree, "path" | "branch">, authHeader?: () => Promise<string>) {
   try {
     await gitStrict(wt.path, ["push", "--no-verify", "-u", "origin", `${wt.branch}:${wt.branch}`], { timeout: 120_000 });
     return;

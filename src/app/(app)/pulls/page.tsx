@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, PageHeader } from "@/components/app/common";
+import { NewPrButton } from "@/components/app/new-pr";
 import { ProviderIcon } from "@/components/app/provider-icon";
 import { useApi } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
@@ -63,7 +64,7 @@ export default function PullsPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader icon={GitPullRequestIcon} title="Pull requests" description="PRs abiertas en los repositorios de tus proyectos." />
+      <PageHeader icon={GitPullRequestIcon} title="Pull requests" description="PRs abiertas en los repositorios de tus proyectos." actions={<NewPrButton />} />
       <div className="flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
           <SearchIcon className="absolute top-2 left-2.5 size-4 text-muted-foreground" />

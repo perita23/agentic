@@ -657,6 +657,21 @@ try {
     "approve and merge a PR from the app (merge pinned to the reviewed head SHA)",
   );
 
+  // New PR from the UI: pick a branch with commits, the app pushes it and opens the PR.
+  execFileSync("git", ["checkout", "-q", "-b", "feat/nueva"], { cwd: project });
+  execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "Nueva desde la UI"], { cwd: project });
+  execFileSync("git", ["checkout", "-q", "main"], { cwd: project });
+  await page.goto(`${base}/pulls`);
+  await page.getByRole("button", { name: "Nueva PR" }).click();
+  await page.getByLabel("Título").waitFor();
+  await page.waitForFunction(() => document.querySelector("#pr-title")?.value === "Nueva desde la UI");
+  check((await page.locator("#pr-head").inputValue()) === "feat/nueva", "new PR dialog proposes the branch that has commits and its last commit as the title");
+  await page.getByRole("button", { name: "Crear pull request" }).click();
+  await page.getByText("PR #13 creada").waitFor();
+  const uiPr = ghWrites.find((w) => w.method === "POST" && w.path === "/repos/acme/demo/pulls" && w.body.head === "feat/nueva");
+  check(uiPr?.body.base === "main" && uiPr.body.title === "Nueva desde la UI" && execFileSync("git", ["branch", "--list", "feat/nueva"], { cwd: bareRemote, encoding: "utf8" }).includes("feat/nueva"), "new PR from the Pull requests page: branch pushed and PR opened");
+  await page.getByText("PR #13 creada").waitFor({ state: "detached", timeout: 15000 });
+
   // Jira: search, open an issue, move it, comment and import it as a task.
   await fetch(base + "/api/integrations/jira", { method: "PUT", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ siteUrl: jiraUrl, email: "ana@acme.test", token: "jira-smoke" }) });
   await page.goto(`${base}/jira`);
@@ -697,7 +712,7 @@ try {
   await page.getByRole("button", { name: "Crear PR" }).click();
   await page.getByRole("button", { name: "Crear PR" }).last().click();
   await page.getByText("PR #13 creada").waitFor();
-  const prCall = ghWrites.find((w) => w.method === "POST" && w.path === "/repos/acme/demo/pulls");
+  const prCall = ghWrites.find((w) => w.method === "POST" && w.path === "/repos/acme/demo/pulls" && w.body.head !== "feat/nueva");
   check(prCall?.body.head === wtTask.worktree.branch && prCall?.body.base === "main" && execFileSync("git", ["log", "--format=%s", "-1", wtTask.worktree.branch], { cwd: bareRemote, encoding: "utf8" }).trim() === "Aislar en rama", "task worktree: commit, push and open a PR from the app");
   await page.keyboard.press("Escape");
 

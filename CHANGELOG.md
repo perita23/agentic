@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.35.0] - 2026-11-04
+
+### Añadido
+- **Crear pull requests desde la sección Pull requests.** El botón «Nueva PR» abre un asistente: eliges el proyecto, la rama con los cambios (propone la actual o la más reciente que tenga commits, con cuántos commits lleva de ventaja), la rama destino, el título (por defecto el último commit) y la descripción, y puedes crearla como borrador. Agentic sube la rama a `origin` (con tu SSH/credenciales de git y, si hace falta, el token de la cuenta conectada) y abre la PR en GitHub o Bitbucket. Avisa si hay cambios sin commit, que no entran en la PR.
+
 ## [0.34.0] - 2026-11-04
 
 ### Añadido
