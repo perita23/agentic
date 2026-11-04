@@ -8,6 +8,15 @@ if (args[0] === "--version") {
   console.log("9.9.9 (Fake Claude)");
   process.exit(0);
 }
+if (args[0] === "mcp") {
+  // `claude mcp add/remove`: record the call so tests can check the argv.
+  if (process.env.FAKE_CLAUDE_LOG) (await import("node:fs")).appendFileSync(process.env.FAKE_CLAUDE_LOG, JSON.stringify({ args, cwd: process.cwd() }) + "\n");
+  if (args.includes("broken")) {
+    process.stderr.write("Error: invalid MCP configuration\n");
+    process.exit(1);
+  }
+  process.exit(0);
+}
 const sid = "11111111-2222-4333-8444-555555555555";
 out({ type: "system", subtype: "init", session_id: sid, cwd: process.cwd() });
 out({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: JSON.stringify({ args, cwd: process.cwd() }) }] } });

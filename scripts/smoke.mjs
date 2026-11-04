@@ -352,6 +352,17 @@ try {
   check(chats.chats.length === 1 && chatRun && chatRun.projectPath.endsWith("/chat"), "chat starts a Claude conversation outside any project and keeps it in the history");
   await shot("05b-chat");
 
+  // MCP servers: add a popular one through `claude mcp add`.
+  await page.goto(`${base}/mcp`);
+  await page.getByRole("heading", { name: "Servidores MCP" }).waitFor();
+  await page.getByRole("button", { name: "Añadir servidor" }).first().click();
+  await page.getByRole("button", { name: "Playwright" }).click();
+  check((await page.getByLabel("Argumentos").inputValue()).includes("@playwright/mcp"), "MCP presets fill the server definition");
+  await page.getByRole("dialog").getByRole("button", { name: "Añadir", exact: true }).click();
+  await page.getByText("Servidor «playwright» añadido").waitFor();
+  check(true, "MCP server added through the claude CLI from the app");
+  await shot("05c-mcp");
+
   // Agents
   await page.goto(`${base}/agents`);
   await page.getByRole("button", { name: "Nuevo agente" }).first().click();

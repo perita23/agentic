@@ -3,6 +3,14 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.19.0] - 2026-11-04
+
+### Añadido
+- **Servidores MCP** (nueva sección «MCP»): ve todos los servidores MCP de Claude Code (de todos tus proyectos, privados de un proyecto o compartidos en `.mcp.json`), añádelos y quítalos sin editar JSON. Plantillas de un clic para Playwright, Context7, GitHub, sistema de ficheros y Sequential thinking. Los cambios se hacen con `claude mcp add/remove`, así Claude Code sigue siendo la fuente de verdad.
+
+### Seguridad
+- Los valores de variables de entorno y cabeceras de los servidores MCP nunca llegan al navegador: sólo se muestran sus nombres.
+
 ## [0.18.0] - 2026-11-03
 
 ### Cambiado
