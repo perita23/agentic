@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { git } from "./git";
+import { git, gitStrict } from "./git";
 import { HttpError } from "./util";
 
 /**
@@ -100,4 +100,47 @@ export async function removeWorktree(wt: TaskWorktree, { deleteBranch = false } 
   if (fs.existsSync(wt.path)) await mustGit(wt.projectPath, ["worktree", "remove", "--force", wt.path], "No se pudo quitar el worktree");
   await git(wt.projectPath, ["worktree", "prune"]);
   if (deleteBranch) await git(wt.projectPath, ["branch", "-D", wt.branch]);
+}
+
+/** Commit every pending change in the worktree (no-op when clean). */
+export async function commitAll(wt: TaskWorktree, message: string): Promise<boolean> {
+  const status = (await git(wt.path, ["status", "--porcelain"])) ?? "";
+  if (!status.trim()) return false;
+  await gitStrict(wt.path, ["add", "-A"]);
+  // Use the user's identity; fall back to a neutral one only when git has none configured.
+  const hasIdentity = !!(await git(wt.path, ["config", "user.email"]))?.trim();
+  const identity = hasIdentity ? [] : ["-c", "user.name=Agentic", "-c", "user.email=agentic@localhost"];
+  await gitStrict(wt.path, [...identity, "commit", "--no-verify", "-m", message]);
+  return true;
+}
+
+/** The branch to propose changes into: the worktree's base, else origin's default, else main. */
+export async function baseBranch(wt: TaskWorktree): Promise<string> {
+  if (wt.base) return wt.base;
+  const head = (await git(wt.projectPath, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]))?.trim();
+  return head?.replace(/^origin\//, "") || "main";
+}
+
+/**
+ * Push the task branch to origin. Tries the user's own git setup first (SSH,
+ * credential helper); for https remotes it can retry with the connected
+ * account's token, passed through the environment, never the command line.
+ */
+export async function pushBranch(wt: TaskWorktree, authHeader?: () => Promise<string>) {
+  try {
+    await gitStrict(wt.path, ["push", "--no-verify", "-u", "origin", `${wt.branch}:${wt.branch}`], { timeout: 120_000 });
+    return;
+  } catch (e) {
+    const remote = (await git(wt.path, ["remote", "get-url", "origin"]))?.trim() ?? "";
+    if (!authHeader || !/^https:\/\//i.test(remote)) throw new HttpError(400, `No se pudo subir la rama: ${(e as Error).message}`);
+  }
+  const header = await authHeader();
+  try {
+    await gitStrict(wt.path, ["push", "--no-verify", "-u", "origin", `${wt.branch}:${wt.branch}`], {
+      timeout: 120_000,
+      env: { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "http.extraHeader", GIT_CONFIG_VALUE_0: header },
+    });
+  } catch (e) {
+    throw new HttpError(400, `No se pudo subir la rama: ${(e as Error).message.replace(/Basic [A-Za-z0-9+/=]+/g, "Basic ***")}`);
+  }
 }

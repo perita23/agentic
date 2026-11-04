@@ -34,6 +34,10 @@ execFileSync("git", ["init", "-q", "-b", "main"], { cwd: project });
 execFileSync("git", ["-c", "user.name=demo", "-c", "user.email=d@d", "add", "."], { cwd: project });
 execFileSync("git", ["-c", "user.name=demo", "-c", "user.email=d@d", "commit", "-qm", "Initial commit"], { cwd: project });
 execFileSync("git", ["remote", "add", "origin", "https://127.0.0.1/acme/demo.git"], { cwd: project });
+// Pushes land in a local bare repo; the fetch URL still looks like GitHub for the PR inbox.
+const bareRemote = fs.mkdtempSync(path.join(os.tmpdir(), "agentic-smoke-bare-"));
+execFileSync("git", ["init", "-q", "--bare"], { cwd: bareRemote });
+execFileSync("git", ["config", `url.${bareRemote}.pushInsteadOf`, "https://127.0.0.1/acme/demo.git"], { cwd: project });
 
 const enc = project.replace(/\//g, "-");
 fs.mkdirSync(path.join(claudeHome, "projects", enc), { recursive: true });
@@ -97,7 +101,7 @@ const github = http.createServer((req, res) => {
     const pr = { number: 12, title: "Añade modo oscuro", user: { login: "ana" }, head: { ref: "feat/dark", sha: PR_SHA }, base: { ref: "main" }, updated_at: new Date().toISOString(), html_url: "https://github.com/acme/demo/pull/12", state: "open", draft: false, body: "Implementa el tema oscuro.", mergeable: true, comments: 0 };
     const routes = {
       "/user": () => ({ login: "smoke" }),
-      "/repos/acme/demo/pulls": () => [pr],
+      "/repos/acme/demo/pulls": () => (req.method === "POST" ? { number: 13, html_url: "https://github.com/acme/demo/pull/13" } : [pr]),
       "/repos/acme/demo/pulls/12": () => pr,
       "/repos/acme/demo/pulls/12/files": () => [{ filename: "src/theme.css", status: "modified", additions: 2, deletions: 0, patch: "@@ -1 +1,3 @@\n body {}\n+.dark { color: white }\n+.dark a {}" }],
       "/repos/acme/demo/pulls/12/reviews": () => (req.method === "GET" ? [] : { id: 1 }),
@@ -542,6 +546,18 @@ try {
       jt?.title === "SHOP-7 El checkout falla en Safari",
     "transition, comment and import a Jira issue from the app",
   );
+
+  // Open a PR straight from a task's worktree (commit + push + GitHub PR).
+  const wtTask = (await (await fetch(base + "/api/tasks", { headers: { authorization: `Bearer ${token}` } })).json()).tasks.find((t) => t.title === "Aislar en rama");
+  fs.writeFileSync(path.join(wtTask.worktree.path, "dark.css"), ".dark {}\n");
+  await page.goto(`${base}/tasks`);
+  await page.locator("main").getByText("Aislar en rama").click();
+  await page.getByRole("button", { name: "Crear PR" }).click();
+  await page.getByRole("button", { name: "Crear PR" }).last().click();
+  await page.getByText("PR #13 creada").waitFor();
+  const prCall = ghWrites.find((w) => w.method === "POST" && w.path === "/repos/acme/demo/pulls");
+  check(prCall?.body.head === wtTask.worktree.branch && prCall?.body.base === "main" && execFileSync("git", ["log", "--format=%s", "-1", wtTask.worktree.branch], { cwd: bareRemote, encoding: "utf8" }).trim() === "Aislar en rama", "task worktree: commit, push and open a PR from the app");
+  await page.keyboard.press("Escape");
 
   await page.goto(`${base}/settings`);
   await page.getByText("9.9.9 (Fake Claude)").waitFor();

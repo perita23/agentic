@@ -119,6 +119,28 @@ export class PullService {
     return r;
   }
 
+  /** Repository (and provider) behind a project, for creating PRs from it. */
+  async repoFor(projectPath: string) {
+    const r = (await this.repos()).find((x) => x.projectPath === projectPath);
+    if (!r) throw new HttpError(400, "Conecta GitHub o Bitbucket (Integraciones) y comprueba que el proyecto tiene un remoto «origin» de ese servicio");
+    return r;
+  }
+
+  /** Open a pull request from `head` into `base`. */
+  async create(projectPath: string, input: { head: string; base: string; title: string; body: string; draft: boolean }): Promise<{ provider: PrProvider; number: number; url: string }> {
+    const r = await this.repoFor(projectPath);
+    const slug = `${encodeURIComponent(r.owner)}/${encodeURIComponent(r.repo)}`;
+    if (r.provider === "github") {
+      const p = await this.integrations.gh<Gh>(`/repos/${slug}/pulls`, { method: "POST", body: { title: input.title, head: input.head, base: input.base, body: input.body, draft: input.draft } });
+      return { provider: "github", number: p.number, url: p.html_url };
+    }
+    const p = await this.integrations.bb<Gh>(`/repositories/${slug}/pullrequests`, {
+      method: "POST",
+      body: { title: input.title, description: input.body, source: { branch: { name: input.head } }, destination: { branch: { name: input.base } }, draft: input.draft },
+    });
+    return { provider: "bitbucket", number: p.id, url: p.links?.html?.href ?? "" };
+  }
+
   async inbox(): Promise<{ items: PullSummary[]; errors: { repo: string; error: string }[] }> {
     const repos = await this.repos();
     const items: PullSummary[] = [];

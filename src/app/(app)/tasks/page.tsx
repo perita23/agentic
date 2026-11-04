@@ -17,7 +17,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CalendarIcon, CheckSquareIcon, FileStackIcon, FolderIcon, GitBranchIcon, KanbanSquareIcon, PlayIcon, PlusIcon, RocketIcon, SearchIcon } from "lucide-react";
+import { CalendarIcon, CheckSquareIcon, FileStackIcon, FolderIcon, GitBranchIcon, GitPullRequestIcon, KanbanSquareIcon, PlayIcon, PlusIcon, RocketIcon, SearchIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -107,6 +107,18 @@ function TaskCard({ task, overlay }: { task: Task; overlay?: boolean }) {
           <span className="flex min-w-0 items-center gap-1 font-mono" title={`Worktree: ${task.worktree.branch}`}>
             <GitBranchIcon className="size-3 shrink-0" /> <span className="max-w-32 truncate">{task.worktree.branch.replace(/^agentic\//, "")}</span>
           </span>
+        )}
+        {task.pullRequest && (
+          <a
+            href={task.pullRequest.url}
+            target="_blank"
+            rel="noreferrer"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center gap-1 text-success hover:underline"
+          >
+            <GitPullRequestIcon className="size-3" /> #{task.pullRequest.number}
+          </a>
         )}
         {task.runIds.length > 0 && (
           <span className="flex items-center gap-1">

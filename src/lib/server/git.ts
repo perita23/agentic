@@ -27,15 +27,15 @@ const ENV = {
   GIT_PAGER: "cat",
 };
 
-async function run(cwd: string, args: string[], timeout: number, maxBuffer: number) {
+async function run(cwd: string, args: string[], timeout: number, maxBuffer: number, extraEnv: Record<string, string> = {}) {
   try {
-    const { stdout } = await execFileP("git", args, { cwd, timeout, maxBuffer, env: { ...process.env, ...ENV } });
+    const { stdout } = await execFileP("git", args, { cwd, timeout, maxBuffer, env: { ...process.env, ...ENV, ...extraEnv } });
     return stdout;
   } catch (e) {
     // SHA-256 repositories have a different empty-tree id; filters are still neutralised.
     if (!/attr|tree/i.test(String((e as { stderr?: string }).stderr ?? ""))) throw e;
     const { GIT_ATTR_SOURCE: _ignored, ...env } = ENV; // eslint-disable-line @typescript-eslint/no-unused-vars
-    const { stdout } = await execFileP("git", args, { cwd, timeout, maxBuffer, env: { ...process.env, ...env } });
+    const { stdout } = await execFileP("git", args, { cwd, timeout, maxBuffer, env: { ...process.env, ...env, ...extraEnv } });
     return stdout;
   }
 }
@@ -57,6 +57,21 @@ async function filterOverrides(cwd: string): Promise<string[]> {
   const args = names.flatMap((n) => ["-c", `filter.${n}.clean=`, "-c", `filter.${n}.smudge=`, "-c", `filter.${n}.process=`, "-c", `filter.${n}.required=false`]);
   filterCache.set(cwd, { at: Date.now(), args });
   return args;
+}
+
+/**
+ * Like `git()` but throws an Error with git's own message (last lines of stderr).
+ * `env` adds variables, e.g. GIT_CONFIG_COUNT/KEY_n/VALUE_n to pass a credential
+ * header without putting it on the command line.
+ */
+export async function gitStrict(cwd: string, args: string[], { timeout = 60_000, maxBuffer = 2 * 1024 * 1024, env = {} as Record<string, string> } = {}): Promise<string> {
+  try {
+    return await run(cwd, [...BASE_ARGS, ...(await filterOverrides(cwd)), ...args], timeout, maxBuffer, env);
+  } catch (e) {
+    const err = e as { stderr?: string; message: string };
+    const msg = (err.stderr || err.message).trim().split("\n").filter(Boolean).slice(-3).join(" ");
+    throw new Error(msg.slice(0, 500) || "git falló");
+  }
 }
 
 /** Run git hardened against hostile repos. Returns stdout, or null on any failure. */

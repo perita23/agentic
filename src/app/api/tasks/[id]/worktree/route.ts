@@ -5,8 +5,8 @@ import { removeWorktree, worktreeStatus } from "@/lib/server/worktrees";
 /** The task's worktree: branch, uncommitted files and commits on top of the base branch. */
 export const GET = route(async ({ c, params }) => {
   const task = c.tasks.get(params.id);
-  if (!task.worktree) return { worktree: null, status: null };
-  return { worktree: task.worktree, status: await worktreeStatus(task.worktree) };
+  if (!task.worktree) return { worktree: null, status: null, pullRequest: task.pullRequest ?? null };
+  return { worktree: task.worktree, status: await worktreeStatus(task.worktree), pullRequest: task.pullRequest ?? null };
 });
 
 /** Remove the worktree folder. The branch is kept (with its commits) unless ?deleteBranch=1. */

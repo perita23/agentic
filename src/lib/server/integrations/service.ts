@@ -382,6 +382,17 @@ export class IntegrationService {
     });
   }
 
+  /**
+   * HTTP header for `git push` over https with the connected account's token
+   * (passed to git through GIT_CONFIG_* env vars, never on the command line).
+   */
+  async gitAuthHeader(provider: "github" | "bitbucket"): Promise<string> {
+    if (provider === "github") return `Authorization: Basic ${Buffer.from(`x-access-token:${this.need("github").token}`).toString("base64")}`;
+    const cfg = await this.fresh("bitbucket");
+    const cred = cfg.username && cfg.auth !== "oauth" ? `${cfg.username}:${cfg.token}` : `x-token-auth:${cfg.token}`;
+    return `Authorization: Basic ${Buffer.from(cred).toString("base64")}`;
+  }
+
   githubHost() {
     const api = new URL(this.need("github").apiUrl);
     return api.hostname === "api.github.com" ? "github.com" : api.hostname;
