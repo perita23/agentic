@@ -25,6 +25,8 @@ import { RUN_STATUS_LABEL, RUN_STATUS_VARIANT } from "@/components/app/run-row";
 import { api, fetcher, refresh, useApi, type Run, type RunLog } from "@/lib/api";
 import { cn, shortPath, timeAgo } from "@/lib/utils";
 import { AttachButton, AttachmentBar, useAttachments } from "@/components/app/attachments";
+import { BranchSwitcher } from "@/components/app/branch-switcher";
+import { FileList, useFileMenu } from "@/components/app/file-menu";
 import { Markdown } from "@/components/app/markdown";
 import { PlanCard } from "@/components/app/plan-card";
 import { ToolCard, type ToolResult } from "@/components/app/tool-card";
@@ -245,6 +247,42 @@ function Segment({ run, index, latest, onEvents }: { run: Run; index: number; la
   );
 }
 
+interface ChangeRow {
+  path: string;
+  action: "created" | "edited" | "deleted";
+  add: number | null;
+  del: number | null;
+}
+
+/** Files Claude has changed, inside the chat flow (the "Cambios" tab keeps the full diff). */
+function ChangesCard({ files, live }: { files: ChangeRow[]; live: boolean }) {
+  if (!files.length) return null;
+  const tone = { created: "bg-success/15 text-success", edited: "bg-warning/15 text-warning", deleted: "bg-destructive/15 text-destructive" } as const;
+  const label = { created: "nuevo", edited: "editado", deleted: "borrado" } as const;
+  return (
+    <details open className="ml-6 rounded-lg border bg-card px-3.5 py-2.5 text-xs" aria-label="Archivos modificados">
+      <summary className="flex cursor-pointer items-center gap-1.5 text-[13px] font-medium text-foreground">
+        <FilePenLineIcon className="size-3.5" /> Claude ha modificado {files.length} {files.length === 1 ? "archivo" : "archivos"}
+        {live && <span className="text-[11px] font-normal text-success">· en vivo</span>}
+      </summary>
+      <ul className="mt-2 flex max-h-56 flex-col gap-1 overflow-y-auto">
+        {files.map((f) => (
+          <li key={f.path} className="flex min-w-0 items-center gap-2 font-mono">
+            <span className={cn("shrink-0 rounded px-1 text-[10px] font-medium", tone[f.action])}>{label[f.action]}</span>
+            <span className="min-w-0 truncate" title={f.path}>{f.path}</span>
+            {(f.add != null || f.del != null) && (
+              <span className="ml-auto flex shrink-0 gap-1.5 tabular-nums">
+                {f.add ? <span className="text-success">+{f.add}</span> : null}
+                {f.del ? <span className="text-destructive">−{f.del}</span> : null}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 /** The whole conversation (first run + replies) in one place, like the chat. */
 function HeadlessLog({ thread }: { thread: Run[] }) {
   const run = thread[thread.length - 1];
@@ -256,7 +294,24 @@ function HeadlessLog({ thread }: { thread: Run[] }) {
   const scroller = React.useRef<HTMLDivElement>(null);
   const [follow, setFollow] = React.useState(true);
   const live = thread.some((r) => byRun[r.id]?.live);
-  const files = React.useMemo(() => changedFiles(thread.flatMap((r) => byRun[r.id]?.events ?? []), run.projectPath), [thread, byRun, run.projectPath]);
+  const toolFiles = React.useMemo(() => changedFiles(thread.flatMap((r) => byRun[r.id]?.events ?? []), run.projectPath), [thread, byRun, run.projectPath]);
+  // The real changes in the working tree (git), which also include what Claude did through the terminal
+  // (sed, python, tee…); polled while Claude works. Tool calls fill in what git has not shown yet.
+  const root = thread[0];
+  const working = live || run.status === "running";
+  const { data: ch, mutate: refetchChanges } = useApi<{ available: boolean; files: { file: string; status: string; additions: number | null; deletions: number | null; preExisting: boolean }[]; newFiles: { file: string }[] }>(`/api/runs/${root.id}/changes`, { refreshInterval: working ? 3000 : 0 });
+  React.useEffect(() => {
+    if (!working) void refetchChanges();
+  }, [working, refetchChanges]);
+  const files = React.useMemo(() => {
+    const out = new Map<string, ChangeRow>();
+    if (ch?.available) {
+      for (const f of ch.files) if (!f.preExisting) out.set(f.file, { path: f.file, action: f.status === "A" ? "created" : f.status === "D" ? "deleted" : "edited", add: f.additions, del: f.deletions });
+      for (const n of ch.newFiles) if (!out.has(n.file)) out.set(n.file, { path: n.file, action: "created", add: null, del: null });
+    }
+    for (const t of toolFiles) if (!out.has(t.path)) out.set(t.path, { path: t.path, action: t.action, add: null, del: null });
+    return [...out.values()];
+  }, [ch, toolFiles]);
 
   React.useEffect(() => {
     // Scroll only the log container, never the whole window.
@@ -278,28 +333,12 @@ function HeadlessLog({ thread }: { thread: Run[] }) {
           <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} className="accent-primary" /> Seguir
         </label>
       </CardHeader>
-      {files.length > 0 && (
-        <details open className="border-b bg-card px-4 py-2 text-xs" aria-label="Archivos modificados">
-          <summary className="flex cursor-pointer items-center gap-1.5 font-medium text-foreground">
-            <FilePenLineIcon className="size-3.5" /> Archivos modificados <span className="tabular-nums text-muted-foreground">({files.length})</span>
-            {live && <span className="text-[11px] font-normal text-success">· en vivo</span>}
-          </summary>
-          <ul className="mt-1.5 flex max-h-32 flex-col gap-0.5 overflow-y-auto">
-            {files.map((f) => (
-              <li key={f.path} className="flex items-center gap-2 font-mono">
-                <span className={cn("rounded px-1 text-[10px] font-medium", f.action === "created" ? "bg-success/15 text-success" : "bg-warning/15 text-warning")}>{f.action === "created" ? "nuevo" : "editado"}</span>
-                <span className="min-w-0 truncate" title={f.path}>{f.path}</span>
-                {f.touches > 1 && <span className="text-muted-foreground">×{f.touches}</span>}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
       <CardContent ref={scroller} className="max-h-[65vh] min-h-64 overflow-y-auto bg-inset p-4">
         <div className="flex flex-col gap-3">
           {thread.map((r, i) => (
             <Segment key={r.id} run={r} index={i} latest={i === thread.length - 1} onEvents={onEvents} />
           ))}
+          <ChangesCard files={files} live={working} />
           {/* The orb lives at the end of the output, where Claude is writing (like in the chat). */}
           <ActivityOrb activity={run.status === "failed" ? { state: "error", label: "Ha fallado" } : stateFromEvents(byRun[run.id]?.events ?? [])} size={44} className="mt-1" />
         </div>
@@ -320,6 +359,8 @@ function ReplyBox({ run }: { run: Run }) {
   const [busy, setBusy] = React.useState(false);
   const commands = useSlashCommands(run.projectPath);
   const menu = useSlashMenu(text, setText, commands);
+  const boxRef = React.useRef<HTMLTextAreaElement>(null);
+  const files = useFileMenu(text, setText, boxRef, run.projectPath);
   const att = useAttachments();
   const [drag, setDrag] = React.useState(false);
   if (run.mode !== "headless") return null;
@@ -378,23 +419,31 @@ function ReplyBox({ run }: { run: Run }) {
       <AttachmentBar att={att} disabled={off} />
       <div className="relative">
         {menu.open && <SlashList items={menu.items} active={menu.active} onPick={menu.pick} />}
+        {files.open && <FileList items={files.items} active={files.active} onPick={files.pick} />}
         <textarea
+          ref={boxRef}
           aria-label="Responder a Claude"
           rows={5}
           value={text}
           disabled={off}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            files.track(e.currentTarget);
+          }}
+          onSelect={(e) => files.track(e.currentTarget)}
           onPaste={(e) => { if (!off) att.onPaste(e); }}
           onKeyDown={(e) => {
+            if (files.onKeyDown(e)) return;
             if (menu.onKeyDown(e)) return;
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void send(e);
           }}
-          placeholder={waiting ? "Claude está trabajando; podrás responder cuando termine…" : noSession ? "Esta ejecución no tiene sesión que continuar." : "Responde a Claude. Escribe / para comandos, o pega o arrastra imágenes y textos largos."}
+          placeholder={waiting ? "Claude está trabajando; podrás responder cuando termine…" : noSession ? "Esta ejecución no tiene sesión que continuar." : "Responde a Claude. Escribe / para comandos y @ para archivos, o pega o arrastra imágenes y textos largos."}
           className="min-h-32 w-full resize-y rounded-md border bg-inset p-3 text-sm disabled:opacity-60"
         />
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <AttachButton att={att} disabled={off} />
+        <BranchSwitcher project={run.projectPath} disabled={waiting} disabledReason="Claude está trabajando: espera a que termine para cambiar de rama" />
         <select aria-label="Permisos" value={mode} onChange={(e) => setMode(e.target.value)} className="h-8 rounded-md border bg-inset px-2 text-xs" disabled={off}>
           <option value="default">Permisos: preguntar</option>
           <option value="plan">Permisos: sólo planificar</option>

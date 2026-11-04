@@ -3,6 +3,19 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.37.0] - 2026-11-04
+
+### Añadido
+- **Cambiar de rama desde el chat.** En la barra de la caja de respuesta hay un botón con la rama en la que está el proyecto (y cuántos archivos tienen cambios sin commit). Al pulsarlo puedes buscar otra rama, pasar a una que sólo exista en el remoto, o crear una nueva escribiendo su nombre. Es seguro: nunca se pierden cambios (si chocaran con la otra rama, git no mueve nada y te lo explica), y no se puede cambiar mientras Claude está trabajando en el proyecto.
+
+## [0.36.0] - 2026-11-04
+
+### Añadido
+- **Mencionar archivos con `@`.** En la caja de respuesta, escribe `@` y unas letras y Agentic sugiere archivos y carpetas del proyecto mientras escribes (primero los que empiezan por lo que tecleas, luego los que lo contienen, luego coincidencias aproximadas). Flechas para moverte, Tab o Enter para elegir, Esc para cerrar. Respeta `.gitignore` y sólo ofrece nombres, nunca el contenido.
+
+### Corregido
+- **Los cambios de Claude se ven en el chat aunque los haga por terminal.** El panel «Claude ha modificado N archivos» ya no depende sólo de las llamadas de edición: se alimenta del estado real de git del proyecto (cada pocos segundos mientras trabaja), así que también salen los archivos cambiados con `sed`, `python`, `tee`, etc., con sus líneas añadidas y quitadas. Ahora va dentro de la conversación, justo antes del indicador de actividad.
+
 ## [0.35.4] - 2026-11-04
 
 ### Corregido

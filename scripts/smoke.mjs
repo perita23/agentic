@@ -311,8 +311,11 @@ try {
   check(true, "headless run launched from UI and finished with result");
   await page.getByText("Ejecución completada").waitFor({ timeout: 10000 });
   check(true, "finished run triggers a notification toast");
-  await page.getByText("Archivos modificados").first().waitFor({ timeout: 10000 });
-  check(await page.locator("main details[aria-label='Archivos modificados']").getByText("created-by-claude.txt").isVisible(), "the chat lists the files Claude changed, next to the output");
+  const changesCard = page.locator("main details[aria-label='Archivos modificados']");
+  await changesCard.getByText("created-by-claude.txt").waitFor({ timeout: 15000 });
+  // tracked.txt was changed by the process itself (like sed/python through the terminal), not by an Edit/Write tool call.
+  await changesCard.getByText("tracked.txt").waitFor({ timeout: 15000 });
+  check(true, "the chat lists the files Claude changed (also those changed through the terminal), inside the conversation");
   await page.getByRole("tab", { name: "Cambios" }).click();
   await page.locator("main [role=tabpanel][data-state=active]").getByText("created-by-claude.txt").waitFor({ timeout: 10000 });
   await page.locator("main").getByText("+hello from claude").waitFor();
@@ -369,6 +372,25 @@ try {
   await page.getByText("Leyendo logs · api").click();
   await page.getByText("GET /health 200").waitFor();
   check(true, "docker logs render as a tool card with its output, not a bare Bash");
+
+  // "@" autocompletes project files while typing.
+  await page.waitForFunction(() => !document.querySelector("textarea[aria-label='Responder a Claude']")?.disabled, null, { timeout: 15000 });
+  await page.getByLabel("Responder a Claude").fill("mira @trac");
+  await page.getByRole("option", { name: /tracked\.txt/ }).waitFor({ timeout: 10000 });
+  await page.getByLabel("Responder a Claude").press("Tab");
+  check((await page.getByLabel("Responder a Claude").inputValue()) === "mira @tracked.txt ", "typing @ suggests project files and Tab inserts the chosen one");
+  await page.getByLabel("Responder a Claude").fill("");
+
+  // Branch switcher in the composer: create a branch from the chat and come back.
+  await page.locator("button[aria-haspopup='listbox']").first().click();
+  await page.getByLabel("Buscar rama").fill("nueva-ui");
+  await page.getByRole("button", { name: /Crear y cambiar a «nueva-ui»/ }).click();
+  await page.getByText("Rama «nueva-ui» creada").waitFor();
+  check((await execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: project, encoding: "utf8" })).trim() === "nueva-ui", "the chat can create a branch and move the project to it");
+  await page.locator("button[aria-haspopup='listbox']").first().click();
+  await page.getByRole("option", { name: "main", exact: true }).click();
+  await page.getByText("Ahora estás en «main»").waitFor();
+  check((await execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: project, encoding: "utf8" })).trim() === "main", "the chat can switch back to another branch");
 
   // A reply whose tool result is a big screenshot must not stall the chat: the picture shows, and Claude's next message arrives.
   await page.waitForFunction(() => !document.querySelector("textarea[aria-label='Responder a Claude']")?.disabled, null, { timeout: 15000 });
