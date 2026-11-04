@@ -15,6 +15,8 @@ import { BudgetService } from "./budgets";
 import { BackupService } from "./backup";
 import { CommandService } from "./commands";
 import { LibraryService } from "./library";
+import { PrefsService } from "./prefs";
+import { SessionTrash } from "./trash";
 import pkg from "../../../package.json";
 import { PullService } from "./integrations/pulls";
 import { IntegrationService } from "./integrations/service";
@@ -47,6 +49,8 @@ export interface Context {
   backups: BackupService;
   commands: CommandService;
   library: LibraryService;
+  prefs: PrefsService;
+  trash: SessionTrash;
   oauth: OAuthService;
 }
 
@@ -101,6 +105,8 @@ export function createContext(config: Config): Context {
     backups: new BackupService(store, config.dataDir, pkg.version),
     commands: new CommandService(config.claudeHome, projects),
     library: new LibraryService(sessions),
+    prefs: new PrefsService(store),
+    trash: new SessionTrash(config.dataDir, config.claudeHome, sessions),
     oauth: new OAuthService(store, integrations),
     queue,
     integrations,

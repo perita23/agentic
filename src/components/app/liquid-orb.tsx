@@ -5,7 +5,9 @@ import type { Activity, OrbState } from "@/lib/orb-state";
 import { cn } from "@/lib/utils";
 
 /** How fast the orb's clock runs (rad/s) in each state: slow and calm. The speed eases between states. */
-const SPEED: Record<OrbState, number> = { idle: 0.18, thinking: 0.55, writing: 0.7, reading: 0.35, editing: 0.9, running: 1.2, searching: 0.45, waiting: 0.25, done: 0.12, error: 0.6 };
+const SPEED: Record<OrbState, number> = { idle: 0.5, thinking: 1.5, writing: 2.4, reading: 2.6, editing: 3.4, running: 4.2, searching: 1.7, waiting: 0.9, done: 0.3, error: 5 };
+
+const BALLS = [0, 1, 2, 3, 4, 5, 6, 7];
 
 /**
  * The liquid ball: its shape, movement, size and colour show what Claude is doing right now.
@@ -39,21 +41,20 @@ export function LiquidOrb({ state, size = 40, className }: { state: OrbState; si
   }, []);
 
   return (
-    <span ref={ref} className={cn("orb", className)} data-state={state} style={{ width: size, height: size }} aria-hidden="true">
+    <span ref={ref} className={cn("orb", className)} data-state={state} style={{ width: size, height: size, "--px": `${size}px` } as React.CSSProperties} aria-hidden="true">
       <svg width="0" height="0" className="absolute" focusable="false">
         <defs>
           <filter id={id} x="-45%" y="-45%" width="190%" height="190%" colorInterpolationFilters="sRGB">
-            <feGaussianBlur in="SourceGraphic" stdDeviation={Math.max(2, size / 10)} result="b" />
-            <feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8" />
+            <feGaussianBlur in="SourceGraphic" stdDeviation={Math.max(1.5, size / 16)} result="b" />
+            <feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" />
           </filter>
         </defs>
       </svg>
       <span className="orb-goo" style={{ filter: `url(#${id})` }}>
         <span className="orb-pose">
-          <i className="orb-ball a" />
-          <i className="orb-ball b" />
-          <i className="orb-ball c" />
-          <i className="orb-ball d" />
+          {BALLS.map((i) => (
+            <i key={i} className="orb-ball" style={{ "--i": i } as React.CSSProperties} />
+          ))}
         </span>
       </span>
     </span>

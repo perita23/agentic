@@ -2,12 +2,14 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { MessagesSquareIcon, SearchIcon } from "lucide-react";
+import { CheckSquareIcon, MessagesSquareIcon, SearchIcon, Trash2Icon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, PageHeader } from "@/components/app/common";
 import { SessionRow } from "@/components/app/session-row";
+import { deleteSessions, TrashButton } from "@/components/app/session-trash";
+import { Button } from "@/components/ui/button";
 import { useApi, type ProjectListItem, type SessionSummary } from "@/lib/api";
 import { baseName } from "@/lib/utils";
 
@@ -18,6 +20,8 @@ export default function SessionsPage() {
   const [project, setProject] = React.useState(ALL);
   const [filter, setFilter] = React.useState<"all" | "active">("all");
   const [deep, setDeep] = React.useState(false);
+  const [selecting, setSelecting] = React.useState(false);
+  const [picked, setPicked] = React.useState<Set<string>>(new Set());
   const deferredQ = React.useDeferredValue(q);
   const params = new URLSearchParams();
   if (deferredQ) params.set("q", deferredQ);
@@ -31,7 +35,26 @@ export default function SessionsPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader icon={MessagesSquareIcon} title="Sesiones" description="Todas las conversaciones de Claude Code guardadas en ~/.claude, con su estado en vivo." />
+      <PageHeader
+        icon={MessagesSquareIcon}
+        title="Sesiones"
+        description="Todas las conversaciones de Claude Code guardadas en ~/.claude, con su estado en vivo."
+        actions={
+          <div className="flex gap-2">
+            <Button
+              variant={selecting ? "secondary" : "outline"}
+              aria-pressed={selecting}
+              onClick={() => {
+                setSelecting((v) => !v);
+                setPicked(new Set());
+              }}
+            >
+              <CheckSquareIcon /> {selecting ? "Cancelar" : "Seleccionar"}
+            </Button>
+            <TrashButton />
+          </div>
+        }
+      />
       <div className="flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
           <SearchIcon className="absolute top-2 left-2.5 size-4 text-muted-foreground" />
@@ -81,6 +104,26 @@ export default function SessionsPage() {
       <div className="overflow-hidden rounded-lg border bg-card">
         <div className="flex items-center justify-between border-b bg-secondary/30 px-4 py-2 text-xs text-muted-foreground">
           <span>{data ? `${data.total} sesiones` : "Cargando…"}</span>
+          {selecting && (
+            <span className="flex items-center gap-2">
+              <button type="button" className="cursor-pointer hover:text-foreground" onClick={() => setPicked(new Set((data?.sessions ?? []).filter((x) => !x.active).map((x) => x.id)))}>
+                Seleccionar todas
+              </button>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={!picked.size}
+                onClick={async () => {
+                  if (!confirm(`¿Mover ${picked.size} sesión${picked.size === 1 ? "" : "es"} a la papelera? Podrás recuperar${picked.size === 1 ? "la" : "las"} durante 30 días.`)) return;
+                  await deleteSessions([...picked]);
+                  setPicked(new Set());
+                  setSelecting(false);
+                }}
+              >
+                <Trash2Icon /> Borrar{picked.size ? ` (${picked.size})` : ""}
+              </Button>
+            </span>
+          )}
         </div>
         {isLoading && !data ? (
           <div className="space-y-2 p-4">
@@ -89,7 +132,14 @@ export default function SessionsPage() {
             ))}
           </div>
         ) : data?.sessions.length ? (
-          <div className="divide-y">{data.sessions.map((s) => <SessionRow key={s.id} s={s} />)}</div>
+          <div className="divide-y">{data.sessions.map((s) => (
+              <SessionRow
+                key={s.id}
+                s={s}
+                onDelete={(x) => void deleteSessions([x.id])}
+                select={selecting ? { checked: picked.has(s.id), onToggle: () => setPicked((p) => { const n = new Set(p); if (n.has(s.id)) n.delete(s.id); else if (!s.active) n.add(s.id); return n; }) } : undefined}
+              />
+            ))}</div>
         ) : (
           <div className="p-6">
             <EmptyState icon={MessagesSquareIcon} title="No hay sesiones" description="No se encontraron sesiones con estos filtros." />

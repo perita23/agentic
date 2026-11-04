@@ -10,7 +10,7 @@ import { HttpError, parse } from "./util";
  * integrations stay encrypted on this device and must be reconnected after a
  * restore on another machine. Automatic copies: one per day, last 7 kept.
  */
-export const BACKUP_COLLECTIONS = ["tasks", "templates", "projects", "schedules", "budgets", "chats", "runs", "ui-state"] as const;
+export const BACKUP_COLLECTIONS = ["tasks", "templates", "projects", "schedules", "budgets", "chats", "runs", "ui-state", "prefs"] as const;
 /** Everything `wipe` removes (credentials included). Login (token, passkeys) is kept. */
 const WIPE_COLLECTIONS = [...BACKUP_COLLECTIONS, "integrations", "oauth-apps", "queue", "budget-alerts"];
 const KEEP = 7;
@@ -113,7 +113,7 @@ export class BackupService {
     for (const name of BACKUP_COLLECTIONS) {
       const v = data.collections[name];
       if (v === undefined) continue;
-      const okShape = name === "budgets" || name === "ui-state" ? v !== null && typeof v === "object" && !Array.isArray(v) : Array.isArray(v);
+      const okShape = name === "budgets" || name === "ui-state" || name === "prefs" ? v !== null && typeof v === "object" && !Array.isArray(v) : Array.isArray(v);
       if (!okShape) throw new HttpError(400, `La colección «${name}» de la copia no es válida`);
       let value = v;
       // Runs from a backup are history: none of them is running here.

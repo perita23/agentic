@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeftIcon, BotIcon, FileDiffIcon, CornerDownLeftIcon, ExternalLinkIcon, PlayIcon, SquareIcon, TerminalIcon, Trash2Icon, WrenchIcon } from "lucide-react";
+import { ArrowLeftIcon, BotIcon, FileDiffIcon, FilePenLineIcon, CornerDownLeftIcon, ExternalLinkIcon, PlayIcon, SquareIcon, TerminalIcon, Trash2Icon, WrenchIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import { stateFromEvents } from "@/lib/orb-state";
 import { RUN_STATUS_LABEL, RUN_STATUS_VARIANT } from "@/components/app/run-row";
 import { api, fetcher, refresh, useApi, type Run, type RunLog } from "@/lib/api";
 import { cn, shortPath, timeAgo } from "@/lib/utils";
+import { changedFiles, editedPath } from "@/lib/changed-files";
 
 type Ev = RunLog["events"][number];
 
@@ -31,6 +32,11 @@ function contentText(c: unknown): string {
   if (typeof c === "string") return c;
   if (Array.isArray(c)) return c.map((b) => (typeof b === "string" ? b : b?.type === "text" ? b.text : "")).join("\n");
   return "";
+}
+
+function relPath(p: string, root: string) {
+  const base = root.replace(/\/+$/, "") + "/";
+  return p.startsWith(base) ? p.slice(base.length) : p;
 }
 
 function EventView({ e, run }: { e: Ev; run: Run }) {
@@ -65,6 +71,7 @@ function EventView({ e, run }: { e: Ev; run: Run }) {
             <details key={i} className="ml-6 rounded border bg-inset text-xs">
               <summary className="flex cursor-pointer items-center gap-1.5 px-2 py-1 font-mono text-link">
                 <WrenchIcon className="size-3" /> {b.name}
+                {editedPath(String(b.name), b.input) && <span className="min-w-0 truncate text-foreground">{relPath(editedPath(String(b.name), b.input)!, run.projectPath)}</span>}
               </summary>
               <pre className="max-h-64 overflow-auto px-2 py-1.5 font-mono text-[11px] text-muted-foreground">{JSON.stringify(b.input, null, 2)}</pre>
             </details>
@@ -218,6 +225,7 @@ function HeadlessLog({ thread }: { thread: Run[] }) {
   const scroller = React.useRef<HTMLDivElement>(null);
   const [follow, setFollow] = React.useState(true);
   const live = thread.some((r) => byRun[r.id]?.live);
+  const files = React.useMemo(() => changedFiles(thread.flatMap((r) => byRun[r.id]?.events ?? []), run.projectPath), [thread, byRun, run.projectPath]);
 
   React.useEffect(() => {
     // Scroll only the log container, never the whole window.
@@ -239,6 +247,23 @@ function HeadlessLog({ thread }: { thread: Run[] }) {
           <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} className="accent-primary" /> Seguir
         </label>
       </CardHeader>
+      {files.length > 0 && (
+        <details open className="border-b bg-card px-4 py-2 text-xs" aria-label="Archivos modificados">
+          <summary className="flex cursor-pointer items-center gap-1.5 font-medium text-foreground">
+            <FilePenLineIcon className="size-3.5" /> Archivos modificados <span className="tabular-nums text-muted-foreground">({files.length})</span>
+            {live && <span className="text-[11px] font-normal text-success">· en vivo</span>}
+          </summary>
+          <ul className="mt-1.5 flex max-h-32 flex-col gap-0.5 overflow-y-auto">
+            {files.map((f) => (
+              <li key={f.path} className="flex items-center gap-2 font-mono">
+                <span className={cn("rounded px-1 text-[10px] font-medium", f.action === "created" ? "bg-success/15 text-success" : "bg-warning/15 text-warning")}>{f.action === "created" ? "nuevo" : "editado"}</span>
+                <span className="min-w-0 truncate" title={f.path}>{f.path}</span>
+                {f.touches > 1 && <span className="text-muted-foreground">×{f.touches}</span>}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       <CardContent ref={scroller} className="max-h-[65vh] min-h-64 overflow-y-auto bg-inset p-4">
         <div className="flex flex-col gap-3">
           {thread.map((r, i) => (
