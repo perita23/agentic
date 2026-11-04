@@ -3,6 +3,15 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.25.0] - 2026-11-04
+
+### Añadido
+- **Crear la PR desde la tarea**: en una tarea con worktree, el botón «Crear PR» hace commit de los cambios pendientes, sube la rama y abre la pull request en GitHub o Bitbucket, con título, descripción y opción de borrador. La tarea pasa a Revisión y muestra el enlace a la PR, también en el tablero.
+- Si tu git no puede subir la rama por https, Agentic lo reintenta con la cuenta conectada en Integraciones. El token nunca aparece en la línea de comandos.
+
+### Cambiado
+- Dependencias al día: React 19.3.1 y las acciones de GitHub en su última versión.
+
 ## [0.24.0] - 2026-11-04
 
 ### Añadido
