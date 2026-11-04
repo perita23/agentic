@@ -36,5 +36,7 @@ if (prompt.includes("SLEEP")) {
   for (let i = 0; i < 2000; i++) out({ type: "assistant", message: { content: [{ type: "text", text: "x".repeat(200) }] } });
   out({ type: "result", subtype: "success", is_error: false, result: "ok", total_cost_usd: 0.01, session_id: sid });
 } else {
+  // Claude Code reports plan usage as it runs.
+  out({ type: "rate_limit_event", rate_limit_info: { status: "allowed_warning", resetsAt: Math.floor(Date.now() / 1000) + 2 * 3600 + 14 * 60, rateLimitType: "five_hour", utilization: 0.62 } });
   out({ type: "result", subtype: "success", is_error: false, result: "done: " + prompt, total_cost_usd: 0.0123, duration_ms: 42, num_turns: 1, session_id: sid });
 }

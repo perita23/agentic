@@ -7,6 +7,7 @@ import { z } from "zod";
 import { git, SAFE_DIFF } from "./git";
 import type { JsonStore } from "./store";
 import { stateFromEvents, type Activity } from "../orb-state";
+import { parseRateLimit, type RateLimit } from "../usage";
 import { absPath, existingDir, HttpError, MODEL_RE, nowIso, parse, PERMISSION_MODES, text, UUID_RE, AGENT_NAME_RE } from "./util";
 
 const execFileP = promisify(execFile);
@@ -409,6 +410,24 @@ export class RunManager {
     } finally {
       fs.closeSync(fd);
     }
+  }
+
+  /**
+   * Plan limits (5 h window, weekly…) as last reported by Claude Code in `rate_limit_event`s,
+   * newest run first: Claude Code only informs of them while it runs.
+   */
+  rateLimits(maxRuns = 15): RateLimit[] {
+    const out = new Map<string, RateLimit>();
+    for (const r of this.list().filter((x) => x.mode === "headless").slice(0, maxRuns)) {
+      const at = r.endedAt ?? r.startedAt;
+      const perRun = new Map<string, RateLimit>();
+      for (const e of this.tailEvents(r.id, 96 * 1024)) {
+        const l = parseRateLimit(e, at);
+        if (l) perRun.set(l.type, l); // later events of the run win
+      }
+      for (const [type, l] of perRun) if (!out.has(type)) out.set(type, l);
+    }
+    return [...out.values()];
   }
 
   /** What Claude is doing in a run right now. */

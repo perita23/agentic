@@ -16,6 +16,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLauncher } from "@/components/app/launcher";
 import { linkify } from "@/components/app/linkify";
 import { ActivityOrb } from "@/components/app/liquid-orb";
+import { JiraCommentButton } from "@/components/app/jira-comment";
+import { UsageCard } from "@/components/app/usage-card";
 import { stateFromEvents } from "@/lib/orb-state";
 import { RUN_STATUS_LABEL, RUN_STATUS_VARIANT } from "@/components/app/run-row";
 import { api, fetcher, refresh, useApi, type Run, type RunLog } from "@/lib/api";
@@ -29,7 +31,8 @@ function contentText(c: unknown): string {
   return "";
 }
 
-function EventView({ e }: { e: Ev }) {
+function EventView({ e, run }: { e: Ev; run: Run }) {
+  const jira = (text: string) => <JiraCommentButton text={text} hints={[run.prompt, run.resultText]} taskId={run.taskId} />;
   if (e.type === "agentic" && e.subtype === "start")
     return <div className="font-mono text-xs text-muted-foreground">$ {(e.args as string[]).join(" ")}</div>;
   if (e.type === "agentic" && e.subtype === "exit")
@@ -51,7 +54,10 @@ function EventView({ e }: { e: Ev }) {
           b.type === "text" ? (
             <div key={i} className="flex gap-2">
               <BotIcon className="mt-0.5 size-4 shrink-0 text-orange" />
-              <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">{linkify(String(b.text ?? ""))}</div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">{linkify(String(b.text ?? ""))}</div>
+                <div className="mt-1 flex">{jira(String(b.text ?? ""))}</div>
+              </div>
             </div>
           ) : b.type === "tool_use" ? (
             <details key={i} className="ml-6 rounded border bg-inset text-xs">
@@ -89,7 +95,8 @@ function EventView({ e }: { e: Ev }) {
           {typeof e.duration_ms === "number" && <span>{(e.duration_ms / 1000).toFixed(1)} s</span>}
           {typeof e.num_turns === "number" && <span>{e.num_turns} turnos</span>}
         </div>
-        <div className="whitespace-pre-wrap break-words">{String(e.result ?? "")}</div>
+        <div className="whitespace-pre-wrap break-words">{linkify(String(e.result ?? ""))}</div>
+        {!e.is_error && !!e.result && <div className="mt-2 flex justify-end">{jira(String(e.result))}</div>}
       </div>
     );
   if (e.type === "stderr") return <pre className="font-mono text-xs whitespace-pre-wrap text-destructive/80">{String(e.text)}</pre>;
@@ -203,7 +210,7 @@ function HeadlessLog({ run }: { run: Run }) {
       <CardContent ref={scroller} className="max-h-[65vh] min-h-64 overflow-y-auto bg-inset p-4">
         <div className="flex flex-col gap-3">
           {events.map((e, i) => (
-            <EventView key={i} e={e} />
+            <EventView key={i} e={e} run={run} />
           ))}
           {run.status === "running" && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -447,6 +454,7 @@ export default function RunPage() {
               <Metric k="Código salida" v={run.exitCode != null ? String(run.exitCode) : "—"} />
             </CardContent>
           </Card>
+          <UsageCard />
           {run.taskId && (
             <Button variant="outline" asChild>
               <Link href={`/tasks?task=${run.taskId}`}>Ver tarea vinculada</Link>

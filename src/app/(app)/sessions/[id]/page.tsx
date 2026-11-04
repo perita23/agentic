@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { linkify } from "@/components/app/linkify";
+import { JiraCommentButton } from "@/components/app/jira-comment";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { motion } from "motion/react";
@@ -84,6 +85,11 @@ export default function SessionPage() {
                 {m.timestamp && <span className="ml-auto">{new Date(m.timestamp).toLocaleString("es-ES")}</span>}
               </div>
               {m.text && <div className="px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words">{linkify(m.text)}</div>}
+              {m.text && m.role !== "user" && (
+                <div className="flex justify-end px-2 pb-1.5">
+                  <JiraCommentButton text={m.text} hints={[data.title, data.messages.find((x) => x.role === "user")?.text]} />
+                </div>
+              )}
               {!!m.tools?.length && (
                 <div className="flex flex-col gap-1 px-3 pb-2">
                   {m.tools.map((t, j) => (

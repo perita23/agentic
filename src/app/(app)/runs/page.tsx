@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, PageHeader } from "@/components/app/common";
 import { useLauncher } from "@/components/app/launcher";
 import { RunRow } from "@/components/app/run-row";
+import { UsageCard } from "@/components/app/usage-card";
 import { useApi, type Run } from "@/lib/api";
 
 const FILTERS = [
@@ -34,6 +35,7 @@ export default function RunsPage() {
           </Button>
         }
       />
+      <UsageCard />
       <div className="flex w-fit rounded-md border p-0.5">
         {FILTERS.map((f) => (
           <button
