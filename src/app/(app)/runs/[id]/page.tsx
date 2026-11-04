@@ -18,6 +18,8 @@ import { linkify } from "@/components/app/linkify";
 import { ActivityOrb } from "@/components/app/liquid-orb";
 import { JiraCommentButton } from "@/components/app/jira-comment";
 import { UsageCard } from "@/components/app/usage-card";
+import { SlashList, useSlashCommands, useSlashMenu } from "@/components/app/slash-menu";
+import { MODELS, parseSlash, type PermMode } from "@/lib/slash";
 import { stateFromEvents } from "@/lib/orb-state";
 import { RUN_STATUS_LABEL, RUN_STATUS_VARIANT } from "@/components/app/run-row";
 import { api, fetcher, refresh, useApi, type Run, type RunLog } from "@/lib/api";
@@ -257,24 +259,42 @@ function HeadlessLog({ thread }: { thread: Run[] }) {
  */
 function ReplyBox({ run }: { run: Run }) {
   const [text, setText] = React.useState("");
-  const [mode, setMode] = React.useState(run.permissionMode || "default");
+  const [mode, setMode] = React.useState<string>(run.permissionMode || "default");
+  const [model, setModel] = React.useState<string>(run.model || "");
   const [busy, setBusy] = React.useState(false);
+  const commands = useSlashCommands(run.projectPath);
+  const menu = useSlashMenu(text, setText, commands);
   if (run.mode !== "headless") return null;
   const waiting = run.status === "running";
   const noSession = !run.sessionId;
 
-  async function send(e: React.FormEvent) {
-    e.preventDefault();
+  async function send(e?: React.SyntheticEvent) {
+    e?.preventDefault();
     if (!text.trim() || waiting || noSession) return;
+    const cmd = parseSlash(text);
+    if (cmd.error) {
+      toast.error(cmd.error);
+      return;
+    }
+    const nextMode = cmd.mode ?? (mode as PermMode);
+    const nextModel = cmd.model ?? model;
+    if (cmd.mode) setMode(cmd.mode);
+    if (cmd.model) setModel(cmd.model);
+    if (!cmd.prompt) {
+      // Only switched mode/model: nothing to send yet.
+      toast.success(`Ajustado: ${cmd.applied.join(" · ")}`, { description: "Se aplica a tu próximo mensaje." });
+      setText("");
+      return;
+    }
     setBusy(true);
     try {
       await api<Run>("POST", "/api/runs", {
         mode: "headless",
         projectPath: run.projectPath,
-        prompt: text.trim(),
+        prompt: cmd.prompt,
         continueRunId: run.id,
-        permissionMode: mode,
-        model: run.model || undefined,
+        permissionMode: nextMode,
+        model: nextModel || undefined,
       });
       setText("");
       // The reply shows up below, in this same conversation.
@@ -286,28 +306,42 @@ function ReplyBox({ run }: { run: Run }) {
     }
   }
 
+  const off = waiting || noSession;
   return (
     <form onSubmit={send} className="grid gap-2 border-t bg-card p-3">
-      <textarea
-        aria-label="Responder a Claude"
-        rows={2}
-        value={text}
-        disabled={waiting || noSession}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send(e);
-        }}
-        placeholder={waiting ? "Claude está trabajando; podrás responder cuando termine…" : noSession ? "Esta ejecución no tiene sesión que continuar." : "Responde a Claude o envía otra instrucción…"}
-        className="w-full resize-y rounded-md border bg-inset p-2.5 text-sm disabled:opacity-60"
-      />
+      <div className="relative">
+        {menu.open && <SlashList items={menu.items} active={menu.active} onPick={menu.pick} />}
+        <textarea
+          aria-label="Responder a Claude"
+          rows={2}
+          value={text}
+          disabled={off}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (menu.onKeyDown(e)) return;
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void send(e);
+          }}
+          placeholder={waiting ? "Claude está trabajando; podrás responder cuando termine…" : noSession ? "Esta ejecución no tiene sesión que continuar." : "Responde a Claude, o escribe / para comandos (/plan, /model, los tuyos…)"}
+          className="w-full resize-y rounded-md border bg-inset p-2.5 text-sm disabled:opacity-60"
+        />
+      </div>
       <div className="flex flex-wrap items-center gap-2">
-        <select aria-label="Permisos" value={mode} onChange={(e) => setMode(e.target.value)} className="h-8 rounded-md border bg-inset px-2 text-xs" disabled={waiting || noSession}>
+        <select aria-label="Permisos" value={mode} onChange={(e) => setMode(e.target.value)} className="h-8 rounded-md border bg-inset px-2 text-xs" disabled={off}>
           <option value="default">Permisos: preguntar</option>
           <option value="plan">Permisos: sólo planificar</option>
           <option value="acceptEdits">Permisos: aceptar ediciones</option>
+          <option value="auto">Permisos: auto</option>
+        </select>
+        <select aria-label="Modelo" value={model} onChange={(e) => setModel(e.target.value)} className="h-8 rounded-md border bg-inset px-2 text-xs" disabled={off}>
+          <option value="">Modelo: por defecto</option>
+          {MODELS.map((m) => (
+            <option key={m} value={m}>
+              Modelo: {m}
+            </option>
+          ))}
         </select>
         <span className="hidden text-xs text-muted-foreground sm:inline">Ctrl/⌘ + Enter para enviar</span>
-        <Button type="submit" size="sm" className="ml-auto" disabled={busy || waiting || noSession || !text.trim()}>
+        <Button type="submit" size="sm" className="ml-auto" disabled={busy || off || !text.trim()}>
           <CornerDownLeftIcon /> {busy ? "Enviando…" : "Enviar"}
         </Button>
       </div>

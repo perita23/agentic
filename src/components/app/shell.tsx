@@ -20,7 +20,7 @@ import {
   SearchIcon,
   SettingsIcon,
   TicketIcon,
-  TerminalSquareIcon, SparklesIcon, ServerIcon, ShieldCheckIcon, AlarmClockIcon } from "lucide-react";
+  TerminalSquareIcon, SparklesIcon, ServerIcon, ShieldCheckIcon, AlarmClockIcon, LibraryIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { useApi, type Overview, type ProjectListItem, type SessionSummary } from "@/lib/api";
@@ -37,6 +37,7 @@ const NAV = [
   { href: "/", label: "Dashboard", icon: LayoutDashboardIcon },
   { href: "/chat", label: "Chat", icon: SparklesIcon },
   { href: "/sessions", label: "Sesiones", icon: MessagesSquareIcon, badge: "sessions" as const },
+  { href: "/library", label: "Biblioteca", icon: LibraryIcon },
   { href: "/runs", label: "Ejecuciones", icon: TerminalSquareIcon, badge: "runs" as const },
   { href: "/tasks", label: "Tareas", icon: KanbanSquareIcon },
   { href: "/schedules", label: "Programadas", icon: AlarmClockIcon },

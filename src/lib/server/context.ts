@@ -13,6 +13,8 @@ import { worktreesRoot } from "./worktrees";
 import { ScheduleService } from "./schedules";
 import { BudgetService } from "./budgets";
 import { BackupService } from "./backup";
+import { CommandService } from "./commands";
+import { LibraryService } from "./library";
 import pkg from "../../../package.json";
 import { PullService } from "./integrations/pulls";
 import { IntegrationService } from "./integrations/service";
@@ -43,6 +45,8 @@ export interface Context {
   schedules: ScheduleService;
   budgets: BudgetService;
   backups: BackupService;
+  commands: CommandService;
+  library: LibraryService;
   oauth: OAuthService;
 }
 
@@ -95,6 +99,8 @@ export function createContext(config: Config): Context {
     schedules,
     budgets,
     backups: new BackupService(store, config.dataDir, pkg.version),
+    commands: new CommandService(config.claudeHome, projects),
+    library: new LibraryService(sessions),
     oauth: new OAuthService(store, integrations),
     queue,
     integrations,

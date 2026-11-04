@@ -3,6 +3,12 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.29.0] - 2026-11-04
+
+### Añadido
+- **Comandos de Claude en el chat de la sesión.** Escribe `/` en la caja de respuesta de Headless o en el Chat y aparece un menú con los comandos: `/plan` (Claude sólo planifica), `/edits` (aceptar ediciones), `/ask` (preguntar), `/auto` y `/model` (sonnet, opus, haiku o fable). Puedes escribirlos solos para dejar el modo ajustado o seguidos del mensaje (`/plan refactoriza el login`). También salen **tus comandos personalizados y skills** de Claude Code (de `~/.claude` y del proyecto), con su descripción, y se envían a Claude tal cual. Además, ahora el Chat y Headless tienen selector de permisos (preguntar, plan, aceptar ediciones, auto).
+- **Biblioteca** (nueva sección): indexa los **artifacts de Claude**, pull requests, incidencias (GitHub, Jira, Linear) y documentos (Google Docs, Notion, Figma) que han salido en tus sesiones, con el texto que los rodea como título, el proyecto, la fecha y cuántas veces se mencionan. Se busca, se filtra por tipo, se abren en el navegador con un clic y llevan a su sesión. Todo se lee de tus sesiones locales: la primera vez indexa las más recientes primero y no se envía nada fuera.
+
 ## [0.28.1] - 2026-11-04
 
 ### Cambiado
