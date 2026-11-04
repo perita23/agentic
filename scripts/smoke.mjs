@@ -286,6 +286,20 @@ try {
   await shot("03b-run-diff");
   await shot("03-run");
 
+  // The liquid orb shows what Claude did; Headless runs can be answered (continues the same session).
+  await page.getByRole("tab", { name: "Salida" }).click();
+  await page.locator('main .orb[data-state="done"]').first().waitFor();
+  check(true, "run page shows the liquid orb in its final state");
+  await shot("03c-run-orb");
+  const firstRunId = page.url().split("/").pop();
+  const authH = { authorization: `Bearer ${token}` };
+  const firstRun = await (await fetch(base + `/api/runs/${firstRunId}`, { headers: authH })).json();
+  await page.getByLabel("Responder a Claude").fill("Sí, hazlo con TypeScript");
+  await page.getByRole("button", { name: "Enviar", exact: true }).click();
+  await page.waitForURL((u) => /\/runs\/[0-9a-f-]{36}$/.test(u.pathname) && !u.pathname.endsWith(firstRunId));
+  const replyRun = await (await fetch(base + `/api/runs/${page.url().split("/").pop()}`, { headers: authH })).json();
+  check(!!firstRun.sessionId && replyRun.resumeSessionId === firstRun.sessionId && replyRun.prompt.includes("TypeScript"), "reply in Headless continues the same Claude session");
+
   // Stop a long-running run from the UI (regression: body-less POSTs were rejected with 415).
   const longRun = await (
     await fetch(base + "/api/runs", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ projectPath: project, prompt: "SLEEP" }) })
@@ -294,6 +308,8 @@ try {
   await page.getByText("en vivo").waitFor({ timeout: 10000 });
   await page.locator("main").getByText("some stderr line").waitFor({ timeout: 10000 });
   check((await fetch(base + `/api/runs/${longRun.id}`, { headers: { authorization: `Bearer ${token}` } }).then((r) => r.json())).status === "running", "live log streams over SSE while the run is still running");
+  await page.locator("aside").getByText("Claude trabajando").waitFor({ timeout: 20000 });
+  check(true, "sidebar shows the live orb while a run is working");
   await page.getByRole("button", { name: "Detener" }).click();
   await page.locator("main").getByText("detenida", { exact: true }).waitFor({ timeout: 15000 });
   check(true, "stop a running run from the UI");

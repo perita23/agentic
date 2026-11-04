@@ -88,6 +88,7 @@ export class ChatService {
     return {
       ...chat,
       running: run?.status === "running",
+      activity: run?.status === "running" ? this.runs.activity(run.id) : null,
       error: run && run.status === "failed" ? run.error || run.resultText || "La respuesta falló" : null,
       pendingPrompt: run?.status === "running" && !transcript?.messages.some((m) => m.role === "user" && m.text.trim() === run.prompt.trim()) ? run.prompt : null,
       messages: (transcript?.messages ?? []).filter((m) => m.text.trim() || m.tools?.length),

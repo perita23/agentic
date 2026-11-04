@@ -20,6 +20,11 @@ export const GET = route(async ({ c }) => {
       projects: c.projects.list().length,
       costUsd: runs.reduce((a, r) => a + (r.costUsd || 0), 0),
     },
+    // What Claude is doing in the most recent run that is still working.
+    activity: (() => {
+      const r = runs.find((x) => x.status === "running" && x.mode === "headless");
+      return r ? { ...c.runs.activity(r.id), runId: r.id } : null;
+    })(),
     tasksByStatus: byStatus,
     recentSessions: sessions.slice(0, 8),
     recentRuns: runs.slice(0, 6),

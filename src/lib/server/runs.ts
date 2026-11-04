@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { z } from "zod";
 import { git, SAFE_DIFF } from "./git";
 import type { JsonStore } from "./store";
+import { stateFromEvents, type Activity } from "../orb-state";
 import { absPath, existingDir, HttpError, MODEL_RE, nowIso, parse, PERMISSION_MODES, text, UUID_RE, AGENT_NAME_RE } from "./util";
 
 const execFileP = promisify(execFile);
@@ -382,6 +383,39 @@ export class RunManager {
   }
 
   /** Incremental log read: events from byte `offset`, only complete lines. */
+  /** Parsed events at the end of a run's log (live status without reading the whole file). */
+  tailEvents(id: string, bytes = 128 * 1024): unknown[] {
+    let fd: number;
+    try {
+      fd = fs.openSync(this.logFile(id), "r");
+    } catch {
+      return [];
+    }
+    try {
+      const size = fs.fstatSync(fd).size;
+      const start = Math.max(0, size - bytes);
+      const buf = Buffer.alloc(size - start);
+      fs.readSync(fd, buf, 0, buf.length, start);
+      let text = buf.toString("utf8");
+      if (start > 0) text = text.slice(text.indexOf("\n") + 1); // drop the partial first line
+      return text.split("\n").flatMap((l) => {
+        if (!l) return [];
+        try {
+          return [JSON.parse(l)];
+        } catch {
+          return [];
+        }
+      });
+    } finally {
+      fs.closeSync(fd);
+    }
+  }
+
+  /** What Claude is doing in a run right now. */
+  activity(id: string): Activity {
+    return stateFromEvents(this.tailEvents(id));
+  }
+
   readLog(id: string, offset = 0, maxBytes = 256 * 1024) {
     const run = this.get(id);
     const f = this.logFile(id);

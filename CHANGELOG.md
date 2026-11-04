@@ -3,6 +3,16 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.26.0] - 2026-11-04
+
+### Añadido
+- **La bola líquida muestra lo que hace Claude.** Cambia de color y de movimiento según el estado: pensando, escribiendo la respuesta, leyendo ficheros, editando, ejecutando un comando, buscando, esperando tu respuesta, terminado o con error. Aparece en el Chat mientras Claude responde, en la página de cada ejecución y, en pequeño, en la barra lateral mientras haya algo en marcha (con enlace a esa ejecución). El estado siempre se escribe también con texto.
+- **Responder desde Headless**: cada ejecución headless tiene ahora una caja para responder a las preguntas de Claude o enviarle otra instrucción. Continúa la misma conversación de Claude en una ejecución nueva y puedes elegir los permisos (preguntar, sólo planificar o aceptar ediciones). Si Claude termina con una pregunta o una herramienta necesitaba permiso, la bola pasa a «Esperando tu respuesta».
+- **Enlaces clicables**: las URL que aparecen en el Chat, en las ejecuciones y en las sesiones ya se pueden pulsar y se abren en el navegador. Los **artifacts de Claude** (`claude.ai/artifact/…`) se muestran como un botón «Abrir artifact».
+
+### Seguridad
+- Sólo se enlazan URL `http(s)`; el resto de esquemas y cualquier HTML se muestran como texto.
+
 ## [0.25.2] - 2026-11-04
 
 ### Cambiado

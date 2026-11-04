@@ -70,7 +70,7 @@ Criterio: lo que más tiempo ahorra a quien trabaja a diario con Claude Code, si
 
 ## Ideas anotadas (sin implementar)
 
-### La bola líquida como indicador de estado de la IA
+### La bola líquida como indicador de estado de la IA (hecho en v0.26)
 Idea del usuario (2026-11-04): que la bola líquida («morphism») de la pantalla de inicio sea también el *loader* de cuando la IA está pensando, y que cambie de animación según lo que esté haciendo en ese momento.
 
 - **Un solo componente compartido** (`<LiquidOrb state=… />`) con la misma estética que la pantalla de bloqueo, usado en:
