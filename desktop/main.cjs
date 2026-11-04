@@ -14,6 +14,7 @@ const { createDesktopSession } = require("./lib/session.cjs");
 const { loginShellPath, pickPort, waitForPort } = require("./lib/env.cjs");
 const updater = require("./lib/updater.cjs");
 const appLock = require("./lib/lock.cjs");
+const { buildLockPage } = require("./lib/lock-page.cjs");
 
 const limiter = appLock.createLimiter();
 
@@ -166,7 +167,14 @@ function unlock() {
       lock.show();
       lock.focus();
     });
-    lock.loadFile(path.join(__dirname, "lock.html"));
+    // Never a silent blank window: a failed load stops the app with a message.
+    wc.on("did-fail-load", (_e, code, desc, _url, isMainFrame) => {
+      if (!isMainFrame) return;
+      console.error(`[agentic] lock window failed to load: ${desc} (${code})`);
+      dialog.showErrorBox("Agentic no pudo abrir la pantalla de bloqueo", `${desc} (${code})`);
+      app.exit(1);
+    });
+    lock.loadURL(buildLockPage(__dirname));
   });
 }
 

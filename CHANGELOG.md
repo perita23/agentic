@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.25.1] - 2026-11-04
+
+### Corregido
+- **App de Mac: la ventana de inicio salía negra y vacía.** La pantalla de bloqueo (crear contraseña o desbloquear) no se cargaba por una medida de seguridad de Electron que impide leer archivos desde dentro del paquete. Ahora la pantalla se construye sin esa carga y, si algo fallara, la app lo dice en lugar de quedarse en negro.
+
 ## [0.25.0] - 2026-11-04
 
 ### Añadido
