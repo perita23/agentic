@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { z } from "zod";
 import type { JsonStore } from "./store";
+import type { TaskWorktree } from "./worktrees";
 import { absPath, HttpError, nowIso, parse, renderTemplate, text } from "./util";
 
 export const TASK_STATUSES = ["backlog", "todo", "in_progress", "review", "done"] as const;
@@ -50,6 +51,8 @@ export type Task = z.infer<typeof taskCreateSchema> & {
   templateId?: string | null;
   /** Link to the GitHub / Jira / Bitbucket item this task was imported from (server-managed). */
   external?: { provider: string; id: string; key: string; url: string } | null;
+  /** Isolated git worktree (own branch) the task runs in, when enabled (server-managed). */
+  worktree?: TaskWorktree | null;
   createdAt: string;
   updatedAt: string;
   checklist: { id: string; text: string; done: boolean }[];
@@ -251,6 +254,18 @@ export class TaskService {
       if (t.status === "backlog" || t.status === "todo") t.status = "in_progress";
       t.updatedAt = nowIso();
     });
+  }
+
+  setWorktree(id: string, worktree: TaskWorktree | null) {
+    let updated: Task | undefined;
+    this.store.update<Task[]>(T, [], (all) => {
+      const t = all.find((x) => x.id === id);
+      if (!t) throw new HttpError(404, "Task not found");
+      t.worktree = worktree;
+      t.updatedAt = nowIso();
+      updated = { ...t };
+    });
+    return updated!;
   }
 
   /** When a run finishes successfully, move its task to review. */

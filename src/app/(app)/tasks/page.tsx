@@ -17,7 +17,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CalendarIcon, CheckSquareIcon, FileStackIcon, FolderIcon, KanbanSquareIcon, PlayIcon, PlusIcon, RocketIcon, SearchIcon } from "lucide-react";
+import { CalendarIcon, CheckSquareIcon, FileStackIcon, FolderIcon, GitBranchIcon, KanbanSquareIcon, PlayIcon, PlusIcon, RocketIcon, SearchIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -78,7 +78,7 @@ function TaskCard({ task, overlay }: { task: Task; overlay?: boolean }) {
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              launcher.open({ taskId: task.id, projectPath: task.projectPath, prompt: task.prompt || `${task.title}\n\n${task.description}`.trim(), title: `Ejecutar tarea: ${task.title}` });
+              launcher.open({ taskId: task.id, projectPath: task.projectPath, prompt: task.prompt || `${task.title}\n\n${task.description}`.trim(), title: `Ejecutar tarea: ${task.title}`, worktree: !!task.worktree });
             }}
             className="cursor-pointer rounded p-0.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-accent hover:text-success"
           >
@@ -101,6 +101,11 @@ function TaskCard({ task, overlay }: { task: Task; overlay?: boolean }) {
         {task.checklist.length > 0 && (
           <span className={cn("flex items-center gap-1", done === task.checklist.length && "text-success")}>
             <CheckSquareIcon className="size-3" /> {done}/{task.checklist.length}
+          </span>
+        )}
+        {task.worktree && (
+          <span className="flex min-w-0 items-center gap-1 font-mono" title={`Worktree: ${task.worktree.branch}`}>
+            <GitBranchIcon className="size-3 shrink-0" /> <span className="max-w-32 truncate">{task.worktree.branch.replace(/^agentic\//, "")}</span>
           </span>
         )}
         {task.runIds.length > 0 && (

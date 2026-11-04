@@ -3,6 +3,27 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.22.0] - 2026-11-04
+
+### Añadido
+- **Programadas** (nueva sección): trabajos recurrentes de Claude Code, como un resumen de commits cada mañana, tests cada noche o una revisión semanal de dependencias. Se pueden programar ciertos días a una hora o cada X horas.
+- Plantillas de un clic, botón «Ejecutar ahora», pausar o activar con un interruptor, enlace a la última ejecución y cuenta atrás hasta la siguiente.
+- Se ejecutan mientras Agentic esté abierta. Si estaba cerrada a la hora prevista, la ejecución se recupera una vez al abrir, salvo que hayan pasado más de 6 horas.
+
+### Seguridad
+- Las programaciones nunca pueden usar «Sin permisos» (`bypassPermissions`), y cada una puede tener un presupuesto máximo en USD.
+
+## [0.21.0] - 2026-11-04
+
+### Añadido
+- **Tareas en worktrees aislados**: al ejecutar una tarea puedes marcar «Trabajar en un worktree aislado». Claude trabaja en su propia rama (`agentic/<tarea>`) y en su propia carpeta, así tu copia del repo no se toca y puedes lanzar varias tareas a la vez sin que se pisen.
+- En la tarea ves la rama, los commits que lleva y los ficheros sin commit. Puedes copiar la ruta, quitar la carpeta conservando la rama, o borrar ambas.
+- Volver a ejecutar la tarea reutiliza su worktree. Si lo quitaste, se crea de nuevo sobre la misma rama, con todo lo que ya tenía.
+- Funciona en monorepos: si el proyecto es una subcarpeta, Claude arranca en esa misma subcarpeta dentro del worktree.
+
+### Seguridad
+- Los worktrees se crean con git blindado (sin hooks, filtros ni fsmonitor del repositorio) y fuera del repo, en `~/.agentic/worktrees`.
+
 ## [0.20.0] - 2026-11-04
 
 ### Añadido
