@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.27.1] - 2026-11-04
+
+### Cambiado
+- **La bola de la IA, dentro de la salida.** En las ejecuciones headless ya no va en una franja fija arriba: aparece al final de la salida, justo donde Claude está trabajando, igual que en el Chat, y la sigues viendo mientras la salida baja sola.
+
 ## [0.27.0] - 2026-11-04
 
 ### Añadido

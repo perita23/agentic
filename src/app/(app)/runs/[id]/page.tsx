@@ -204,19 +204,13 @@ function HeadlessLog({ run }: { run: Run }) {
           <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} className="accent-primary" /> Seguir
         </label>
       </CardHeader>
-      <div className="flex items-center border-b bg-card px-4 py-3">
-        <ActivityOrb activity={run.status === "running" ? stateFromEvents(events) : run.status === "failed" ? { state: "error", label: "Ha fallado" } : stateFromEvents(events)} size={48} />
-      </div>
       <CardContent ref={scroller} className="max-h-[65vh] min-h-64 overflow-y-auto bg-inset p-4">
         <div className="flex flex-col gap-3">
           {events.map((e, i) => (
             <EventView key={i} e={e} run={run} />
           ))}
-          {run.status === "running" && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <StatusDot status="running" /> Claude está trabajando…
-            </div>
-          )}
+          {/* The orb lives at the end of the output, where Claude is writing (like in the chat). */}
+          <ActivityOrb activity={run.status === "failed" ? { state: "error", label: "Ha fallado" } : stateFromEvents(events)} size={44} className="mt-1" />
         </div>
       </CardContent>
       <ReplyBox run={run} />
