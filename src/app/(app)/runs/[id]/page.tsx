@@ -25,6 +25,7 @@ import { RUN_STATUS_LABEL, RUN_STATUS_VARIANT } from "@/components/app/run-row";
 import { api, fetcher, refresh, useApi, type Run, type RunLog } from "@/lib/api";
 import { cn, shortPath, timeAgo } from "@/lib/utils";
 import { AttachButton, AttachmentBar, useAttachments } from "@/components/app/attachments";
+import { BranchSwitcher } from "@/components/app/branch-switcher";
 import { FileList, useFileMenu } from "@/components/app/file-menu";
 import { Markdown } from "@/components/app/markdown";
 import { PlanCard } from "@/components/app/plan-card";
@@ -442,6 +443,7 @@ function ReplyBox({ run }: { run: Run }) {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <AttachButton att={att} disabled={off} />
+        <BranchSwitcher project={run.projectPath} disabled={waiting} disabledReason="Claude está trabajando: espera a que termine para cambiar de rama" />
         <select aria-label="Permisos" value={mode} onChange={(e) => setMode(e.target.value)} className="h-8 rounded-md border bg-inset px-2 text-xs" disabled={off}>
           <option value="default">Permisos: preguntar</option>
           <option value="plan">Permisos: sólo planificar</option>

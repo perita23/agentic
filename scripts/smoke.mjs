@@ -381,6 +381,17 @@ try {
   check((await page.getByLabel("Responder a Claude").inputValue()) === "mira @tracked.txt ", "typing @ suggests project files and Tab inserts the chosen one");
   await page.getByLabel("Responder a Claude").fill("");
 
+  // Branch switcher in the composer: create a branch from the chat and come back.
+  await page.locator("button[aria-haspopup='listbox']").first().click();
+  await page.getByLabel("Buscar rama").fill("nueva-ui");
+  await page.getByRole("button", { name: /Crear y cambiar a «nueva-ui»/ }).click();
+  await page.getByText("Rama «nueva-ui» creada").waitFor();
+  check((await execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: project, encoding: "utf8" })).trim() === "nueva-ui", "the chat can create a branch and move the project to it");
+  await page.locator("button[aria-haspopup='listbox']").first().click();
+  await page.getByRole("option", { name: "main", exact: true }).click();
+  await page.getByText("Ahora estás en «main»").waitFor();
+  check((await execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: project, encoding: "utf8" })).trim() === "main", "the chat can switch back to another branch");
+
   // A reply whose tool result is a big screenshot must not stall the chat: the picture shows, and Claude's next message arrives.
   await page.waitForFunction(() => !document.querySelector("textarea[aria-label='Responder a Claude']")?.disabled, null, { timeout: 15000 });
   await page.getByLabel("Responder a Claude").fill("BIGIMG mira la captura");

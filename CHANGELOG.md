@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.37.0] - 2026-11-04
+
+### Añadido
+- **Cambiar de rama desde el chat.** En la barra de la caja de respuesta hay un botón con la rama en la que está el proyecto (y cuántos archivos tienen cambios sin commit). Al pulsarlo puedes buscar otra rama, pasar a una que sólo exista en el remoto, o crear una nueva escribiendo su nombre. Es seguro: nunca se pierden cambios (si chocaran con la otra rama, git no mueve nada y te lo explica), y no se puede cambiar mientras Claude está trabajando en el proyecto.
+
 ## [0.36.0] - 2026-11-04
 
 ### Añadido
