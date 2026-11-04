@@ -550,6 +550,20 @@ try {
   check(true, "settings shows detected claude version");
   await shot("08-settings");
 
+  // Backups: save a copy, export (no credentials), then restore an exported file.
+  await page.getByRole("button", { name: "Guardar copia ahora" }).click();
+  await page.getByText("Copia guardada").waitFor();
+  await page.getByRole("button", { name: /^Restaurar agentic-.*-manual\.json$/ }).waitFor();
+  const exported = await (await fetch(base + "/api/backup", { headers: { authorization: `Bearer ${token}` } })).text();
+  check(exported.includes('"app": "agentic"') && !exported.includes("xoxp-") && !/"integrations"/.test(exported), "backup export contains data but no credentials");
+  const exportFile = path.join(tmp, "export.json");
+  fs.writeFileSync(exportFile, exported);
+  page.once("dialog", (d) => d.accept());
+  await page.getByLabel("Archivo de copia").setInputFiles(exportFile);
+  await page.getByText("Copia restaurada").waitFor();
+  check(true, "backup file restored from Settings (with a safety copy first)");
+  await shot("08b-backups");
+
   // Command palette
   await page.goto(`${base}/`);
   await page.getByRole("heading", { name: "Dashboard" }).waitFor();

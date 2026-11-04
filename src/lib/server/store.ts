@@ -72,6 +72,19 @@ export class JsonStore {
     return value;
   }
 
+  /** A collection's value, or undefined when it was never written (nothing is cached then). */
+  peek<T>(name: string): T | undefined {
+    if (this.cache.has(name)) return this.cache.get(name) as T;
+    if (!fs.existsSync(this.file(name))) return undefined;
+    return this.read<T | undefined>(name, undefined);
+  }
+
+  /** Delete a collection (file and cache). */
+  drop(name: string) {
+    fs.rmSync(this.file(name), { force: true });
+    this.cache.delete(name);
+  }
+
   /** Read-modify-write. `fn` gets a deep copy; mutate it or return a new value. */
   update<T>(name: string, fallback: T, fn: (draft: T) => T | void): T {
     const draft = structuredClone(this.read(name, fallback));

@@ -12,6 +12,8 @@ import { PermissionService } from "./permissions";
 import { worktreesRoot } from "./worktrees";
 import { ScheduleService } from "./schedules";
 import { BudgetService } from "./budgets";
+import { BackupService } from "./backup";
+import pkg from "../../../package.json";
 import { PullService } from "./integrations/pulls";
 import { IntegrationService } from "./integrations/service";
 import { TaskQueue } from "./queue";
@@ -40,6 +42,7 @@ export interface Context {
   permissions: PermissionService;
   schedules: ScheduleService;
   budgets: BudgetService;
+  backups: BackupService;
   oauth: OAuthService;
 }
 
@@ -91,6 +94,7 @@ export function createContext(config: Config): Context {
     permissions: new PermissionService(config.claudeHome, projects),
     schedules,
     budgets,
+    backups: new BackupService(store, config.dataDir, pkg.version),
     oauth: new OAuthService(store, integrations),
     queue,
     integrations,
@@ -106,6 +110,7 @@ export function ctx(): Context {
     g.__agentic = createContext(getConfig());
     g.__agentic.schedules.start();
     g.__agentic.budgets.start();
+    startAutoBackups(g.__agentic);
     const stop = () => {
       g.__agentic?.schedules.stop();
       g.__agentic?.budgets.stop();
@@ -115,6 +120,19 @@ export function ctx(): Context {
     process.once("SIGTERM", stop);
   }
   return g.__agentic;
+}
+
+/** One automatic copy per day (checked at start and every 6 h). */
+function startAutoBackups(c: Context) {
+  const run = () => {
+    try {
+      c.backups.autoBackup();
+    } catch (e) {
+      console.warn("[agentic] automatic backup failed:", (e as Error).message);
+    }
+  };
+  run();
+  setInterval(run, 6 * 3600_000).unref();
 }
 
 /** Test helper. */

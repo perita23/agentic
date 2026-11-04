@@ -4,12 +4,12 @@ import { SESSION_COOKIE, sessionIdHash, validateSession } from "./auth";
 import { assertRequestAllowed, parseCookies } from "./security";
 import { HttpError } from "./util";
 
-const MAX_BODY = 1024 * 1024;
+const DEFAULT_MAX_BODY = 1024 * 1024;
 
 type Params = Record<string, string>;
 type Handler = (args: { req: Request; params: Params; c: Context; url: URL; body: () => Promise<unknown> }) => unknown | Promise<unknown>;
 
-async function readJson(req: Request): Promise<unknown> {
+async function readJson(req: Request, MAX_BODY: number): Promise<unknown> {
   const len = Number(req.headers.get("content-length") || 0);
   if (len > MAX_BODY) throw new HttpError(413, "Request body too large");
   const reader = req.body?.getReader();
@@ -46,14 +46,14 @@ export function json(data: unknown, status = 200) {
  * validates Host/Origin/Content-Type, parses JSON lazily with a size cap and maps
  * errors to `{ error }` JSON without leaking stack traces.
  */
-export function route(handler: Handler, opts: { public?: boolean } = {}) {
+export function route(handler: Handler, opts: { public?: boolean; maxBody?: number } = {}) {
   return async (req: Request, context: { params: Promise<Params> }) => {
     try {
       const c = ctx();
       assertRequestAllowed(req, opts.public ? null : { token: c.token, dataDir: c.config.dataDir });
       const params = (await context?.params) ?? {};
       const url = new URL(req.url);
-      const result = await handler({ req, params, c, url, body: () => readJson(req) });
+      const result = await handler({ req, params, c, url, body: () => readJson(req, opts.maxBody ?? DEFAULT_MAX_BODY) });
       // Audit every successful state change (method + path only: never bodies or secrets).
       if (req.method !== "GET" && !url.pathname.startsWith("/api/auth/") && !url.pathname.endsWith("/search")) audit(c.config.dataDir, "api", { method: req.method, path: url.pathname.slice(0, 300) });
       if (result instanceof Response) return result;

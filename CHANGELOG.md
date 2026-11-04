@@ -3,6 +3,16 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.24.0] - 2026-11-04
+
+### Añadido
+- **Copias de seguridad** (Ajustes → Copias de seguridad y tus datos): cada día se guarda una copia automática y se conservan las 7 últimas. También puedes guardar una copia cuando quieras, descargarla o restaurarla con un clic.
+- **Exportar e importar**: lleva tus tareas, plantillas, proyectos, programadas, presupuesto, chats e historial de ejecuciones a otro equipo con un archivo JSON. Antes de restaurar se guarda siempre una copia de tus datos actuales, así que todo se puede deshacer.
+- **Borrar todos mis datos**: deja Agentic como recién instalada, incluidas las conexiones y sus credenciales. Tu acceso con contraseña y Touch ID se mantiene, y tus repos y sesiones de Claude Code no se tocan.
+
+### Seguridad
+- Las copias nunca incluyen credenciales de integraciones y se guardan con permisos 0600.
+
 ## [0.23.0] - 2026-11-04
 
 ### Añadido
