@@ -300,9 +300,11 @@ try {
   const firstRun = await (await fetch(base + `/api/runs/${firstRunId}`, { headers: authH })).json();
   await page.getByLabel("Responder a Claude").fill("Sí, hazlo con TypeScript");
   await page.getByRole("button", { name: "Enviar", exact: true }).click();
-  await page.waitForURL((u) => /\/runs\/[0-9a-f-]{36}$/.test(u.pathname) && !u.pathname.endsWith(firstRunId));
-  const replyRun = await (await fetch(base + `/api/runs/${page.url().split("/").pop()}`, { headers: authH })).json();
-  check(!!firstRun.sessionId && replyRun.resumeSessionId === firstRun.sessionId && replyRun.prompt.includes("TypeScript"), "reply in Headless continues the same Claude session");
+  // The reply appears below in the SAME page (no new run page) and Claude answers it there.
+  await page.getByText("done: Sí, hazlo con TypeScript").waitFor({ timeout: 15000 });
+  const replyRun = (await (await fetch(base + "/api/runs", { headers: authH })).json()).runs.find((r) => r.threadId === firstRunId);
+  check(page.url().endsWith(firstRunId) && !!firstRun.sessionId && replyRun?.resumeSessionId === firstRun.sessionId && replyRun.prompt.includes("TypeScript"), "reply in Headless continues the same conversation in the same page");
+  await shot("03e-thread");
 
   // Stop a long-running run from the UI (regression: body-less POSTs were rejected with 415).
   const longRun = await (

@@ -134,47 +134,53 @@ html[data-desktop="mac"]:not([data-fullscreen]) .traffic-light-gap {
   scrollbar-width: thin;
 }
 
-/* ---- Liquid orb: Claude's live status (colour, speed and amplitude per state) ---- */
+/* ---- Liquid orb: Claude's live status ----
+   JS advances one clock (--t) at a per-state speed that eases between states; every other
+   parameter (orbit radii, spread, stretch, tilt, pulse, shake, size, colours) is a registered
+   property that CSS transitions. Nothing switches animation, so shapes morph into each other. */
 @property --c1 { syntax: "<color>"; inherits: true; initial-value: #d8ccff; }
 @property --c2 { syntax: "<color>"; inherits: true; initial-value: #8b6cf5; }
 @property --c3 { syntax: "<color>"; inherits: true; initial-value: #ff8a5b; }
-@property --spd { syntax: "<time>"; inherits: true; initial-value: 9s; }
-@property --amp { syntax: "<number>"; inherits: true; initial-value: 0.35; }
-@property --glow { syntax: "<number>"; inherits: true; initial-value: 0.3; }
-/* Every parameter eases between states, so changing state morphs instead of jumping. */
-.orb { position: relative; flex: none; display: inline-block; --c1: #d8ccff; --c2: #8b6cf5; --c3: #ff8a5b; --spd: 9s; --amp: 0.35; --glow: 0.3;
-  transition: --c1 1.1s ease, --c2 1.1s ease, --c3 1.1s ease, --spd 1.1s ease, --amp 1.1s ease, --glow 1.1s ease;
-  filter: drop-shadow(0 0 calc(var(--glow) * 22px) color-mix(in srgb, var(--c2) 70%, transparent)); animation: orb-in 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
-.orb[data-state="thinking"] { --spd: 3.4s; --amp: 0.9; --glow: 0.55; }
-.orb[data-state="writing"] { --c1: #ffe0d0; --c2: #ff8a5b; --c3: #ff6fa0; --spd: 2.2s; --amp: 0.6; --glow: 0.6; }
-.orb[data-state="reading"] { --c1: #cdeaff; --c2: #5aa9ff; --c3: #8b6cf5; --spd: 4.2s; --amp: 0.5; --glow: 0.45; }
-.orb[data-state="editing"] { --c1: #d9ffe9; --c2: #34d399; --c3: #a78bfa; --spd: 2.6s; --amp: 0.8; --glow: 0.55; }
-.orb[data-state="running"] { --c1: #fff3c4; --c2: #fbbf24; --c3: #ff8a5b; --spd: 1.5s; --amp: 0.75; --glow: 0.8; }
-.orb[data-state="searching"] { --c1: #c7f9ff; --c2: #22d3ee; --c3: #a78bfa; --spd: 2.9s; --amp: 1; --glow: 0.55; }
-.orb[data-state="waiting"] { --c1: #ffe9b8; --c2: #f59e0b; --c3: #fb7185; --spd: 6s; --amp: 0.3; --glow: 0.7; }
-.orb[data-state="done"] { --c1: #d9ffe9; --c2: #34d399; --c3: #bef264; --spd: 8s; --amp: 0.25; --glow: 0.35; }
-.orb[data-state="error"] { --c1: #ffd0d0; --c2: #ef4444; --c3: #fb923c; --spd: 5s; --amp: 0.3; --glow: 0.6; }
+@property --ax { syntax: "<number>"; inherits: true; initial-value: 22; }
+@property --ay { syntax: "<number>"; inherits: true; initial-value: 22; }
+@property --spread { syntax: "<number>"; inherits: true; initial-value: 0.5; }
+@property --sx { syntax: "<number>"; inherits: true; initial-value: 1; }
+@property --sy { syntax: "<number>"; inherits: true; initial-value: 1; }
+@property --sc { syntax: "<number>"; inherits: true; initial-value: 0.8; }
+@property --pulse { syntax: "<number>"; inherits: true; initial-value: 0.05; }
+@property --shake { syntax: "<number>"; inherits: true; initial-value: 0; }
+@property --tilt { syntax: "<angle>"; inherits: true; initial-value: 0deg; }
+.orb { position: relative; flex: none; display: inline-block; --t: 0;
+  --c1: #d8ccff; --c2: #8b6cf5; --c3: #ff8a5b; --ax: 22; --ay: 22; --spread: 0.5; --sx: 1; --sy: 1; --sc: 0.8; --pulse: 0.05; --shake: 0; --tilt: 0deg;
+  transition: --c1 1.4s ease, --c2 1.4s ease, --c3 1.4s ease, --ax 1.4s ease, --ay 1.4s ease, --spread 1.4s ease, --sx 1.4s ease, --sy 1.4s ease, --sc 1.4s ease, --pulse 1.4s ease, --shake 1.4s ease, --tilt 1.4s ease;
+  animation: orb-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+/* Each state has its own shape and way of moving. */
+.orb[data-state="idle"] { /* small tight drop that breathes */ }
+.orb[data-state="thinking"] { --c1: #d8ccff; --c2: #8b6cf5; --c3: #ff8a5b; --sc: 1; --spread: 1; --ax: 68; --ay: 68; --pulse: 0; }
+.orb[data-state="writing"] { --c1: #ffe0d0; --c2: #ff8a5b; --c3: #ff6fa0; --sc: 1; --spread: 1.1; --ax: 95; --ay: 6; --sx: 1.35; --sy: 0.72; --pulse: 0.06; }
+.orb[data-state="reading"] { --c1: #cdeaff; --c2: #5aa9ff; --c3: #8b6cf5; --sc: 1; --spread: 0.9; --ax: 6; --ay: 95; --sx: 0.72; --sy: 1.35; --pulse: 0; }
+.orb[data-state="editing"] { --c1: #d9ffe9; --c2: #34d399; --c3: #a78bfa; --sc: 0.92; --spread: 0.7; --ax: 30; --ay: 30; --tilt: 24deg; --pulse: 0.08; }
+.orb[data-state="running"] { --c1: #fff3c4; --c2: #fbbf24; --c3: #ff8a5b; --sc: 1.05; --spread: 0.85; --ax: 44; --ay: 44; --pulse: 0.26; }
+.orb[data-state="searching"] { --c1: #c7f9ff; --c2: #22d3ee; --c3: #a78bfa; --sc: 0.7; --spread: 1.7; --ax: 85; --ay: 85; --pulse: 0; }
+.orb[data-state="waiting"] { --c1: #ffe9b8; --c2: #f59e0b; --c3: #fb7185; --sc: 1.12; --spread: 0.25; --ax: 12; --ay: 12; --pulse: 0.16; }
+.orb[data-state="done"] { --c1: #d9ffe9; --c2: #34d399; --c3: #bef264; --sc: 0.86; --spread: 0.22; --ax: 8; --ay: 8; --pulse: 0.04; }
+.orb[data-state="error"] { --c1: #ffd0d0; --c2: #ef4444; --c3: #fb923c; --sc: 0.95; --spread: 0.6; --ax: 22; --ay: 22; --shake: 16; --tilt: -18deg; --pulse: 0; }
 .orb-goo { position: absolute; inset: 0; }
-/* One signature movement per state on top of the wobble. */
-.orb[data-state="thinking"] .orb-goo { animation: orb-spin 7s linear infinite; }
-.orb[data-state="waiting"] .orb-goo { animation: orb-breathe 3.2s ease-in-out infinite; }
-.orb[data-state="running"] .orb-goo { animation: orb-pulse 1.2s ease-in-out infinite; }
-.orb[data-state="done"] .orb-goo { animation: orb-pop 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.4); }
-.orb[data-state="error"] .orb-goo { animation: orb-shake 0.55s ease-in-out; }
-.orb-ball { position: absolute; aspect-ratio: 1; border-radius: 50%; animation-duration: var(--spd); animation-timing-function: ease-in-out; animation-iteration-count: infinite; will-change: transform, border-radius; }
-.orb-ball.a { width: 58%; left: 6%; top: 8%; background: radial-gradient(circle at 35% 30%, #fff, var(--c1) 38%, var(--c2)); animation-name: orb-a, orb-morph; }
-.orb-ball.b { width: 46%; right: 2%; top: 20%; background: radial-gradient(circle at 40% 30%, var(--c1), var(--c2) 75%); animation-name: orb-b, orb-morph; animation-delay: 0s, -1.3s; }
-.orb-ball.c { width: 44%; left: 26%; bottom: 0; background: radial-gradient(circle at 40% 30%, #fff, var(--c3) 60%); animation-name: orb-c, orb-morph; animation-delay: 0s, -2.1s; }
-.orb-ball.d { width: 30%; right: 14%; bottom: 8%; background: radial-gradient(circle at 40% 30%, var(--c1), var(--c3)); animation-name: orb-d, orb-morph; animation-delay: 0s, -0.7s; }
-@keyframes orb-a { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(calc(var(--amp) * 48%), calc(var(--amp) * 38%)) scale(calc(1 + var(--amp) * 0.14)); } }
-@keyframes orb-b { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(calc(var(--amp) * -52%), calc(var(--amp) * 46%)) scale(calc(1 - var(--amp) * 0.12)); } }
-@keyframes orb-c { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(calc(var(--amp) * 44%), calc(var(--amp) * -56%)) scale(calc(1 + var(--amp) * 0.18)); } }
-@keyframes orb-d { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(calc(var(--amp) * -70%), calc(var(--amp) * -48%)) scale(calc(1 + var(--amp) * 0.2)); } }
-@keyframes orb-morph { 0%, 100% { border-radius: 50%; } 33% { border-radius: 58% 42% 46% 54% / 46% 56% 44% 54%; } 66% { border-radius: 44% 56% 54% 46% / 56% 44% 56% 44%; } }
-@keyframes orb-in { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
-@keyframes orb-spin { to { transform: rotate(360deg); } }
-@keyframes orb-breathe { 0%, 100% { transform: scale(0.94); } 50% { transform: scale(1.1); } }
-@keyframes orb-pulse { 0%, 100% { transform: scale(0.97); } 50% { transform: scale(1.08); } }
-@keyframes orb-pop { 0% { transform: scale(0.82); } 55% { transform: scale(1.16); } 100% { transform: scale(1); } }
-@keyframes orb-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-9%); } 40% { transform: translateX(8%); } 60% { transform: translateX(-5%); } 80% { transform: translateX(3%); } }
-@media (prefers-reduced-motion: reduce) { .orb, .orb-goo, .orb-ball { animation: none; } }
+.orb-pose { position: absolute; inset: 0;
+  transform: rotate(var(--tilt)) translateX(calc(sin(calc(var(--t) * 6rad)) * var(--shake) * 1%))
+    scale(calc(var(--sc) * var(--sx) * (1 + var(--pulse) * sin(calc(var(--t) * 1.4rad)))), calc(var(--sc) * var(--sy) * (1 + var(--pulse) * sin(calc(var(--t) * 1.4rad))))); }
+.orb-ball { position: absolute; left: 50%; top: 50%; aspect-ratio: 1; border-radius: 50%; }
+.orb-ball.a { width: 46%; background: radial-gradient(circle at 35% 30%, #fff, var(--c1) 38%, var(--c2));
+  translate: calc(-50% + var(--spread) * -28%) calc(-50% + var(--spread) * -20%);
+  transform: translate(calc(cos(calc(var(--t) * 1rad)) * var(--ax) * 1%), calc(sin(calc(var(--t) * 1rad)) * var(--ay) * 1%)); }
+.orb-ball.b { width: 38%; background: radial-gradient(circle at 40% 30%, var(--c1), var(--c2) 75%);
+  translate: calc(-50% + var(--spread) * 34%) calc(-50% + var(--spread) * -14%);
+  transform: translate(calc(cos(calc(var(--t) * 1.3rad + 2rad)) * var(--ax) * 1%), calc(sin(calc(var(--t) * 1.3rad + 2rad)) * var(--ay) * 1%)); }
+.orb-ball.c { width: 36%; background: radial-gradient(circle at 40% 30%, #fff, var(--c3) 60%);
+  translate: calc(-50% + var(--spread) * -4%) calc(-50% + var(--spread) * 34%);
+  transform: translate(calc(cos(calc(var(--t) * 0.8rad + 4rad)) * var(--ax) * 1%), calc(sin(calc(var(--t) * 0.8rad + 4rad)) * var(--ay) * 1%)); }
+.orb-ball.d { width: 26%; background: radial-gradient(circle at 40% 30%, var(--c1), var(--c3));
+  translate: calc(-50% + var(--spread) * 30%) calc(-50% + var(--spread) * 26%);
+  transform: translate(calc(cos(calc(var(--t) * 1.7rad + 1rad)) * var(--ax) * 1%), calc(sin(calc(var(--t) * 1.7rad + 1rad)) * var(--ay) * 1%)); }
+@keyframes orb-in { from { opacity: 0; scale: 0.6; } to { opacity: 1; scale: 1; } }
+@media (prefers-reduced-motion: reduce) { .orb { animation: none; } }

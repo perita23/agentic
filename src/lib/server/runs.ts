@@ -24,6 +24,8 @@ export interface Run {
   permissionMode: string;
   resumeSessionId: string | null;
   taskId: string | null;
+  /** Set on replies: id of the first run of the conversation (the run page shows the whole thread). */
+  threadId: string | null;
   status: RunStatus;
   pid: number | null;
   tmuxSession: string | null;
@@ -101,6 +103,8 @@ export const runCreateSchema = z
     permissionMode: z.enum(PERMISSION_MODES).default("default"),
     resumeSessionId: z.string().regex(UUID_RE, "invalid session id").optional().or(z.literal("").transform(() => undefined)),
     taskId: z.uuid().optional(),
+    /** Continue the conversation of this run (same page, same Claude session). */
+    continueRunId: z.uuid().optional(),
     maxBudgetUsd: z.number().positive().max(1000).optional(),
   })
   .refine((r) => r.mode === "tmux" || r.prompt.trim().length > 0, { message: "prompt is required for headless runs", path: ["prompt"] });
@@ -196,8 +200,28 @@ export class RunManager {
     return [...this.procs.values()].length;
   }
 
+  /** Runs of one conversation (the first run and its replies), oldest first. */
+  thread(id: string): Run[] {
+    const first = this.get(id);
+    const key = first.threadId ?? first.id;
+    return this.list()
+      .filter((r) => (r.threadId ?? r.id) === key)
+      .sort((a, b) => (a.startedAt < b.startedAt ? -1 : 1));
+  }
+
   async start(body: unknown): Promise<Run> {
-    const input = parse(runCreateSchema, body);
+    let input = parse(runCreateSchema, body);
+    let threadId: string | null = null;
+    if (input.continueRunId) {
+      // A reply: same project, resuming the Claude session of the thread's latest run.
+      const thread = this.thread(input.continueRunId);
+      const latest = thread[thread.length - 1];
+      if (latest.mode !== "headless") throw new HttpError(400, "Sólo las ejecuciones headless se pueden continuar así");
+      if (latest.status === "running") throw new HttpError(409, "Claude sigue trabajando: espera a que termine");
+      if (!latest.sessionId) throw new HttpError(400, "Esta ejecución no tiene sesión que continuar");
+      input = { ...input, mode: "headless", projectPath: latest.projectPath, resumeSessionId: latest.sessionId, agent: input.agent ?? latest.agent ?? undefined };
+      threadId = thread[0].id;
+    }
     const cwd = existingDir(input.projectPath);
     if (input.mode === "headless" && this.runningCount() >= this.opts.maxConcurrent)
       throw new HttpError(429, `Límite de ${this.opts.maxConcurrent} ejecuciones simultáneas alcanzado`);
@@ -212,6 +236,7 @@ export class RunManager {
       permissionMode: input.permissionMode,
       resumeSessionId: input.resumeSessionId ?? null,
       taskId: input.taskId ?? null,
+      threadId,
       status: "running",
       pid: null,
       tmuxSession: null,
