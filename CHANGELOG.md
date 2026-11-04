@@ -3,6 +3,19 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.20.0] - 2026-11-04
+
+### Añadido
+- **Permisos de Claude Code** (nueva sección «Permisos»): decide qué puede hacer Claude sin preguntarte, qué debe confirmar siempre y qué tiene prohibido, para todos tus proyectos o sólo para uno (compartido por git o sólo para ti). También puedes elegir el modo con el que arranca cada sesión.
+- **Recetas rápidas**: proteger `.env` y claves, ejecutar tests y lint sin preguntar, git de sólo lectura, confirmar cada `git push` o bloquear comandos peligrosos, todo con un clic.
+- Aviso cuando una misma regla está en varias listas, explicando cuál gana.
+
+### Seguridad
+- Sólo se modifica el bloque `permissions` de `settings.json`; el resto de tus ajustes se conserva. Si el fichero no es JSON válido, Agentic no lo toca.
+
+### Corregido
+- Al terminar una ejecución, su registro ya está completo: antes podían faltar las últimas líneas si lo abrías justo al acabar.
+
 ## [0.19.0] - 2026-11-04
 
 ### Añadido

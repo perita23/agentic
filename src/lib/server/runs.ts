@@ -244,6 +244,7 @@ export class RunManager {
 
     const logPath = this.logFile(run.id);
     const log = fs.createWriteStream(logPath, { flags: "a", mode: 0o600 });
+    log.on("error", (e) => console.error("[agentic] run log write failed", run.id, e.message));
     let bytes = 0;
     let truncatedLog = false;
     const writeLog = (obj: unknown) => {
@@ -326,9 +327,14 @@ export class RunManager {
       const status: RunStatus = stopped ? "stopped" : code === 0 && !current.error ? "completed" : "failed";
       const error = err ? `No se pudo ejecutar ${this.opts.claudeBin}: ${err.message}` : current.error || (status === "failed" ? `exit ${code ?? signal}` : null);
       writeLog({ type: "agentic", subtype: "exit", code, signal, at: nowIso() });
+      const endedAt = nowIso();
+      // Mark the run finished only once the log is flushed, so whoever reacts to
+      // the new status (UI, tests, notifications) reads the complete log.
+      log.once("close", () => {
+        const done = this.patch(run.id, { status, exitCode: code, endedAt, error, logBytes: bytes });
+        if (done) this.opts.onFinished?.(done);
+      });
       log.end();
-      const done = this.patch(run.id, { status, exitCode: code, endedAt: nowIso(), error, logBytes: bytes });
-      if (done) this.opts.onFinished?.(done);
     };
     child.on("error", (e) => finish(null, null, e));
     child.on("close", (code, signal) => finish(code, signal));

@@ -8,6 +8,7 @@ import { OAuthService } from "./integrations/oauth";
 import { Installer } from "./install";
 import { ChatService, chatDir } from "./chats";
 import { McpService } from "./mcp";
+import { PermissionService } from "./permissions";
 import { PullService } from "./integrations/pulls";
 import { IntegrationService } from "./integrations/service";
 import { TaskQueue } from "./queue";
@@ -33,6 +34,7 @@ export interface Context {
   installer: Installer;
   chats: ChatService;
   mcp: McpService;
+  permissions: PermissionService;
   oauth: OAuthService;
 }
 
@@ -78,6 +80,7 @@ export function createContext(config: Config): Context {
     installer: new Installer(),
     chats: new ChatService(store, runs, sessions, config.dataDir),
     mcp: new McpService(config.claudeHome, config.claudeBin, projects),
+    permissions: new PermissionService(config.claudeHome, projects),
     oauth: new OAuthService(store, integrations),
     queue,
     integrations,
