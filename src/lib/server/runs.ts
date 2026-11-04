@@ -629,7 +629,8 @@ export class RunManager {
   }
 
   /** What changed in the repository since the run started. */
-  async diff(id: string): Promise<RunDiff> {
+  /** `summary`: file list only (no patch, no new-file contents): cheap enough to poll while Claude works. */
+  async diff(id: string, { summary = false } = {}): Promise<RunDiff> {
     const run = this.get(id);
     const empty = { commits: [], files: [], newFiles: [], patch: "", truncated: false };
     if (!run.git) return { available: false, reason: "El proyecto no era un repositorio git al lanzar la ejecución.", ...empty };
@@ -644,7 +645,7 @@ export class RunManager {
       git(cwd, ["diff", ...SAFE_DIFF, "--name-status", "-z", base, "--"]),
       git(cwd, ["log", "--format=%h%x1f%s", `${base}..HEAD`, "-n", "100"]),
       git(cwd, ["ls-files", "-z", "--others", "--exclude-standard"], UNTRACKED_OPTS),
-      git(cwd, ["diff", ...SAFE_DIFF, base, "--"], { maxBuffer: 8 * 1024 * 1024 }),
+      summary ? Promise.resolve("") : git(cwd, ["diff", ...SAFE_DIFF, base, "--"], { maxBuffer: 8 * 1024 * 1024 }),
     ]);
 
     const statusOf = new Map<string, string>();
@@ -686,7 +687,7 @@ export class RunManager {
       let content: string | null = null;
       try {
         const st = fs.lstatSync(full);
-        if (st.isFile() && st.size <= 64 * 1024) {
+        if (!summary && st.isFile() && st.size <= 64 * 1024) {
           const buf = fs.readFileSync(full);
           if (!buf.includes(0)) content = buf.toString("utf8");
         }
