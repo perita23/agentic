@@ -27,6 +27,6 @@ export const GET = route(async ({ c }) => {
     })(),
     tasksByStatus: byStatus,
     recentSessions: sessions.slice(0, 8),
-    recentRuns: runs.slice(0, 6),
+    recentRuns: runs.filter((r) => !r.threadId).slice(0, 6),
   };
 });

@@ -9,6 +9,7 @@ import { useLauncher } from "@/components/app/launcher";
 import { RunRow } from "@/components/app/run-row";
 import { UsageCard } from "@/components/app/usage-card";
 import { useApi, type Run } from "@/lib/api";
+import { collapseThreads } from "@/lib/threads";
 
 const FILTERS = [
   { key: "all", label: "Todas" },
@@ -21,7 +22,9 @@ export default function RunsPage() {
   const { data } = useApi<{ runs: Run[] }>("/api/runs", { refreshInterval: 3000 });
   const launcher = useLauncher();
   const [filter, setFilter] = React.useState<(typeof FILTERS)[number]["key"]>("all");
-  const runs = (data?.runs ?? []).filter((r) => filter === "all" || r.status === filter);
+  // One row per conversation (the first run, with the status of its latest reply).
+  const threads = React.useMemo(() => collapseThreads(data?.runs ?? []), [data]);
+  const runs = threads.filter((r) => filter === "all" || r.status === filter);
 
   return (
     <div className="flex flex-col gap-5">
@@ -44,7 +47,7 @@ export default function RunsPage() {
             className={`cursor-pointer rounded px-3 py-1 text-sm ${filter === f.key ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"}`}
           >
             {f.label}
-            <span className="ml-1.5 text-xs text-muted-foreground tabular-nums">{(data?.runs ?? []).filter((r) => f.key === "all" || r.status === f.key).length}</span>
+            <span className="ml-1.5 text-xs text-muted-foreground tabular-nums">{threads.filter((r) => f.key === "all" || r.status === f.key).length}</span>
           </button>
         ))}
       </div>

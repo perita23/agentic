@@ -104,12 +104,10 @@ function EventView({ e, run }: { e: Ev; run: Run }) {
   return null;
 }
 
-function HeadlessLog({ run }: { run: Run }) {
+/** Events of one run: live over SSE, with incremental polling as fallback. */
+function useRunEvents(runId: string) {
   const [events, setEvents] = React.useState<Ev[]>([]);
   const offset = React.useRef(0);
-  const scroller = React.useRef<HTMLDivElement>(null);
-  const [follow, setFollow] = React.useState(true);
-
   const [live, setLive] = React.useState(false);
 
   React.useEffect(() => {
@@ -139,14 +137,14 @@ function HeadlessLog({ run }: { run: Run }) {
         let more = true;
         let status = "running";
         while (more && !cancelled) {
-          const log = await fetcher<RunLog>(`/api/runs/${run.id}/log?offset=${offset.current}`);
+          const log = await fetcher<RunLog>(`/api/runs/${runId}/log?offset=${offset.current}`);
           more = log.nextOffset > offset.current && log.events.length > 0;
           offset.current = log.nextOffset;
           status = log.status;
           log.events.forEach(push);
         }
         if (!cancelled && status === "running") timer = setTimeout(poll, 1000);
-        else refresh(`/api/runs/${run.id}`);
+        else refresh(`/api/runs/${runId}`);
       } catch {
         if (!cancelled) timer = setTimeout(poll, 3000);
       }
@@ -155,7 +153,7 @@ function HeadlessLog({ run }: { run: Run }) {
     if (typeof EventSource === "undefined") {
       void poll();
     } else {
-      es = new EventSource(`/api/runs/${run.id}/stream`);
+      es = new EventSource(`/api/runs/${runId}/stream`);
       es.onopen = () => setLive(true);
       es.onmessage = (m) => {
         try {
@@ -166,7 +164,7 @@ function HeadlessLog({ run }: { run: Run }) {
       es.addEventListener("end", () => {
         es?.close();
         setLive(false);
-        refresh(`/api/runs/${run.id}`);
+        refresh(`/api/runs/${runId}`);
       });
       es.onerror = () => {
         // The browser retries on its own (resuming via Last-Event-ID); if it gave up, poll instead.
@@ -182,12 +180,47 @@ function HeadlessLog({ run }: { run: Run }) {
       es?.close();
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [run.id]);
+  }, [runId]);
+
+  return { events, live };
+}
+
+/** One turn of the conversation: the user's message (replies) and what Claude did. */
+function Segment({ run, index, onEvents }: { run: Run; index: number; onEvents: (id: string, events: Ev[], live: boolean) => void }) {
+  const { events, live } = useRunEvents(run.id);
+  React.useEffect(() => onEvents(run.id, events, live), [run.id, events, live, onEvents]);
+  // Replies reuse the session: hide the repeated command line, init and exit noise.
+  const shown = index === 0 ? events : events.filter((e) => !(e.type === "agentic" && (e.subtype === "start" || e.subtype === "exit")) && !(e.type === "system" && e.subtype === "init"));
+  return (
+    <>
+      {index > 0 && (
+        <div className="flex justify-end">
+          <div className="max-w-[85%] rounded-2xl rounded-br-md bg-secondary px-3.5 py-2 text-sm break-words whitespace-pre-wrap">{linkify(run.prompt)}</div>
+        </div>
+      )}
+      {shown.map((e, i) => (
+        <EventView key={i} e={e} run={run} />
+      ))}
+    </>
+  );
+}
+
+/** The whole conversation (first run + replies) in one place, like the chat. */
+function HeadlessLog({ thread }: { thread: Run[] }) {
+  const run = thread[thread.length - 1];
+  const [byRun, setByRun] = React.useState<Record<string, { events: Ev[]; live: boolean }>>({});
+  const onEvents = React.useCallback(
+    (id: string, events: Ev[], live: boolean) => setByRun((p) => (p[id]?.events === events && p[id]?.live === live ? p : { ...p, [id]: { events, live } })),
+    [],
+  );
+  const scroller = React.useRef<HTMLDivElement>(null);
+  const [follow, setFollow] = React.useState(true);
+  const live = thread.some((r) => byRun[r.id]?.live);
 
   React.useEffect(() => {
     // Scroll only the log container, never the whole window.
     if (follow && scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
-  }, [events, follow]);
+  }, [byRun, thread.length, follow]);
 
   return (
     <Card className="gap-0 py-0">
@@ -204,19 +237,13 @@ function HeadlessLog({ run }: { run: Run }) {
           <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} className="accent-primary" /> Seguir
         </label>
       </CardHeader>
-      <div className="flex items-center border-b bg-card px-4 py-3">
-        <ActivityOrb activity={run.status === "running" ? stateFromEvents(events) : run.status === "failed" ? { state: "error", label: "Ha fallado" } : stateFromEvents(events)} size={48} />
-      </div>
       <CardContent ref={scroller} className="max-h-[65vh] min-h-64 overflow-y-auto bg-inset p-4">
         <div className="flex flex-col gap-3">
-          {events.map((e, i) => (
-            <EventView key={i} e={e} run={run} />
+          {thread.map((r, i) => (
+            <Segment key={r.id} run={r} index={i} onEvents={onEvents} />
           ))}
-          {run.status === "running" && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <StatusDot status="running" /> Claude está trabajando…
-            </div>
-          )}
+          {/* The orb lives at the end of the output, where Claude is writing (like in the chat). */}
+          <ActivityOrb activity={run.status === "failed" ? { state: "error", label: "Ha fallado" } : stateFromEvents(byRun[run.id]?.events ?? [])} size={44} className="mt-1" />
         </div>
       </CardContent>
       <ReplyBox run={run} />
@@ -229,7 +256,6 @@ function HeadlessLog({ run }: { run: Run }) {
  * (`--resume`) as a new run: send another prompt or answer a question Claude asked.
  */
 function ReplyBox({ run }: { run: Run }) {
-  const router = useRouter();
   const [text, setText] = React.useState("");
   const [mode, setMode] = React.useState(run.permissionMode || "default");
   const [busy, setBusy] = React.useState(false);
@@ -242,17 +268,17 @@ function ReplyBox({ run }: { run: Run }) {
     if (!text.trim() || waiting || noSession) return;
     setBusy(true);
     try {
-      const next = await api<Run>("POST", "/api/runs", {
+      await api<Run>("POST", "/api/runs", {
         mode: "headless",
         projectPath: run.projectPath,
         prompt: text.trim(),
-        resumeSessionId: run.sessionId,
+        continueRunId: run.id,
         permissionMode: mode,
         model: run.model || undefined,
       });
+      setText("");
+      // The reply shows up below, in this same conversation.
       refresh("/api/runs", "/api/overview");
-      toast.success("Enviado", { description: "Claude continúa la misma conversación." });
-      router.push(`/runs/${next.id}`);
     } catch (err) {
       toast.error("No se pudo enviar", { description: errorMessage(err) });
     } finally {
@@ -339,14 +365,25 @@ export default function RunPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const launcher = useLauncher();
-  const { data: run, error } = useApi<Run>(`/api/runs/${id}`, { refreshInterval: (r) => (r?.status === "running" ? 2000 : 0) });
+  const { data: self, error } = useApi<Run>(`/api/runs/${id}`, { refreshInterval: (r) => (r?.status === "running" ? 2000 : 0) });
+  const { data: all } = useApi<{ runs: Run[] }>("/api/runs", { refreshInterval: (d) => (d?.runs.some((r) => r.status === "running") ? 2000 : 0) });
 
   if (error) return <p className="text-sm text-destructive">{error.message}</p>;
-  if (!run) return <Skeleton className="h-64" />;
+  if (!self) return <Skeleton className="h-64" />;
+  // The conversation: the first run and its replies. `run` is the latest turn, `root` the first.
+  const key = self.threadId ?? self.id;
+  const found = (all?.runs ?? []).filter((r) => (r.threadId ?? r.id) === key).sort((a, b) => (a.startedAt < b.startedAt ? -1 : 1));
+  const thread = found.length ? found : [self];
+  const root = thread[0];
+  const run = thread[thread.length - 1];
+  const sum = (f: (r: Run) => number | null) => (thread.some((r) => f(r) != null) ? thread.reduce((a, r) => a + (f(r) ?? 0), 0) : null);
+  const cost = sum((r) => r.costUsd);
+  const duration = sum((r) => r.durationMs);
+  const turns = sum((r) => r.numTurns);
 
   async function stop() {
     try {
-      await api("POST", `/api/runs/${id}/stop`);
+      await api("POST", `/api/runs/${run.id}/stop`);
       toast.success("Ejecución detenida");
       refresh("/api/runs", "/api/overview");
     } catch (e) {
@@ -354,9 +391,9 @@ export default function RunPage() {
     }
   }
   async function remove() {
-    if (!confirm("¿Borrar esta ejecución y su log?")) return;
+    if (!confirm(thread.length > 1 ? `¿Borrar esta conversación (${thread.length} mensajes) y sus logs?` : "¿Borrar esta ejecución y su log?")) return;
     try {
-      await api("DELETE", `/api/runs/${id}`);
+      for (const r of thread) await api("DELETE", `/api/runs/${r.id}`);
       refresh("/api/runs", "/api/overview");
       router.push("/runs");
     } catch (e) {
@@ -374,7 +411,7 @@ export default function RunPage() {
           <div className="min-w-0">
             <h1 className="flex items-center gap-2 text-xl font-semibold">
               <StatusDot status={run.status} />
-              <span className="truncate">{run.prompt.split("\n")[0] || "Sesión interactiva"}</span>
+              <span className="truncate">{root.prompt.split("\n")[0] || "Sesión interactiva"}</span>
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <Badge variant={RUN_STATUS_VARIANT[run.status]}>{RUN_STATUS_LABEL[run.status]}</Badge>
@@ -426,10 +463,10 @@ export default function RunPage() {
             </TabsList>
             {/* forceMount keeps the live log polling while the diff tab is open */}
             <TabsContent value="output" forceMount className="data-[state=inactive]:hidden">
-              {run.mode === "tmux" ? <TmuxConsole run={run} /> : <HeadlessLog run={run} />}
+              {run.mode === "tmux" ? <TmuxConsole run={run} /> : <HeadlessLog thread={thread} />}
             </TabsContent>
             <TabsContent value="diff">
-              <RunDiffView runId={run.id} live={run.status === "running"} />
+              <RunDiffView runId={root.id} live={run.status === "running"} />
             </TabsContent>
           </Tabs>
         </div>
@@ -437,10 +474,10 @@ export default function RunPage() {
           <Card>
             <CardHeader>
               <CardTitle>Prompt</CardTitle>
-              {run.prompt && <CopyButton value={run.prompt} />}
+              {root.prompt && <CopyButton value={root.prompt} />}
             </CardHeader>
             <CardContent>
-              <pre className="max-h-64 overflow-auto font-mono text-xs whitespace-pre-wrap text-muted-foreground">{run.prompt || "—"}</pre>
+              <pre className="max-h-64 overflow-auto font-mono text-xs whitespace-pre-wrap text-muted-foreground">{root.prompt || "—"}</pre>
             </CardContent>
           </Card>
           <Card>
@@ -448,9 +485,9 @@ export default function RunPage() {
               <CardTitle>Métricas</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-3 text-sm">
-              <Metric k="Coste" v={run.costUsd != null ? `$${run.costUsd.toFixed(4)}` : "—"} />
-              <Metric k="Duración" v={run.durationMs != null ? `${(run.durationMs / 1000).toFixed(1)} s` : "—"} />
-              <Metric k="Turnos" v={run.numTurns != null ? String(run.numTurns) : "—"} />
+              <Metric k="Coste" v={cost != null ? `$${cost.toFixed(4)}` : "—"} />
+              <Metric k="Duración" v={duration != null ? `${(duration / 1000).toFixed(1)} s` : "—"} />
+              <Metric k="Turnos" v={turns != null ? String(turns) : "—"} />
               <Metric k="Código salida" v={run.exitCode != null ? String(run.exitCode) : "—"} />
             </CardContent>
           </Card>

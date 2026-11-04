@@ -3,6 +3,15 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.28.0] - 2026-11-04
+
+### Corregido
+- **Headless: responder ya no crea otra ejecución.** Cuando le escribes a Claude en una ejecución headless, tu mensaje y su respuesta aparecen debajo, en la misma página y en la misma conversación, como en el Chat. Antes cada mensaje abría una ejecución nueva y te llevaba a otra página. En la lista de Ejecuciones hay una sola fila por conversación, con el estado de su último mensaje. El coste, la duración y los turnos suman toda la conversación, y los cambios (diff) cubren todo el hilo.
+
+### Cambiado
+- **La bola de la IA, rehecha.** Sin brillo. Al cambiar de estado la forma se transforma de manera continua (antes saltaba de un movimiento a otro), y cada estado se mueve de forma muy distinta: gota pequeña que respira en reposo, esferas que orbitan sueltas al pensar, banda horizontal al escribir, columna vertical al leer, inclinada y grumosa al editar, pulsante al ejecutar, repartida y abierta al buscar, grande y compacta al esperar, diminuta al terminar y temblorosa si falla.
+- La bola va al final de la salida, donde Claude está escribiendo, y no en una franja fija arriba.
+
 ## [0.27.0] - 2026-11-04
 
 ### Añadido
