@@ -20,10 +20,11 @@ import {
   SearchIcon,
   SettingsIcon,
   TicketIcon,
+  EyeIcon, EyeOffIcon, SlidersHorizontalIcon, CheckIcon,
   TerminalSquareIcon, SparklesIcon, ServerIcon, ShieldCheckIcon, AlarmClockIcon, LibraryIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
-import { useApi, type Overview, type ProjectListItem, type SessionSummary } from "@/lib/api";
+import { api, refresh, useApi, type Overview, type ProjectListItem, type SessionSummary } from "@/lib/api";
 import { cn, shortPath } from "@/lib/utils";
 import { Kbd, StatusDot } from "./common";
 import { LauncherProvider, useLauncher } from "./launcher";
@@ -54,6 +55,24 @@ const NAV = [
   { href: "/settings", label: "Ajustes", icon: SettingsIcon },
 ];
 
+/** Items that can never be hidden (you must always be able to get home and to settings). */
+const LOCKED = new Set(["/", "/settings"]);
+
+/** Hidden menu items live on the server (the desktop app's port can change between launches). */
+function usePrefs() {
+  const { data, mutate } = useApi<{ hiddenNav: string[] }>("/api/prefs");
+  const hidden = data?.hiddenNav ?? [];
+  async function setHidden(next: string[]) {
+    await mutate({ hiddenNav: next }, { revalidate: false });
+    try {
+      await api("PUT", "/api/prefs", { hiddenNav: next });
+    } finally {
+      refresh("/api/prefs");
+    }
+  }
+  return { hidden, setHidden };
+}
+
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
 }
@@ -71,15 +90,37 @@ function Logo() {
 function Sidebar({ overview }: { overview?: Overview }) {
   const pathname = usePathname();
   const counts = { sessions: overview?.counts.activeSessions ?? 0, runs: overview?.counts.runningRuns ?? 0 };
+  const { hidden, setHidden } = usePrefs();
+  const [editing, setEditing] = React.useState(false);
+  const items = editing ? NAV : NAV.filter((n) => !hidden.includes(n.href));
   return (
     <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r bg-sidebar md:flex">
       <div className="app-drag traffic-light-gap flex h-14 items-center border-b px-3">
         <Logo />
       </div>
       <nav className="flex flex-1 flex-col gap-0.5 p-2" aria-label="Principal">
-        {NAV.map((item) => {
+        {items.map((item) => {
           const active = isActive(pathname, item.href);
           const count = item.badge ? counts[item.badge] : 0;
+          if (editing) {
+            const locked = LOCKED.has(item.href);
+            const off = hidden.includes(item.href);
+            return (
+              <button
+                key={item.href}
+                type="button"
+                disabled={locked}
+                aria-pressed={!off}
+                aria-label={`${off ? "Mostrar" : "Ocultar"} ${item.label}`}
+                onClick={() => void setHidden(off ? hidden.filter((h) => h !== item.href) : [...hidden, item.href])}
+                className={cn("flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50", off ? "text-muted-foreground/50 line-through" : "text-foreground")}
+              >
+                <item.icon className="size-4" />
+                <span>{item.label}</span>
+                {!locked && (off ? <EyeOffIcon className="ml-auto size-3.5" /> : <EyeIcon className="ml-auto size-3.5" />)}
+              </button>
+            );
+          }
           return (
             <Link
               key={item.href}
@@ -105,6 +146,15 @@ function Sidebar({ overview }: { overview?: Overview }) {
             </Link>
           );
         })}
+        <button
+          type="button"
+          onClick={() => setEditing((v) => !v)}
+          className="mt-1 flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          {editing ? <CheckIcon className="size-3.5" /> : <SlidersHorizontalIcon className="size-3.5" />}
+          {editing ? "Listo" : "Personalizar menú"}
+        </button>
+        {editing && hidden.length > 0 && <p className="px-2.5 text-[11px] text-muted-foreground">Lo oculto sigue disponible con Ctrl K.</p>}
       </nav>
       {overview?.activity && (
         <Link href={`/runs/${overview.activity.runId}`} className="mx-2 mb-2 flex items-center gap-2.5 rounded-lg border bg-card px-2.5 py-2 text-xs transition-colors hover:border-border-strong" aria-live="polite">
@@ -127,9 +177,10 @@ function Sidebar({ overview }: { overview?: Overview }) {
 
 function MobileNav() {
   const pathname = usePathname();
+  const { hidden } = usePrefs();
   return (
     <nav className="flex gap-1 overflow-x-auto border-b bg-sidebar px-2 py-1.5 md:hidden" aria-label="Principal">
-      {NAV.map((item) => (
+      {NAV.filter((n) => !hidden.includes(n.href)).map((item) => (
         <Link
           key={item.href}
           href={item.href}

@@ -50,6 +50,9 @@ const lines = [
   { type: "assistant", cwd: project, timestamp: new Date().toISOString(), message: { model: "claude-sonnet", content: [{ type: "text", text: "Comparativa de precios lista:\nhttps://claude.ai/artifact/SmokeArtifact123" }] } },
 ];
 fs.writeFileSync(path.join(claudeHome, "projects", enc, `${sid}.jsonl`), lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
+// A second, finished session to delete (trash) and restore from the UI.
+const sid2 = "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff";
+fs.writeFileSync(path.join(claudeHome, "projects", enc, `${sid2}.jsonl`), JSON.stringify({ type: "user", cwd: project, timestamp: new Date().toISOString(), message: { role: "user", content: "Sesión desechable para borrar" } }) + "\n");
 fs.writeFileSync(path.join(claudeHome, "sessions", `${process.pid}.json`), JSON.stringify({ pid: process.pid, sessionId: sid, cwd: project, status: "busy", name: "demo-app", entrypoint: "cli", startedAt: Date.now(), updatedAt: Date.now() }));
 
 
@@ -261,6 +264,29 @@ try {
   await page.getByText("Añade modo oscuro al dashboard").first().click();
   await page.getByText("Claro, voy a revisar los estilos.").waitFor();
   check(true, "session transcript renders");
+
+  // Delete a session -> trash -> restore.
+  await page.goto(`${base}/sessions`);
+  await page.getByText("Sesión desechable para borrar").first().waitFor();
+  await page.getByRole("button", { name: /^Borrar «Sesión desechable/ }).click({ force: true });
+  await page.getByText("Sesión movida a la papelera").waitFor();
+  await page.getByText("Sesión desechable para borrar").first().waitFor({ state: "detached" });
+  check(!fs.existsSync(path.join(claudeHome, "projects", enc, `${sid2}.jsonl`)) && (await page.getByText("Sesión desechable para borrar").count()) === 0, "deleting a session moves it to the trash");
+  await page.getByRole("button", { name: /Papelera/ }).click();
+  await page.getByRole("button", { name: "Restaurar" }).click();
+  await page.getByText("Sesión restaurada").waitFor();
+  check(fs.existsSync(path.join(claudeHome, "projects", enc, `${sid2}.jsonl`)), "a session can be restored from the trash");
+  await page.keyboard.press("Escape");
+
+  // Hide a sidebar item and keep it hidden.
+  await page.getByRole("button", { name: "Personalizar menú" }).click();
+  await page.getByRole("button", { name: "Ocultar MCP" }).click();
+  await page.getByRole("button", { name: "Listo" }).click();
+  check((await page.locator("aside nav").getByRole("link", { name: "MCP", exact: true }).count()) === 0, "a sidebar item can be hidden");
+  await page.getByRole("button", { name: "Personalizar menú" }).click();
+  await page.getByRole("button", { name: "Mostrar MCP" }).click();
+  await page.getByRole("button", { name: "Listo" }).click();
+  check((await page.locator("aside nav").getByRole("link", { name: "MCP", exact: true }).count()) === 1, "a hidden sidebar item can be shown again");
   await page.goto(`${base}/sessions`);
   await page.getByRole("button", { name: "En el contenido" }).click();
   await page.getByPlaceholder("Buscar dentro de las conversaciones…").fill("revisar los estilos");

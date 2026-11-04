@@ -2,11 +2,12 @@
 
 import * as React from "react";
 import { linkify } from "@/components/app/linkify";
+import { deleteSessions } from "@/components/app/session-trash";
 import { JiraCommentButton } from "@/components/app/jira-comment";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { ArrowLeftIcon, BotIcon, GitBranchIcon, PlayIcon, UserIcon, WrenchIcon } from "lucide-react";
+import { ArrowLeftIcon, BotIcon, GitBranchIcon, PlayIcon, Trash2Icon, UserIcon, WrenchIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +19,7 @@ import { cn, formatTokens, shortPath, timeAgo } from "@/lib/utils";
 
 export default function SessionPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const { data, error } = useApi<Transcript>(`/api/sessions/${id}`, { refreshInterval: (d) => (d?.active ? 3000 : 0) });
   const launcher = useLauncher();
   const resumeCmd = data?.cwd ? `cd ${JSON.stringify(data.cwd)} && claude --resume ${id}` : `claude --resume ${id}`;
@@ -55,6 +57,20 @@ export default function SessionPage() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {!data.active && (
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Borrar sesión"
+                title="Mover a la papelera"
+                className="hover:text-destructive"
+                onClick={async () => {
+                  if ((await deleteSessions([id])).length) router.push("/sessions");
+                }}
+              >
+                <Trash2Icon />
+              </Button>
+            )}
             <div className="flex items-center rounded-md border bg-inset pl-3 font-mono text-xs text-muted-foreground">
               <span className="max-w-64 truncate">claude --resume {id.slice(0, 8)}…</span>
               <CopyButton value={resumeCmd} label="Copiar comando de reanudación" />

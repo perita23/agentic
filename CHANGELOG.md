@@ -3,6 +3,12 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.30.0] - 2026-11-04
+
+### Añadido
+- **Personalizar el menú lateral.** El botón «Personalizar menú» (abajo del menú) deja ocultar las secciones que no usas, con un ojo en cada una. Se guarda en tu configuración, también en la app de escritorio. Dashboard y Ajustes no se pueden ocultar, y lo oculto sigue accesible con Ctrl K.
+- **Borrar sesiones de Claude Code.** Desde la lista (icono de papelera al pasar el ratón, o «Seleccionar» para borrar varias) y desde la propia sesión. No se borran de golpe: van a una **papelera** (30 días) con «Deshacer» al instante, y desde «Papelera» puedes restaurarlas, eliminarlas para siempre o vaciarla. Las sesiones en marcha no se pueden borrar.
+
 ## [0.29.0] - 2026-11-04
 
 ### Añadido
