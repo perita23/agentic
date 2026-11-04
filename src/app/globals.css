@@ -152,23 +152,23 @@ html[data-desktop="mac"]:not([data-fullscreen]) .traffic-light-gap {
 @property --tilt { syntax: "<angle>"; inherits: true; initial-value: 0deg; }
 .orb { position: relative; flex: none; display: inline-block; --t: 0;
   --c1: #d8ccff; --c2: #8b6cf5; --c3: #ff8a5b; --ax: 22; --ay: 22; --spread: 0.5; --sx: 1; --sy: 1; --sc: 0.8; --pulse: 0.05; --shake: 0; --tilt: 0deg;
-  transition: --c1 1.4s ease, --c2 1.4s ease, --c3 1.4s ease, --ax 1.4s ease, --ay 1.4s ease, --spread 1.4s ease, --sx 1.4s ease, --sy 1.4s ease, --sc 1.4s ease, --pulse 1.4s ease, --shake 1.4s ease, --tilt 1.4s ease;
+  transition: --c1 2.4s ease, --c2 2.4s ease, --c3 2.4s ease, --ax 2.4s ease, --ay 2.4s ease, --spread 2.4s ease, --sx 2.4s ease, --sy 2.4s ease, --sc 2.4s ease, --pulse 2.4s ease, --shake 2.4s ease, --tilt 2.4s ease;
   animation: orb-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
-/* Each state has its own shape and way of moving. */
-.orb[data-state="idle"] { /* small tight drop that breathes */ }
-.orb[data-state="thinking"] { --c1: #d8ccff; --c2: #8b6cf5; --c3: #ff8a5b; --sc: 1; --spread: 1; --ax: 68; --ay: 68; --pulse: 0; }
-.orb[data-state="writing"] { --c1: #ffe0d0; --c2: #ff8a5b; --c3: #ff6fa0; --sc: 1; --spread: 1.1; --ax: 95; --ay: 6; --sx: 1.35; --sy: 0.72; --pulse: 0.06; }
-.orb[data-state="reading"] { --c1: #cdeaff; --c2: #5aa9ff; --c3: #8b6cf5; --sc: 1; --spread: 0.9; --ax: 6; --ay: 95; --sx: 0.72; --sy: 1.35; --pulse: 0; }
-.orb[data-state="editing"] { --c1: #d9ffe9; --c2: #34d399; --c3: #a78bfa; --sc: 0.92; --spread: 0.7; --ax: 30; --ay: 30; --tilt: 24deg; --pulse: 0.08; }
-.orb[data-state="running"] { --c1: #fff3c4; --c2: #fbbf24; --c3: #ff8a5b; --sc: 1.05; --spread: 0.85; --ax: 44; --ay: 44; --pulse: 0.26; }
-.orb[data-state="searching"] { --c1: #c7f9ff; --c2: #22d3ee; --c3: #a78bfa; --sc: 0.7; --spread: 1.7; --ax: 85; --ay: 85; --pulse: 0; }
-.orb[data-state="waiting"] { --c1: #ffe9b8; --c2: #f59e0b; --c3: #fb7185; --sc: 1.12; --spread: 0.25; --ax: 12; --ay: 12; --pulse: 0.16; }
-.orb[data-state="done"] { --c1: #d9ffe9; --c2: #34d399; --c3: #bef264; --sc: 0.86; --spread: 0.22; --ax: 8; --ay: 8; --pulse: 0.04; }
-.orb[data-state="error"] { --c1: #ffd0d0; --c2: #ef4444; --c3: #fb923c; --sc: 0.95; --spread: 0.6; --ax: 22; --ay: 22; --shake: 16; --tilt: -18deg; --pulse: 0; }
+/* Calm, hypnotic motion: states are told apart by colour, breathing rhythm and a subtly different shape. */
+.orb[data-state="idle"] { /* small tight drop that breathes slowly */ }
+.orb[data-state="thinking"] { --c1: #d8ccff; --c2: #8b6cf5; --c3: #ff8a5b; --sc: 0.95; --spread: 0.9; --ax: 30; --ay: 30; --pulse: 0.03; }
+.orb[data-state="writing"] { --c1: #ffe0d0; --c2: #ff8a5b; --c3: #ff6fa0; --sc: 0.98; --spread: 1; --ax: 38; --ay: 10; --sx: 1.12; --sy: 0.9; --pulse: 0.03; }
+.orb[data-state="reading"] { --c1: #cdeaff; --c2: #5aa9ff; --c3: #8b6cf5; --sc: 0.98; --spread: 0.9; --ax: 10; --ay: 38; --sx: 0.9; --sy: 1.12; --pulse: 0.02; }
+.orb[data-state="editing"] { --c1: #d9ffe9; --c2: #34d399; --c3: #a78bfa; --sc: 0.9; --spread: 0.7; --ax: 18; --ay: 18; --tilt: 14deg; --pulse: 0.05; }
+.orb[data-state="running"] { --c1: #fff3c4; --c2: #fbbf24; --c3: #ff8a5b; --sc: 1; --spread: 0.8; --ax: 22; --ay: 22; --pulse: 0.09; }
+.orb[data-state="searching"] { --c1: #c7f9ff; --c2: #22d3ee; --c3: #a78bfa; --sc: 0.85; --spread: 1.25; --ax: 34; --ay: 34; --pulse: 0.02; }
+.orb[data-state="waiting"] { --c1: #ffe9b8; --c2: #f59e0b; --c3: #fb7185; --sc: 1.02; --spread: 0.3; --ax: 8; --ay: 8; --pulse: 0.08; }
+.orb[data-state="done"] { --c1: #d9ffe9; --c2: #34d399; --c3: #bef264; --sc: 0.85; --spread: 0.25; --ax: 6; --ay: 6; --pulse: 0.03; }
+.orb[data-state="error"] { --c1: #ffd0d0; --c2: #ef4444; --c3: #fb923c; --sc: 0.92; --spread: 0.6; --ax: 14; --ay: 14; --tilt: -10deg; --pulse: 0.03; }
 .orb-goo { position: absolute; inset: 0; }
 .orb-pose { position: absolute; inset: 0;
   transform: rotate(var(--tilt)) translateX(calc(sin(calc(var(--t) * 6rad)) * var(--shake) * 1%))
-    scale(calc(var(--sc) * var(--sx) * (1 + var(--pulse) * sin(calc(var(--t) * 1.4rad)))), calc(var(--sc) * var(--sy) * (1 + var(--pulse) * sin(calc(var(--t) * 1.4rad))))); }
+    scale(calc(var(--sc) * var(--sx) * (1 + var(--pulse) * sin(calc(var(--t) * 3rad)))), calc(var(--sc) * var(--sy) * (1 + var(--pulse) * sin(calc(var(--t) * 3rad))))); }
 .orb-ball { position: absolute; left: 50%; top: 50%; aspect-ratio: 1; border-radius: 50%; }
 .orb-ball.a { width: 46%; background: radial-gradient(circle at 35% 30%, #fff, var(--c1) 38%, var(--c2));
   translate: calc(-50% + var(--spread) * -28%) calc(-50% + var(--spread) * -20%);
