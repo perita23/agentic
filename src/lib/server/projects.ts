@@ -92,13 +92,24 @@ const MARKERS: [string, string][] = [
   ["Dockerfile", "Docker"],
 ];
 
+function realOr(p: string) {
+  try {
+    return fs.realpathSync(p);
+  } catch {
+    return p;
+  }
+}
+
 export class ProjectService {
   constructor(
     private store: JsonStore,
     private sessions: SessionIndex,
     /** Folders Agentic uses internally (e.g. the chat folder): never listed as projects. */
     private hidden: string[] = [],
-  ) {}
+  ) {
+    // Session cwds are real paths (e.g. /private/var on macOS): hide both spellings.
+    this.hidden = [...new Set(hidden.flatMap((h) => [h, realOr(h)]))];
+  }
 
   stored(): StoredProject[] {
     return this.store.read<StoredProject[]>(P, []);

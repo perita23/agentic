@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { PlusIcon, RocketIcon, Trash2Icon, XIcon } from "lucide-react";
+import { CopyIcon, GitBranchIcon, GitCommitHorizontalIcon, PlusIcon, RocketIcon, Trash2Icon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { api, refresh, useApi, type ProjectListItem, type Task } from "@/lib/api";
+import { copyText } from "@/lib/clipboard";
+import type { TaskWorktree, WorktreeStatus } from "@/lib/server/worktrees";
 import { errorMessage } from "./common";
 import { useLauncher } from "./launcher";
 
@@ -117,6 +119,7 @@ export function TaskDialog({ task, defaults, onClose }: { task?: Task; defaults?
       projectPath: saved.projectPath,
       prompt: saved.prompt || `${saved.title}\n\n${saved.description}`.trim(),
       title: `Ejecutar tarea: ${saved.title}`,
+      worktree: !!saved.worktree,
     });
   }
 
@@ -230,6 +233,7 @@ export function TaskDialog({ task, defaults, onClose }: { task?: Task; defaults?
           <Field label="Prompt para Claude (opcional; si está vacío se usan título y descripción)">
             <Textarea rows={4} value={d.prompt} onChange={(e) => set("prompt", e.target.value)} className="font-mono text-[13px]" />
           </Field>
+          {task?.worktree && <WorktreePanel taskId={task.id} />}
           <DialogFooter className="items-center">
             {task && (
               <Button type="button" variant="destructive" size="icon" onClick={remove} className="mr-auto" aria-label="Borrar tarea">
@@ -255,5 +259,65 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <Label>{label}</Label>
       {children}
     </div>
+  );
+}
+
+/** Branch, pending changes and commits of the task's isolated worktree. */
+function WorktreePanel({ taskId }: { taskId: string }) {
+  const key = `/api/tasks/${taskId}/worktree`;
+  const { data } = useApi<{ worktree: TaskWorktree | null; status: WorktreeStatus | null }>(key, { refreshInterval: 10_000 });
+  const [busy, setBusy] = React.useState(false);
+  if (!data?.worktree) return null;
+  const { worktree: wt, status } = data;
+
+  async function remove(deleteBranch: boolean) {
+    const msg = deleteBranch
+      ? `¿Quitar el worktree y BORRAR la rama ${wt.branch}? Se perderán los commits que no hayas fusionado.`
+      : `¿Quitar la carpeta del worktree? La rama ${wt.branch} y sus commits se conservan.`;
+    if (!confirm(msg)) return;
+    setBusy(true);
+    try {
+      await api("DELETE", `${key}${deleteBranch ? "?deleteBranch=1" : ""}`);
+      toast.success(deleteBranch ? "Worktree y rama eliminados" : "Worktree quitado", { description: deleteBranch ? undefined : `La rama ${wt.branch} sigue en el repo.` });
+      refresh("/api/tasks", key);
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section aria-label="Worktree" className="grid gap-2 rounded-lg border bg-inset p-3">
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+        <GitBranchIcon className="size-4 shrink-0 text-purple" />
+        <code className="min-w-0 truncate font-medium">{wt.branch}</code>
+        {wt.base && <span className="text-xs text-muted-foreground">desde {wt.base}</span>}
+        <span className="ml-auto flex gap-1">
+          <Button type="button" size="sm" variant="ghost" onClick={() => copyText(wt.path).then((ok) => (ok ? toast.success("Ruta copiada") : toast.error("No se pudo copiar")))}>
+            <CopyIcon /> Ruta
+          </Button>
+          <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => remove(false)}>
+            Quitar
+          </Button>
+          <Button type="button" size="icon-sm" variant="ghost" disabled={busy} aria-label="Quitar worktree y borrar la rama" className="hover:text-destructive" onClick={() => remove(true)}>
+            <Trash2Icon />
+          </Button>
+        </span>
+      </div>
+      {status && !status.exists && <p className="text-xs text-warning">La carpeta ya no existe. Al volver a ejecutar se crea de nuevo con la misma rama.</p>}
+      {status?.exists && (
+        <div className="grid gap-1 text-xs text-muted-foreground">
+          <span>
+            {status.ahead} commit{status.ahead === 1 ? "" : "s"} en la rama · {status.changedFiles.length} fichero{status.changedFiles.length === 1 ? "" : "s"} sin commit
+          </span>
+          {status.commits.slice(0, 5).map((c) => (
+            <span key={c.hash} className="flex min-w-0 items-center gap-1.5">
+              <GitCommitHorizontalIcon className="size-3 shrink-0" /> <code>{c.hash}</code> <span className="truncate">{c.subject}</span>
+            </span>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

@@ -340,6 +340,24 @@ try {
   const qtAfter = await (await fetch(base + `/api/tasks/${qt.id}`, { headers: { authorization: `Bearer ${token}` } })).json();
   check(qtAfter.status === "review" && qtAfter.runIds.length === 1, "task queue runs To do tasks and moves them to review");
 
+  // Run a task in its own git worktree (own branch); the user's checkout stays on main.
+  await fetch(base + "/api/tasks", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ title: "Aislar en rama", projectPath: project, prompt: "rama", status: "backlog" }) });
+  await page.goto(`${base}/tasks`);
+  await page.locator("main").getByText("Aislar en rama").click();
+  await page.getByRole("button", { name: "Guardar y ejecutar" }).click();
+  await page.getByLabel("Trabajar en un worktree aislado").check();
+  await page.getByRole("button", { name: "Lanzar", exact: true }).click();
+  await page.waitForURL(/\/runs\/[0-9a-f-]{36}$/);
+  const wtRun = await (await fetch(base + `/api/runs/${page.url().split("/").pop()}`, { headers: { authorization: `Bearer ${token}` } })).json();
+  check(wtRun.projectPath.includes(`${path.sep}worktrees${path.sep}`) && execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: project, encoding: "utf8" }).trim() === "main", "task runs in an isolated git worktree");
+  await page.locator("main").getByText("Ejecución completada").or(page.getByText("Ejecución completada")).first().waitFor({ timeout: 15000 });
+  await page.goto(`${base}/tasks`);
+  await page.locator("main").getByText("Aislar en rama").click();
+  await page.getByRole("region", { name: "Worktree" }).getByText(/agentic\/aislar-en-rama-/).waitFor();
+  check(true, "task dialog shows the worktree branch");
+  await shot("04b-task-worktree");
+  await page.keyboard.press("Escape");
+
   // Chat with Claude outside any project; the conversation lands in the history.
   await page.goto(`${base}/chat`);
   await page.getByText("¿En qué te ayudo?").waitFor();

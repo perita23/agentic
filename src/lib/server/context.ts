@@ -9,6 +9,7 @@ import { Installer } from "./install";
 import { ChatService, chatDir } from "./chats";
 import { McpService } from "./mcp";
 import { PermissionService } from "./permissions";
+import { worktreesRoot } from "./worktrees";
 import { PullService } from "./integrations/pulls";
 import { IntegrationService } from "./integrations/service";
 import { TaskQueue } from "./queue";
@@ -64,8 +65,8 @@ export function createContext(config: Config): Context {
     const ok = st.processed.filter((p) => p.status === "completed").length;
     void integrations.notify("queueFinished", queueMessage(st), ok < st.processed.length);
   });
-  // The neutral chat folder is not a project.
-  const projects = new ProjectService(store, sessions, [chatDir(config.dataDir)]);
+  // The neutral chat folder and task worktrees are not projects.
+  const projects = new ProjectService(store, sessions, [chatDir(config.dataDir), worktreesRoot(config.dataDir)]);
   return {
     config,
     token: loadOrCreateToken(config.dataDir),

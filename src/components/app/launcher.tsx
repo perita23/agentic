@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangleIcon, RocketIcon, TerminalSquareIcon, ZapIcon } from "lucide-react";
+import { AlertTriangleIcon, GitBranchIcon, RocketIcon, TerminalSquareIcon, ZapIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -22,6 +22,8 @@ export interface LaunchOptions {
   taskId?: string;
   agent?: string;
   title?: string;
+  /** Tasks only: run in the task's own git worktree (preselected when it already has one). */
+  worktree?: boolean;
 }
 
 const LauncherContext = React.createContext<{ open: (o?: LaunchOptions) => void }>({ open: () => {} });
@@ -63,6 +65,7 @@ function LaunchDialog({ initial, onClose }: { initial: LaunchOptions; onClose: (
   const [model, setModel] = React.useState(DEFAULT);
   const [permissionMode, setPermissionMode] = React.useState("default");
   const [budget, setBudget] = React.useState("");
+  const [worktree, setWorktree] = React.useState(!!initial.worktree);
   const [busy, setBusy] = React.useState(false);
 
   const projectList = (projects?.projects ?? []).filter((p) => p.exists);
@@ -87,6 +90,7 @@ function LaunchDialog({ initial, onClose }: { initial: LaunchOptions; onClose: (
         permissionMode,
         resumeSessionId: initial.resumeSessionId,
         maxBudgetUsd: budget ? Number(budget) : undefined,
+        ...(initial.taskId ? { worktree } : {}),
       };
       const run = initial.taskId ? await api<Run>("POST", `/api/tasks/${initial.taskId}/run`, body) : await api<Run>("POST", "/api/runs", body);
       toast.success(mode === "tmux" ? "Sesión interactiva creada en tmux" : "Ejecución lanzada", { description: shortPath(run.projectPath) });
@@ -242,6 +246,18 @@ function LaunchDialog({ initial, onClose }: { initial: LaunchOptions; onClose: (
               <Label htmlFor="launch-budget">Presupuesto máx. (USD)</Label>
               <Input id="launch-budget" type="number" min="0" step="0.5" placeholder="sin límite" value={budget} onChange={(e) => setBudget(e.target.value)} />
             </div>
+          )}
+
+          {initial.taskId && (
+            <label className={cn("flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors", worktree ? "border-primary bg-primary/10" : "hover:bg-accent")}>
+              <input type="checkbox" checked={worktree} onChange={(e) => setWorktree(e.target.checked)} className="mt-0.5 size-4 accent-[var(--primary)]" />
+              <span className="grid gap-0.5">
+                <span className="flex items-center gap-1.5 text-sm font-medium">
+                  <GitBranchIcon className="size-4" /> Trabajar en un worktree aislado
+                </span>
+                <span className="text-xs text-muted-foreground">Claude trabaja en su propia rama y carpeta: tu copia del repo no se toca y puedes lanzar varias tareas a la vez.</span>
+              </span>
+            </label>
           )}
 
           <DialogFooter className="items-center">
