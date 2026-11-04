@@ -17,6 +17,9 @@ on:
         description: "Rebuild and re-attach the macOS app to an existing release"
         type: boolean
         default: false
+      runner_label:
+        description: "Run the macOS build on this GitHub-hosted label (e.g. macos-14) instead of the default; useful when macos-latest is queueing"
+        required: false
 
 permissions:
   contents: write
@@ -101,7 +104,7 @@ jobs:
     if: needs.release.outputs.created == 'true' || inputs.desktop_only
     # GitHub's macOS runners sometimes queue for a long time. Setting the repository variable DESKTOP_RUNNER
     # (e.g. ["self-hosted","macOS","ARM64"]) builds on your own Mac instead; unset, it uses GitHub's.
-    runs-on: ${{ vars.DESKTOP_RUNNER && fromJSON(vars.DESKTOP_RUNNER) || 'macos-latest' }}
+    runs-on: ${{ inputs.runner_label || (vars.DESKTOP_RUNNER && fromJSON(vars.DESKTOP_RUNNER)) || 'macos-latest' }}
     timeout-minutes: 40
     permissions:
       contents: write
