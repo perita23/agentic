@@ -16,6 +16,8 @@ beforeAll(async () => {
     req.on("end", () => {
       res.writeHead(201, { "content-type": "application/json" });
       if (req.method === "POST") posts.push({ path: req.url!, body: JSON.parse(raw) });
+      if (req.url === "/gh/user") return res.end(JSON.stringify({ login: "me" }));
+      if (req.url!.startsWith("/gh/repos/acme/web/collaborators")) return res.end(JSON.stringify([{ login: "ana" }, { login: "me" }, { login: "luis" }]));
       res.end(JSON.stringify({ number: 9, html_url: "https://github.com/acme/web/pull/9" }));
     });
   });
@@ -63,6 +65,15 @@ describe("create a PR from the UI", () => {
     expect(pr).toMatchObject({ provider: "github", number: 9 });
     expect(posts[0]).toMatchObject({ path: "/gh/repos/acme/web/pulls", body: { head: "feat/login", base: "main", title: "Añade login", draft: true } });
     expect(sh(bare, "branch", "--list", "feat/login")).toContain("feat/login");
+  });
+
+  it("lists reviewer candidates (not yourself) and asks for the chosen ones on the PR", async () => {
+    const { c, repo } = setup();
+    expect((await c.pulls.reviewerCandidates(repo)).map((r) => r.id)).toEqual(["ana", "luis"]);
+    posts.length = 0;
+    await c.pulls.createFromBranch(repo, { head: "feat/login", base: "main", title: "t", reviewers: ["ana", "luis"] });
+    expect(posts.find((x) => x.path.endsWith("/requested_reviewers"))?.body).toEqual({ reviewers: ["ana", "luis"] });
+    await expect(c.pulls.createFromBranch(repo, { head: "feat/login", base: "main", title: "t", reviewers: ["a b; rm"] })).rejects.toThrow(/Revisor no válido/);
   });
 
   it("refuses bad input before touching anything", async () => {
