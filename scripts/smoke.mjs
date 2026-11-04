@@ -155,7 +155,7 @@ const port = 4400 + Math.floor(Math.random() * 500);
 const base = `http://localhost:${port}`;
 const mailFixture = path.join(tmp, "mail.json");
 fs.writeFileSync(mailFixture, JSON.stringify([
-  { uid: 1, fromName: "Ana", fromAddress: "ana@cliente.com", subject: "Bug en demo-app al pagar", snippet: "No funciona el checkout", body: "Texto completo del correo de Ana.\nSegunda línea.", date: new Date().toISOString(), unread: true, listUnsubscribe: false },
+  { uid: 1, fromName: "Ana", fromAddress: "ana@cliente.com", subject: "Bug en demo-app al pagar", snippet: "No funciona el checkout", html: "<p>Hola <b>Ana</b>, esto es el HTML original</p><script>alert(1)</script><a href=\"https://example.com/x\">enlace</a>", body: "Texto completo del correo de Ana.\nSegunda línea.\nhttps://tracking.example.com/" + "a".repeat(400) + "\nResolución &#x2192; hecha", date: new Date().toISOString(), unread: true, listUnsubscribe: false },
   { uid: 2, fromName: "Facturación", fromAddress: "billing@proveedor.com", subject: "Factura de octubre", snippet: "", date: new Date().toISOString(), unread: true, listUnsubscribe: false },
 ]));
 const env = { ...process.env, AGENTIC_MAIL_FIXTURE: mailFixture, AGENTIC_HOME: dataDir, CLAUDE_HOME: claudeHome, CLAUDE_BIN: path.join(root, "test/fixtures/fake-claude.mjs"), PORT: String(port), HOST: "127.0.0.1", AGENTIC_ALLOW_INSECURE_INTEGRATIONS: "1", AGENTIC_SLACK_API_URL: slackUrl };
@@ -562,11 +562,18 @@ try {
   check((await page.getByRole("heading", { name: /demo-app/ }).count()) + (await page.getByText("demo-app", { exact: true }).count()) > 0 && (await page.getByText("Factura de octubre").count()) === 1, "mail is filed under the project named in the subject");
   // Open a message: its text shows and it is marked read; mark it unread again by hand.
   await page.getByRole("button", { name: /Bug en demo-app al pagar/ }).click();
+  const mailFrame = page.frameLocator("iframe[title^='Contenido']");
+  await mailFrame.getByText("esto es el HTML original").waitFor();
+  const frameAttrs = await page.locator("iframe[title^='Contenido']").getAttribute("sandbox");
+  check(!/allow-scripts|allow-same-origin/.test(frameAttrs ?? "x") && !JSON.stringify(await (await fetch(base + "/api/mail", { headers: authH })).json()).includes("<script"), "the original HTML of a mail is shown in a sandbox (no scripts, no same-origin)");
+  await page.getByRole("button", { name: "Ver como texto" }).click();
   await page.getByText("Texto completo del correo de Ana.").waitFor();
   await page.getByRole("button", { name: "Marcar sin leer" }).first().waitFor();
   check(true, "opening a mail shows its text and marks it read");
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "a mail with a very long link does not widen the page (desktop)");
   await page.getByRole("button", { name: "Marcar sin leer" }).first().click();
   await page.getByRole("button", { name: "Marcar leído" }).first().waitFor();
+  await page.getByRole("button", { name: "Ver el mensaje original" }).click();
   // A second account can be added.
   await page.getByRole("button", { name: "Añadir otra cuenta" }).click();
   await page.getByLabel("Correo", { exact: true }).fill("trabajo@empresa.com");

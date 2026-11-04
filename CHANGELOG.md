@@ -3,6 +3,16 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.35.2] - 2026-11-04
+
+### Añadido
+- **Los correos se ven tal cual llegaron.** Si el mensaje trae HTML se muestra con su formato, colores y **imágenes** (también las incrustadas), como en tu cliente de correo. Va dentro de un marco aislado: sin scripts, sin acceso a Agentic, y los enlaces se abren fuera de la app. Se puede cambiar a «Ver como texto» y volver con «Ver el mensaje original». Aviso: cargar imágenes remotas puede avisar al remitente de que has abierto el correo.
+
+### Corregido
+- **Los correos ya no ensanchan la página.** Un mensaje con enlaces larguísimos (como los de Jira) hacía scroll horizontal; ahora el texto se parte dentro de su caja.
+- **Los mensajes se precargan.** Al sincronizar, Agentic guarda (cifrado) el contenido de los correos nuevos, así que se abren al instante en vez de esperar al servidor. Lo ya filtrado se completa solo en la siguiente sincronización, y las siguientes sólo piden el estado de leído de lo que ya tienen.
+- Los caracteres especiales de los correos (como `&#x2192;`) se muestran bien.
+
 ## [0.35.1] - 2026-11-04
 
 ### Añadido

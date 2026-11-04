@@ -1,6 +1,9 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import { z } from "zod";
 import { categorize, matchProject, type MailCategory, type ProjectRef } from "../mail";
+import { dataKeys, isSealed, seal, unseal } from "./seal";
 import type { JsonStore } from "./store";
 import { HttpError, parse, text } from "./util";
 
@@ -48,6 +51,8 @@ export interface MailBody {
   to: string;
   attachments: { name: string; size: number }[];
   truncated: boolean;
+  /** The message as sent (sanitised HTML, inline pictures embedded). Shown in a sandboxed frame. */
+  html?: string;
 }
 
 export type MailBodyFetcher = (account: MailAccount, uid: number) => Promise<MailBody>;
@@ -62,6 +67,8 @@ export interface RawMail {
   date: string;
   unread: boolean;
   listUnsubscribe: boolean;
+  /** Full text, when the fetcher already has it (new messages are preloaded so opening is instant). */
+  body?: MailBody;
 }
 
 export interface MailSettings {
@@ -74,7 +81,8 @@ export interface MailSettings {
   lastRunAt: string | null;
 }
 
-export type MailFetcher = (account: MailAccount, opts: { since: Date; max: number }) => Promise<RawMail[]>;
+/** `known` = uids already filed: only their read state is needed, so the fetcher skips their (big) bodies. */
+export type MailFetcher = (account: MailAccount, opts: { since: Date; max: number; known: Set<number> }) => Promise<RawMail[]>;
 
 const ACCOUNTS = "mail-accounts";
 const ITEMS = "mail-items";
@@ -168,6 +176,7 @@ export class MailService {
       all.length = 0;
       all.push(...keep);
     });
+    this.saveBodies({});
   }
 
   updateSettings(body: unknown) {
@@ -176,13 +185,44 @@ export class MailService {
     return { ...this.settings(), senderRules: undefined };
   }
 
+  // Message bodies (text + HTML) are kept one encrypted file each: they can be big and are read one at a time.
+  private bodyDir() {
+    return path.join(this.store.dir, "mail-bodies");
+  }
+  private bodyFile(id: string) {
+    return path.join(this.bodyDir(), `${crypto.createHash("sha256").update(id).digest("hex").slice(0, 40)}.json`);
+  }
+  private hasBody(id: string) {
+    return fs.existsSync(this.bodyFile(id));
+  }
+  private readBody(id: string): MailBody | null {
+    try {
+      const raw = JSON.parse(fs.readFileSync(this.bodyFile(id), "utf8"));
+      return isSealed(raw) ? unseal<MailBody>(raw, dataKeys(this.store.dir)) : null;
+    } catch {
+      return null;
+    }
+  }
+  private saveBodies(add: Record<string, MailBody>) {
+    fs.mkdirSync(this.bodyDir(), { recursive: true, mode: 0o700 });
+    const key = dataKeys(this.store.dir)[0];
+    for (const [id, b] of Object.entries(add)) fs.writeFileSync(this.bodyFile(id), JSON.stringify(seal(b, key)), { mode: 0o600 });
+    // Keep only the bodies of messages still filed.
+    const live = new Set(this.items().map((m) => path.basename(this.bodyFile(m.id))));
+    for (const n of fs.readdirSync(this.bodyDir())) if (!live.has(n)) fs.rmSync(path.join(this.bodyDir(), n), { force: true });
+  }
+
   /** The full text of one message, fetched on demand (never stored). Text only: no HTML, no remote images. */
   async body(id: string): Promise<MailBody> {
     const m = this.items().find((x) => x.id === id);
     const account = m && this.accounts().find((a) => a.id === m.accountId);
     if (!m || !account) throw new HttpError(404, "Mensaje no encontrado");
+    const cached = this.readBody(id);
+    if (cached) return cached;
     if (!this.io.body) throw new HttpError(501, "No disponible");
-    return this.io.body(account, m.uid);
+    const fresh = await this.io.body(account, m.uid);
+    this.saveBodies({ [id]: fresh });
+    return fresh;
   }
 
   /** Move a message by hand; by default remember it for the sender. */
@@ -234,7 +274,9 @@ export class MailService {
       const since = new Date(Date.now() - settings.days * 86400_000);
       for (const account of this.accounts()) {
         try {
-          const raw = await this.fetcher(account, { since, max: 150 });
+          // Messages already filed AND with their text cached only need their read state; the rest (new, or from older versions) get preloaded.
+          const known = new Set(this.items().filter((m) => m.accountId === account.id && this.hasBody(m.id)).map((m) => m.uid));
+          const raw = await this.fetcher(account, { since, max: 150, known });
           added += this.file(account, raw, settings);
           this.mark(account.id, null);
         } catch (e) {
@@ -263,6 +305,7 @@ export class MailService {
   private file(account: MailAccount, raw: RawMail[], settings: MailSettings): number {
     const projects = this.projects();
     let added = 0;
+    const bodies: Record<string, MailBody> = {};
     this.store.update<MailItem[]>(ITEMS, [], (all) => {
       const byId = new Map(all.map((m) => [m.id, m]));
       for (const r of raw) {
@@ -270,17 +313,22 @@ export class MailService {
         const prev = byId.get(id);
         if (prev) {
           if (prev.userRead === undefined) prev.unread = r.unread; // read elsewhere
+          if (r.body) bodies[id] = r.body;
           continue;
         }
-        const like = { ...r, fromName: r.fromName, fromAddress: r.fromAddress };
+        if (!r.date) continue; // a read-state-only entry for a message we no longer keep
+        const { body, ...rest } = r;
+        if (body) bodies[id] = body;
+        const like = { ...rest };
         const cat = categorize(like);
         const proj = matchProject(like, projects, settings.senderRules);
-        all.push({ id, accountId: account.id, ...r, category: cat.category, urgent: cat.urgent, projectPath: proj?.path ?? null, reason: proj ? `${cat.reason} · ${proj.reason}` : cat.reason, manual: false, done: false });
+        all.push({ id, accountId: account.id, ...rest, category: cat.category, urgent: cat.urgent, projectPath: proj?.path ?? null, reason: proj ? `${cat.reason} · ${proj.reason}` : cat.reason, manual: false, done: false });
         added++;
       }
       all.sort((a, b) => (a.date < b.date ? 1 : -1));
       all.length = Math.min(all.length, MAX_ITEMS);
     });
+    if (Object.keys(bodies).length) this.saveBodies(bodies);
     return added;
   }
 

@@ -81,6 +81,26 @@ describe("MailService", () => {
     expect(seen).toEqual([[1, true]]);
   });
 
+  it("preloads the text of new mail during sync, so opening it never hits the server", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentic-mail-"));
+    let live = 0;
+    const known: number[][] = [];
+    const svc = new MailService(new JsonStore(dir, new Set(MAIL_STORES)), () => [], async (_a, o) => { known.push([...o.known]); return [raw(1, { body: { text: "precargado", to: "me", attachments: [], truncated: false } })]; }, async () => {}, {
+      body: async () => { live++; return { text: "en vivo", to: "", attachments: [], truncated: false }; },
+    });
+    await svc.addAccount(acct);
+    await svc.sync();
+    const id = svc.overview().items[0].id;
+    expect((await svc.body(id)).text).toBe("precargado");
+    expect(live).toBe(0);
+    for (const f of fs.readdirSync(path.join(dir, "mail-bodies"))) expect(fs.readFileSync(path.join(dir, "mail-bodies", f), "utf8")).not.toContain("precargado"); // sealed at rest
+    await svc.sync();
+    expect(known[1]).toEqual([1]); // next sync skips the body of what is already cached
+    svc.removeAccount(svc.overview().accounts[0].id);
+    expect(svc.overview().items).toEqual([]);
+    expect(fs.readdirSync(path.join(dir, "mail-bodies"))).toEqual([]);
+  });
+
   it("removing an account removes its messages; sync errors are reported, not thrown", async () => {
     const { svc } = setup([raw(1)]);
     const a = await svc.addAccount(acct);

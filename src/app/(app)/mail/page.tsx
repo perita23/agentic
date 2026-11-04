@@ -111,6 +111,7 @@ function ConnectDialog({ onClose }: { onClose: () => void }) {
 
 function MailRow({ m, projects }: { m: MailItem; projects: ProjectListItem[] }) {
   const [open, setOpen] = React.useState(false);
+  const [plain, setPlain] = React.useState(false);
   const { data: body, error: bodyError, isLoading } = useApi<MailBody>(open ? `/api/mail/items/${m.id}/body` : null, { revalidateOnFocus: false, shouldRetryOnError: false });
   async function patch(b: object) {
     try {
@@ -127,7 +128,7 @@ function MailRow({ m, projects }: { m: MailItem; projects: ProjectListItem[] }) 
   }
   const chip = "flex h-7 cursor-pointer items-center gap-1 rounded-md border px-2 text-xs text-muted-foreground hover:text-foreground";
   return (
-    <li className={cn("flex items-start gap-3 px-3 py-2.5 sm:px-4", m.done && "opacity-50")} title={m.reason}>
+    <li className={cn("flex min-w-0 items-start gap-3 px-3 py-2.5 sm:px-4", m.done && "opacity-50")} title={m.reason}>
       <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", m.unread ? "bg-primary" : "bg-transparent")} aria-label={m.unread ? "Sin leer" : "Leído"} />
       <div className="min-w-0 flex-1">
         <button type="button" onClick={toggle} aria-expanded={open} className="block w-full min-w-0 cursor-pointer text-left">
@@ -140,7 +141,7 @@ function MailRow({ m, projects }: { m: MailItem; projects: ProjectListItem[] }) 
           {!open && m.snippet && <div className="truncate text-xs text-muted-foreground">{m.snippet}</div>}
         </button>
         {open && (
-          <div className="mt-2 rounded-md border bg-inset p-3 text-sm">
+          <div className="mt-2 min-w-0 max-w-full overflow-hidden rounded-md border bg-inset p-3 text-sm">
             <div className="mb-2 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
               <span className="break-all">De: {m.fromName ? `${m.fromName} <${m.fromAddress}>` : m.fromAddress}</span>
               {body?.to && <span className="break-all">Para: {body.to}</span>}
@@ -149,10 +150,19 @@ function MailRow({ m, projects }: { m: MailItem; projects: ProjectListItem[] }) 
             {bodyError && <p className="text-xs text-destructive">{errorMessage(bodyError)}</p>}
             {body && (
               <>
-                <div className="max-h-96 overflow-auto leading-relaxed break-words whitespace-pre-wrap">{body.text ? linkify(body.text) : <span className="text-muted-foreground">(El mensaje no tiene texto)</span>}</div>
-                {body.truncated && <p className="mt-1 text-xs text-muted-foreground">Mensaje recortado por su tamaño.</p>}
+                {body.html && !plain ? (
+                  // The message as it was sent, in a sandbox: no scripts, no access to Agentic, links open outside.
+                  <iframe title={`Contenido de «${m.subject}»`} sandbox="allow-popups allow-popups-to-escape-sandbox" referrerPolicy="no-referrer" srcDoc={body.html} className="h-[32rem] w-full rounded border bg-white" />
+                ) : (
+                  <div className="max-h-96 overflow-auto leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">{body.text ? linkify(body.text) : <span className="text-muted-foreground">(El mensaje no tiene texto)</span>}</div>
+                )}
+                {body.truncated && plain && <p className="mt-1 text-xs text-muted-foreground">Mensaje recortado por su tamaño.</p>}
                 {body.attachments.length > 0 && <p className="mt-2 text-xs text-muted-foreground">Adjuntos (no se descargan): {body.attachments.map((x) => x.name).join(", ")}</p>}
-                <p className="mt-2 text-[11px] text-muted-foreground">Texto sin formato: no se cargan imágenes ni contenido externo.</p>
+                {body.html && (
+                  <button type="button" onClick={() => setPlain((v) => !v)} className="mt-2 cursor-pointer text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+                    {plain ? "Ver el mensaje original" : "Ver como texto"}
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -179,11 +189,11 @@ function MailRow({ m, projects }: { m: MailItem; projects: ProjectListItem[] }) 
 
 function Group({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
   return (
-    <Card className="gap-0 py-0">
+    <Card className="min-w-0 gap-0 overflow-hidden py-0">
       <CardHeader className="border-b py-2.5">
         <CardTitle className="flex items-center gap-2 text-sm">{title} <span className="text-xs font-normal text-muted-foreground tabular-nums">{count}</span></CardTitle>
       </CardHeader>
-      <CardContent className="p-0"><ul className="divide-y">{children}</ul></CardContent>
+      <CardContent className="min-w-0 p-0"><ul className="min-w-0 divide-y">{children}</ul></CardContent>
     </Card>
   );
 }

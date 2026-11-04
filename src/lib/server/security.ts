@@ -114,13 +114,14 @@ export function assertRequestAllowed(req: RequestLike, ctx: AuthContext | null) 
   }
 }
 
-export function buildCsp(nonce: string, dev: boolean): string {
+/** `remoteImages`: only the Mail page, whose sandboxed frames show the pictures of emails (https only). */
+export function buildCsp(nonce: string, dev: boolean, remoteImages = false): string {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${dev ? " 'unsafe-eval'" : ""}`,
     // Inline style attributes are needed by Radix / Motion positioning.
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' blob: data:",
+    `img-src 'self' blob: data:${remoteImages ? " https:" : ""}`,
     "font-src 'self'",
     `connect-src 'self'${dev ? " ws: wss:" : ""}`,
     "object-src 'none'",

@@ -1,5 +1,6 @@
 import type { MailAccount, MailBody, MailBodyFetcher, MailFetcher, MailSeenSetter, RawMail } from "./mail";
 import fs from "node:fs";
+import { emailDocument, inlineCidImages, sanitizeEmailHtml } from "./mail-html";
 import { allowInsecure } from "./integrations/http";
 import { HttpError } from "./util";
 
@@ -41,7 +42,36 @@ export async function verifyAccount(a: Pick<MailAccount, "host" | "port" | "user
   await client.logout().catch(() => {});
 }
 
-export const imapFetch: MailFetcher = async (account, { since, max }) => {
+const MAX_BODY_CHARS_PRELOAD = 30_000;
+
+/** Text converted from HTML can still carry entities (&#x2192;, &amp;…). */
+export function decodeEntities(t: string): string {
+  const named: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+  return t.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => {
+    if (e[0] === "#") {
+      const code = e[1].toLowerCase() === "x" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+      return code > 0 && code < 0x110000 ? String.fromCodePoint(code) : m;
+    }
+    return named[e.toLowerCase()] ?? m;
+  });
+}
+
+/** Turn a parsed message into the text shown when it is opened (plain text only, never HTML). */
+function toBody(parsed: Awaited<ReturnType<typeof import("mailparser").simpleParser>>): MailBody {
+  const full = decodeEntities(parsed.text || "").replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  const to = (Array.isArray(parsed.to) ? parsed.to : parsed.to ? [parsed.to] : []).map((t) => t.text).join(", ");
+  const rawHtml = typeof parsed.html === "string" ? parsed.html : "";
+  const clean = rawHtml ? sanitizeEmailHtml(inlineCidImages(rawHtml, parsed.attachments ?? [])) : undefined;
+  return {
+    text: full.slice(0, MAX_BODY_CHARS_PRELOAD),
+    truncated: full.length > MAX_BODY_CHARS_PRELOAD,
+    to,
+    attachments: (parsed.attachments ?? []).slice(0, 20).map((a) => ({ name: a.filename || "adjunto", size: a.size })),
+    html: clean ? emailDocument(clean) : undefined,
+  };
+}
+
+export const imapFetch: MailFetcher = async (account, { since, max, known }) => {
   const { simpleParser } = await import("mailparser");
   const client = await connect(account);
   const out: RawMail[] = [];
@@ -50,24 +80,35 @@ export const imapFetch: MailFetcher = async (account, { since, max }) => {
     try {
       const uids = ((await client.search({ since }, { uid: true })) || []).slice(-max);
       if (!uids.length) return out;
-      for await (const msg of client.fetch(uids, { uid: true, flags: true, envelope: true, internalDate: true, headers: ["list-unsubscribe"], source: { maxLength: 16_384 } }, { uid: true })) {
-        const from = msg.envelope?.from?.[0];
-        let snippet = "";
-        try {
-          const parsed = await simpleParser(msg.source ?? Buffer.alloc(0));
-          snippet = (parsed.text || String(parsed.html || "").replace(/<style[\s\S]*?<\/style>|<[^>]+>/g, " ")).replace(/\s+/g, " ").trim().slice(0, 300);
-        } catch {}
-        out.push({
-          uid: msg.uid,
-          fromName: from?.name || from?.address || "",
-          fromAddress: (from?.address || "").toLowerCase(),
-          subject: (msg.envelope?.subject || "(sin asunto)").slice(0, 300),
-          snippet,
-          date: new Date(msg.envelope?.date || msg.internalDate || Date.now()).toISOString(),
-          unread: !msg.flags?.has("\\Seen"),
-          listUnsubscribe: !!msg.headers && /list-unsubscribe/i.test(msg.headers.toString()),
-        });
-      }
+      const fresh = uids.filter((u) => !known.has(u));
+      // Known messages: only their read state (cheap).
+      const old = uids.filter((u) => known.has(u));
+      if (old.length)
+        for await (const msg of client.fetch(old, { uid: true, flags: true }, { uid: true }))
+          out.push({ uid: msg.uid, fromName: "", fromAddress: "", subject: "", snippet: "", date: "", unread: !msg.flags?.has("\\Seen"), listUnsubscribe: false });
+      // New messages: headers plus the text, so opening them later is instant.
+      if (fresh.length)
+        for await (const msg of client.fetch(fresh, { uid: true, flags: true, envelope: true, internalDate: true, headers: ["list-unsubscribe"], source: { maxLength: 1_048_576 } }, { uid: true })) {
+          const from = msg.envelope?.from?.[0];
+          let snippet = "";
+          let body: MailBody | undefined;
+          try {
+            const parsed = await simpleParser(msg.source ?? Buffer.alloc(0));
+            body = toBody(parsed);
+            snippet = body.text.replace(/\s+/g, " ").slice(0, 300);
+          } catch {}
+          out.push({
+            uid: msg.uid,
+            fromName: from?.name || from?.address || "",
+            fromAddress: (from?.address || "").toLowerCase(),
+            subject: (msg.envelope?.subject || "(sin asunto)").slice(0, 300),
+            snippet,
+            date: new Date(msg.envelope?.date || msg.internalDate || Date.now()).toISOString(),
+            unread: !msg.flags?.has("\\Seen"),
+            listUnsubscribe: !!msg.headers && /list-unsubscribe/i.test(msg.headers.toString()),
+            body,
+          });
+        }
     } finally {
       lock.release();
     }
@@ -95,11 +136,13 @@ export const verify: typeof verifyAccount = async (a) => {
 };
 export const fetcher: MailFetcher = async (account, opts) => {
   const f = fixturePath();
-  if (f) return JSON.parse(fs.readFileSync(f, "utf8")) as RawMail[];
+  if (f) {
+    const raw = JSON.parse(fs.readFileSync(f, "utf8")) as (Omit<RawMail, "body"> & { body?: string; html?: string })[];
+    return raw.map(({ html, ...m }) => ({ ...m, body: m.body ? { text: m.body, to: account.user, attachments: [], truncated: false, html: html ? emailDocument(sanitizeEmailHtml(html) ?? "") : undefined } : undefined }));
+  }
   return imapFetch(account, opts);
 };
 
-const MAX_BODY_CHARS = 60_000;
 
 /** One message in full, on demand: plain text only (HTML is converted, never rendered), attachments are only listed. */
 const imapBody: MailBodyFetcher = async (account, uid) => {
@@ -108,12 +151,9 @@ const imapBody: MailBodyFetcher = async (account, uid) => {
   try {
     const lock = await client.getMailboxLock("INBOX", { readOnly: true });
     try {
-      const msg = await client.fetchOne(String(uid), { uid: true, source: { maxLength: 2 * 1024 * 1024 } }, { uid: true });
+      const msg = await client.fetchOne(String(uid), { uid: true, source: { maxLength: 6 * 1024 * 1024 } }, { uid: true });
       if (!msg || !msg.source) throw new HttpError(404, "El mensaje ya no está en el servidor");
-      const parsed = await simpleParser(msg.source);
-      const full = (parsed.text || "").replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
-      const to = (Array.isArray(parsed.to) ? parsed.to : parsed.to ? [parsed.to] : []).map((t) => t.text).join(", ");
-      return { text: full.slice(0, MAX_BODY_CHARS), truncated: full.length > MAX_BODY_CHARS, to, attachments: (parsed.attachments ?? []).slice(0, 20).map((a) => ({ name: a.filename || "adjunto", size: a.size })) } satisfies MailBody;
+      return toBody(await simpleParser(msg.source));
     } finally {
       lock.release();
     }
