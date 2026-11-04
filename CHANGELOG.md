@@ -3,6 +3,22 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.32.0] - 2026-11-04
+
+### Añadido
+- **Las herramientas de Claude se ven bonitas en el chat.** En vez de un «Bash» pelado, cada acción es una tarjeta que dice qué hace: `docker logs -f api` sale como «Docker · Leyendo logs · api», con su icono, el comando y la salida (últimas líneas, sin códigos de colores, con «ver todo»). Reconoce Docker y Compose, Git y GitHub, tests, npm/pip/cargo, Kubernetes, red, bases de datos, cloud, SSH y archivos. Las ediciones muestran lo que quitan y ponen, la lista de tareas sale como checklist, y cada tarjeta indica si está en curso, hecha o con error.
+- **Imágenes en el chat.** Adjunta capturas con el clip, pégalas (⌘/Ctrl+V) o arrástralas a la caja de respuesta; Claude las recibe y las ve. Las imágenes que Claude devuelve (capturas, gráficos) se muestran en el chat y se abren a tamaño completo.
+- **Texto largo pegado** aparece como una ficha «Texto pegado · N líneas» (se puede desplegar o quitar) en lugar de llenar la caja.
+
+### Cambiado
+- La caja de respuesta es más alta.
+- La tarjeta «Claude trabajando» del menú lateral ya sólo aparece cuando no estás viendo la ejecución o el chat.
+
+## [0.31.1] - 2026-11-04
+
+### Cambiado
+- La tarjeta «Claude trabajando» del menú lateral ya sólo aparece cuando no estás viendo la ejecución o el chat (que ya muestran su propia bola).
+
 ## [0.31.0] - 2026-11-04
 
 ### Añadido

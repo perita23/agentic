@@ -29,6 +29,10 @@ if (prompt.includes("EDIT")) {
   out({ type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", id: "t1", name: "Write", input: { file_path: path.join(process.cwd(), "created-by-claude.txt"), content: "hello from claude\n" } }] } });
   if (fs.existsSync("old-name.txt")) fs.renameSync("old-name.txt", "new-name.txt");
 }
+if (prompt.includes("TOOLS")) {
+  out({ type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", id: "tb1", name: "Bash", input: { command: "docker logs -f --tail 50 api" } }] } });
+  out({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "tb1", content: "api listening on :3000\nGET /health 200" }] } });
+}
 if (prompt.includes("SLEEP")) {
   setTimeout(() => {}, 60_000);
 } else if (prompt.includes("FAIL")) {

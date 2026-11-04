@@ -341,6 +341,33 @@ try {
   check(page.url().endsWith(firstRunId) && !!firstRun.sessionId && replyRun?.resumeSessionId === firstRun.sessionId && replyRun.prompt === "Sí, hazlo con TypeScript" && replyRun.permissionMode === "plan", "reply in Headless continues the same conversation in the same page (/plan applied, not sent as text)");
   await shot("03e-thread");
 
+  // Rich tool cards + attachments: pasted images and long text, taller box.
+  const box = page.getByLabel("Responder a Claude");
+  await page.waitForFunction(() => !document.querySelector("textarea[aria-label='Responder a Claude']")?.disabled, null, { timeout: 15000 });
+  check(((await box.boundingBox())?.height ?? 0) >= 110, "the reply box is tall");
+  const png = path.join(tmp, "shot.png");
+  fs.writeFileSync(png, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
+  await page.getByLabel("Adjuntar imágenes", { exact: true }).setInputFiles(png);
+  await page.evaluate(() => {
+    const ta = document.querySelector("textarea[aria-label='Responder a Claude']");
+    const dt = new DataTransfer();
+    dt.setData("text/plain", Array.from({ length: 30 }, (_, i) => `linea pegada ${i}`).join("\n"));
+    ta.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  await page.getByText("Texto pegado").waitFor();
+  check((await box.inputValue()) === "" && (await page.locator("form img[alt='shot.png']").count()) === 1, "a long paste becomes a 'Texto pegado' chip and an image becomes a thumbnail");
+  await box.fill("TOOLS mira esto");
+  await page.getByRole("button", { name: "Enviar", exact: true }).waitFor();
+  await page.waitForFunction(() => !document.querySelector("form [aria-label='Subiendo']"));
+  await page.getByRole("button", { name: "Enviar", exact: true }).click();
+  await page.getByText("Leyendo logs · api").waitFor({ timeout: 15000 });
+  await page.getByText("Leyendo logs · api").click();
+  await page.getByText("GET /health 200").waitFor();
+  check(true, "docker logs render as a tool card with its output, not a bare Bash");
+  const withImg = (await (await fetch(base + "/api/runs", { headers: authH })).json()).runs.find((r) => r.prompt.includes("TOOLS mira esto"));
+  check(withImg?.images?.length === 1 && withImg.prompt.includes("linea pegada 29"), "the message carries the image and the pasted text");
+  check((await fetch(base + `/api/uploads/${withImg.images[0]}`, { headers: authH })).headers.get("content-type") === "image/png", "attached images are served back");
+
   // Stop a long-running run from the UI (regression: body-less POSTs were rejected with 415).
   const longRun = await (
     await fetch(base + "/api/runs", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ projectPath: project, prompt: "SLEEP" }) })
@@ -349,8 +376,11 @@ try {
   await page.getByText("en vivo").waitFor({ timeout: 10000 });
   await page.locator("main").getByText("some stderr line").waitFor({ timeout: 10000 });
   check((await fetch(base + `/api/runs/${longRun.id}`, { headers: { authorization: `Bearer ${token}` } }).then((r) => r.json())).status === "running", "live log streams over SSE while the run is still running");
+  check((await page.locator("aside").getByText("Claude trabajando").count()) === 0, "sidebar hides the live card on the run page (it already shows its own orb)");
+  await page.goto(`${base}/tasks`);
   await page.locator("aside").getByText("Claude trabajando").waitFor({ timeout: 20000 });
   check(true, "sidebar shows the live orb while a run is working");
+  await page.goto(`${base}/runs/${longRun.id}`);
   await page.getByRole("button", { name: "Detener" }).click();
   await page.locator("main").getByText("detenida", { exact: true }).waitFor({ timeout: 15000 });
   check(true, "stop a running run from the UI");

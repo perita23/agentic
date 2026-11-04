@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeftIcon, BotIcon, FileDiffIcon, FilePenLineIcon, CornerDownLeftIcon, ExternalLinkIcon, PlayIcon, SquareIcon, TerminalIcon, Trash2Icon, WrenchIcon } from "lucide-react";
+import { ArrowLeftIcon, BotIcon, FileDiffIcon, FilePenLineIcon, CornerDownLeftIcon, ExternalLinkIcon, PlayIcon, SquareIcon, TerminalIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,9 @@ import { stateFromEvents } from "@/lib/orb-state";
 import { RUN_STATUS_LABEL, RUN_STATUS_VARIANT } from "@/components/app/run-row";
 import { api, fetcher, refresh, useApi, type Run, type RunLog } from "@/lib/api";
 import { cn, shortPath, timeAgo } from "@/lib/utils";
-import { changedFiles, editedPath } from "@/lib/changed-files";
+import { AttachButton, AttachmentBar, useAttachments } from "@/components/app/attachments";
+import { ToolCard, type ToolResult } from "@/components/app/tool-card";
+import { changedFiles } from "@/lib/changed-files";
 
 type Ev = RunLog["events"][number];
 
@@ -34,12 +36,7 @@ function contentText(c: unknown): string {
   return "";
 }
 
-function relPath(p: string, root: string) {
-  const base = root.replace(/\/+$/, "") + "/";
-  return p.startsWith(base) ? p.slice(base.length) : p;
-}
-
-function EventView({ e, run }: { e: Ev; run: Run }) {
+function EventView({ e, run, results, finished, paired }: { e: Ev; run: Run; results: Map<string, ToolResult>; finished: boolean; paired: Set<string> }) {
   const jira = (text: string) => <JiraCommentButton text={text} hints={[run.prompt, run.resultText]} taskId={run.taskId} />;
   if (e.type === "agentic" && e.subtype === "start")
     return <div className="font-mono text-xs text-muted-foreground">$ {(e.args as string[]).join(" ")}</div>;
@@ -68,13 +65,7 @@ function EventView({ e, run }: { e: Ev; run: Run }) {
               </div>
             </div>
           ) : b.type === "tool_use" ? (
-            <details key={i} className="ml-6 rounded border bg-inset text-xs">
-              <summary className="flex cursor-pointer items-center gap-1.5 px-2 py-1 font-mono text-link">
-                <WrenchIcon className="size-3" /> {b.name}
-                {editedPath(String(b.name), b.input) && <span className="min-w-0 truncate text-foreground">{relPath(editedPath(String(b.name), b.input)!, run.projectPath)}</span>}
-              </summary>
-              <pre className="max-h-64 overflow-auto px-2 py-1.5 font-mono text-[11px] text-muted-foreground">{JSON.stringify(b.input, null, 2)}</pre>
-            </details>
+            <ToolCard key={i} name={String(b.name)} input={b.input} result={results.get(String(b.id))} finished={finished} />
           ) : null,
         )}
       </div>
@@ -82,11 +73,11 @@ function EventView({ e, run }: { e: Ev; run: Run }) {
   }
   if (e.type === "user") {
     const blocks: Ev[] = Array.isArray(e.message?.content) ? e.message.content : [];
-    const results = blocks.filter((b) => b.type === "tool_result");
-    if (!results.length) return null;
+    const rs = blocks.filter((b) => b.type === "tool_result" && !paired.has(String(b.tool_use_id)));
+    if (!rs.length) return null;
     return (
       <div className="ml-6 flex flex-col gap-1">
-        {results.map((r, i) => (
+        {rs.map((r, i) => (
           <details key={i} className={cn("rounded border text-xs", r.is_error ? "border-destructive/40" : "")}>
             <summary className="cursor-pointer px-2 py-1 font-mono text-muted-foreground">↳ resultado{r.is_error ? " (error)" : ""}</summary>
             <pre className="max-h-64 overflow-auto px-2 py-1.5 font-mono text-[11px] whitespace-pre-wrap text-muted-foreground">{linkify(contentText(r.content).slice(0, 5000))}</pre>
@@ -200,15 +191,40 @@ function Segment({ run, index, onEvents }: { run: Run; index: number; onEvents: 
   React.useEffect(() => onEvents(run.id, events, live), [run.id, events, live, onEvents]);
   // Replies reuse the session: hide the repeated command line, init and exit noise.
   const shown = index === 0 ? events : events.filter((e) => !(e.type === "agentic" && (e.subtype === "start" || e.subtype === "exit")) && !(e.type === "system" && e.subtype === "init"));
+  // Pair each tool call with its result (they arrive as separate events) so a call renders as one card.
+  const { results, paired } = React.useMemo(() => {
+    const results = new Map<string, ToolResult>();
+    const used = new Set<string>();
+    for (const e of events) {
+      const blocks: Ev[] = e.type === "user" && Array.isArray(e.message?.content) ? e.message.content : [];
+      for (const b of blocks) if (b.type === "tool_result" && b.tool_use_id) results.set(String(b.tool_use_id), { content: b.content, isError: !!b.is_error });
+    }
+    for (const e of events) {
+      const blocks: Ev[] = e.type === "assistant" && Array.isArray(e.message?.content) ? e.message.content : [];
+      for (const b of blocks) if (b.type === "tool_use" && b.id) used.add(String(b.id));
+    }
+    return { results, paired: new Set([...results.keys()].filter((k) => used.has(k))) };
+  }, [events]);
+  const finished = run.status !== "running";
   return (
     <>
       {index > 0 && (
         <div className="flex justify-end">
-          <div className="max-w-[85%] rounded-2xl rounded-br-md bg-secondary px-3.5 py-2 text-sm break-words whitespace-pre-wrap">{linkify(run.prompt)}</div>
+          <div className="grid max-w-[85%] gap-2 rounded-2xl rounded-br-md bg-secondary px-3.5 py-2 text-sm">
+            {run.images?.length ? (
+              <div className="flex flex-wrap gap-2">
+                {run.images.map((id) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <a key={id} href={`/api/uploads/${id}`} target="_blank" rel="noreferrer"><img src={`/api/uploads/${id}`} alt="Imagen adjunta" className="max-h-40 rounded-md border object-cover" /></a>
+                ))}
+              </div>
+            ) : null}
+            <div className="max-h-72 overflow-auto break-words whitespace-pre-wrap">{linkify(run.prompt)}</div>
+          </div>
         </div>
       )}
       {shown.map((e, i) => (
-        <EventView key={i} e={e} run={run} />
+        <EventView key={i} e={e} run={run} results={results} finished={finished} paired={paired} />
       ))}
     </>
   );
@@ -289,13 +305,15 @@ function ReplyBox({ run }: { run: Run }) {
   const [busy, setBusy] = React.useState(false);
   const commands = useSlashCommands(run.projectPath);
   const menu = useSlashMenu(text, setText, commands);
+  const att = useAttachments();
+  const [drag, setDrag] = React.useState(false);
   if (run.mode !== "headless") return null;
   const waiting = run.status === "running";
   const noSession = !run.sessionId;
 
   async function send(e?: React.SyntheticEvent) {
     e?.preventDefault();
-    if (!text.trim() || waiting || noSession) return;
+    if ((!text.trim() && !att.any) || waiting || noSession || att.uploading) return;
     const cmd = parseSlash(text);
     if (cmd.error) {
       toast.error(cmd.error);
@@ -305,7 +323,7 @@ function ReplyBox({ run }: { run: Run }) {
     const nextModel = cmd.model ?? model;
     if (cmd.mode) setMode(cmd.mode);
     if (cmd.model) setModel(cmd.model);
-    if (!cmd.prompt) {
+    if (!cmd.prompt && !att.any) {
       // Only switched mode/model: nothing to send yet.
       toast.success(`Ajustado: ${cmd.applied.join(" · ")}`, { description: "Se aplica a tu próximo mensaje." });
       setText("");
@@ -316,12 +334,14 @@ function ReplyBox({ run }: { run: Run }) {
       await api<Run>("POST", "/api/runs", {
         mode: "headless",
         projectPath: run.projectPath,
-        prompt: cmd.prompt,
+        prompt: att.withPastes(cmd.prompt) || "Mira lo que te adjunto.",
+        images: att.imageIds.length ? att.imageIds : undefined,
         continueRunId: run.id,
         permissionMode: nextMode,
         model: nextModel || undefined,
       });
       setText("");
+      att.clear();
       // The reply shows up below, in this same conversation.
       refresh("/api/runs", "/api/overview");
     } catch (err) {
@@ -333,24 +353,33 @@ function ReplyBox({ run }: { run: Run }) {
 
   const off = waiting || noSession;
   return (
-    <form onSubmit={send} className="grid gap-2 border-t bg-card p-3">
+    <form
+      onSubmit={send}
+      onDragOver={(e) => { if (!off && e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDrag(true); } }}
+      onDragLeave={() => setDrag(false)}
+      onDrop={(e) => { setDrag(false); if (off || !e.dataTransfer.files.length) return; e.preventDefault(); void att.addFiles([...e.dataTransfer.files]); }}
+      className={cn("grid gap-2 border-t bg-card p-3 transition-colors", drag && "bg-accent/40 outline-2 -outline-offset-4 outline-dashed outline-primary/60")}
+    >
+      <AttachmentBar att={att} disabled={off} />
       <div className="relative">
         {menu.open && <SlashList items={menu.items} active={menu.active} onPick={menu.pick} />}
         <textarea
           aria-label="Responder a Claude"
-          rows={2}
+          rows={5}
           value={text}
           disabled={off}
           onChange={(e) => setText(e.target.value)}
+          onPaste={(e) => { if (!off) att.onPaste(e); }}
           onKeyDown={(e) => {
             if (menu.onKeyDown(e)) return;
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void send(e);
           }}
-          placeholder={waiting ? "Claude está trabajando; podrás responder cuando termine…" : noSession ? "Esta ejecución no tiene sesión que continuar." : "Responde a Claude, o escribe / para comandos (/plan, /model, los tuyos…)"}
-          className="w-full resize-y rounded-md border bg-inset p-2.5 text-sm disabled:opacity-60"
+          placeholder={waiting ? "Claude está trabajando; podrás responder cuando termine…" : noSession ? "Esta ejecución no tiene sesión que continuar." : "Responde a Claude. Escribe / para comandos, o pega o arrastra imágenes y textos largos."}
+          className="min-h-32 w-full resize-y rounded-md border bg-inset p-3 text-sm disabled:opacity-60"
         />
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        <AttachButton att={att} disabled={off} />
         <select aria-label="Permisos" value={mode} onChange={(e) => setMode(e.target.value)} className="h-8 rounded-md border bg-inset px-2 text-xs" disabled={off}>
           <option value="default">Permisos: preguntar</option>
           <option value="plan">Permisos: sólo planificar</option>
@@ -366,7 +395,7 @@ function ReplyBox({ run }: { run: Run }) {
           ))}
         </select>
         <span className="hidden text-xs text-muted-foreground sm:inline">Ctrl/⌘ + Enter para enviar</span>
-        <Button type="submit" size="sm" className="ml-auto" disabled={busy || off || !text.trim()}>
+        <Button type="submit" size="sm" className="ml-auto" disabled={busy || off || att.uploading || (!text.trim() && !att.any)}>
           <CornerDownLeftIcon /> {busy ? "Enviando…" : "Enviar"}
         </Button>
       </div>
