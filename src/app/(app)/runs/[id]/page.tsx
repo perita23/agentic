@@ -25,6 +25,8 @@ import { RUN_STATUS_LABEL, RUN_STATUS_VARIANT } from "@/components/app/run-row";
 import { api, fetcher, refresh, useApi, type Run, type RunLog } from "@/lib/api";
 import { cn, shortPath, timeAgo } from "@/lib/utils";
 import { AttachButton, AttachmentBar, useAttachments } from "@/components/app/attachments";
+import { Markdown } from "@/components/app/markdown";
+import { PlanCard } from "@/components/app/plan-card";
 import { ToolCard, type ToolResult } from "@/components/app/tool-card";
 import { changedFiles } from "@/lib/changed-files";
 
@@ -36,7 +38,7 @@ function contentText(c: unknown): string {
   return "";
 }
 
-function EventView({ e, run, results, finished, paired }: { e: Ev; run: Run; results: Map<string, ToolResult>; finished: boolean; paired: Set<string> }) {
+function EventView({ e, run, results, finished, paired, planId }: { e: Ev; run: Run; results: Map<string, ToolResult>; finished: boolean; paired: Set<string>; planId: string | null }) {
   const jira = (text: string) => <JiraCommentButton text={text} hints={[run.prompt, run.resultText]} taskId={run.taskId} />;
   if (e.type === "agentic" && e.subtype === "start")
     return <div className="font-mono text-xs text-muted-foreground">$ {(e.args as string[]).join(" ")}</div>;
@@ -60,10 +62,12 @@ function EventView({ e, run, results, finished, paired }: { e: Ev; run: Run; res
             <div key={i} className="flex gap-2">
               <BotIcon className="mt-0.5 size-4 shrink-0 text-orange" />
               <div className="min-w-0 flex-1">
-                <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">{linkify(String(b.text ?? ""))}</div>
+                <Markdown>{String(b.text ?? "")}</Markdown>
                 <div className="mt-1 flex">{jira(String(b.text ?? ""))}</div>
               </div>
             </div>
+          ) : b.type === "tool_use" && b.name === "ExitPlanMode" && typeof b.input?.plan === "string" ? (
+            <div key={i} className="ml-6"><PlanCard plan={b.input.plan} run={run} actionable={planId === String(b.id) && run.status !== "running"} /></div>
           ) : b.type === "tool_use" ? (
             <ToolCard key={i} name={String(b.name)} input={b.input} result={results.get(String(b.id))} finished={finished} />
           ) : null,
@@ -95,7 +99,7 @@ function EventView({ e, run, results, finished, paired }: { e: Ev; run: Run; res
           {typeof e.duration_ms === "number" && <span>{(e.duration_ms / 1000).toFixed(1)} s</span>}
           {typeof e.num_turns === "number" && <span>{e.num_turns} turnos</span>}
         </div>
-        <div className="whitespace-pre-wrap break-words">{linkify(String(e.result ?? ""))}</div>
+        <Markdown>{String(e.result ?? "")}</Markdown>
         {!e.is_error && !!e.result && <div className="mt-2 flex justify-end">{jira(String(e.result))}</div>}
       </div>
     );
@@ -186,7 +190,7 @@ function useRunEvents(runId: string) {
 }
 
 /** One turn of the conversation: the user's message (replies) and what Claude did. */
-function Segment({ run, index, onEvents }: { run: Run; index: number; onEvents: (id: string, events: Ev[], live: boolean) => void }) {
+function Segment({ run, index, latest, onEvents }: { run: Run; index: number; latest: boolean; onEvents: (id: string, events: Ev[], live: boolean) => void }) {
   const { events, live } = useRunEvents(run.id);
   React.useEffect(() => onEvents(run.id, events, live), [run.id, events, live, onEvents]);
   // Replies reuse the session: hide the repeated command line, init and exit noise.
@@ -206,6 +210,16 @@ function Segment({ run, index, onEvents }: { run: Run; index: number; onEvents: 
     return { results, paired: new Set([...results.keys()].filter((k) => used.has(k))) };
   }, [events]);
   const finished = run.status !== "running";
+  // Only the last plan of the latest turn can still be answered.
+  const planId = React.useMemo(() => {
+    if (!latest) return null;
+    let id: string | null = null;
+    for (const e of events) {
+      const blocks: Ev[] = e.type === "assistant" && Array.isArray(e.message?.content) ? e.message.content : [];
+      for (const b of blocks) if (b.type === "tool_use" && b.name === "ExitPlanMode" && b.id) id = String(b.id);
+    }
+    return id;
+  }, [events, latest]);
   return (
     <>
       {index > 0 && (
@@ -224,7 +238,7 @@ function Segment({ run, index, onEvents }: { run: Run; index: number; onEvents: 
         </div>
       )}
       {shown.map((e, i) => (
-        <EventView key={i} e={e} run={run} results={results} finished={finished} paired={paired} />
+        <EventView key={i} e={e} run={run} results={results} finished={finished} paired={paired} planId={planId} />
       ))}
     </>
   );
@@ -283,7 +297,7 @@ function HeadlessLog({ thread }: { thread: Run[] }) {
       <CardContent ref={scroller} className="max-h-[65vh] min-h-64 overflow-y-auto bg-inset p-4">
         <div className="flex flex-col gap-3">
           {thread.map((r, i) => (
-            <Segment key={r.id} run={r} index={i} onEvents={onEvents} />
+            <Segment key={r.id} run={r} index={i} latest={i === thread.length - 1} onEvents={onEvents} />
           ))}
           {/* The orb lives at the end of the output, where Claude is writing (like in the chat). */}
           <ActivityOrb activity={run.status === "failed" ? { state: "error", label: "Ha fallado" } : stateFromEvents(byRun[run.id]?.events ?? [])} size={44} className="mt-1" />

@@ -3,6 +3,12 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.34.0] - 2026-11-04
+
+### Añadido
+- **El plan de Claude se ve como un documento y se puede responder.** Cuando Claude propone un plan (modo plan), aparece en una tarjeta «Plan de Claude» con Markdown bonito (títulos, listas, tablas, código) y tres botones: **Aceptar y ejecutar** (Claude sigue con permiso para editar archivos), **Rechazar** (no cambia nada y espera tus indicaciones) y **Hablar con Claude** (te lleva a la caja de respuesta). Los botones sólo salen mientras el plan está pendiente.
+- **Las respuestas de Claude se muestran en Markdown** en el chat de Headless (negritas, listas, tablas, bloques de código), no como texto plano. El HTML incluido en el texto nunca se interpreta.
+
 ## [0.33.0] - 2026-11-04
 
 ### Añadido

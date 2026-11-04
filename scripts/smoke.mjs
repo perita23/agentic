@@ -369,6 +369,19 @@ try {
   await page.getByText("Leyendo logs · api").click();
   await page.getByText("GET /health 200").waitFor();
   check(true, "docker logs render as a tool card with its output, not a bare Bash");
+
+  // A plan renders as Markdown with three ways to answer it.
+  await page.waitForFunction(() => !document.querySelector("textarea[aria-label='Responder a Claude']")?.disabled, null, { timeout: 15000 });
+  await page.getByLabel("Responder a Claude").fill("/plan PLAN dame un plan");
+  await page.getByRole("button", { name: "Enviar", exact: true }).click();
+  await page.getByRole("heading", { name: "Plan de prueba" }).waitFor({ timeout: 15000 });
+  check((await page.locator("main strong", { hasText: "Paso dos" }).count()) >= 1 && (await page.locator("main table").count()) >= 1, "the plan is rendered as Markdown (bold, table), not raw text");
+  for (const name of ["Aceptar y ejecutar", "Rechazar", "Hablar con Claude"]) await page.getByRole("button", { name }).waitFor();
+  check(true, "the plan offers Accept, Reject and Talk to Claude");
+  await page.getByRole("button", { name: "Aceptar y ejecutar" }).click();
+  await page.getByText("done: Apruebo el plan. Ejecútalo.").waitFor({ timeout: 15000 });
+  const approved = (await (await fetch(base + "/api/runs", { headers: authH })).json()).runs.find((r) => r.prompt === "Apruebo el plan. Ejecútalo.");
+  check(approved?.permissionMode === "acceptEdits", "accepting the plan continues the conversation with permission to edit");
   const withImg = (await (await fetch(base + "/api/runs", { headers: authH })).json()).runs.find((r) => r.prompt.includes("TOOLS mira esto"));
   check(withImg?.images?.length === 1 && withImg.prompt.includes("linea pegada 29"), "the message carries the image and the pasted text");
   check((await fetch(base + `/api/uploads/${withImg.images[0]}`, { headers: authH })).headers.get("content-type") === "image/png", "attached images are served back");
