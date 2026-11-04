@@ -3,6 +3,16 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.22.0] - 2026-11-04
+
+### Añadido
+- **Programadas** (nueva sección): trabajos recurrentes de Claude Code, como un resumen de commits cada mañana, tests cada noche o una revisión semanal de dependencias. Se pueden programar ciertos días a una hora o cada X horas.
+- Plantillas de un clic, botón «Ejecutar ahora», pausar o activar con un interruptor, enlace a la última ejecución y cuenta atrás hasta la siguiente.
+- Se ejecutan mientras Agentic esté abierta. Si estaba cerrada a la hora prevista, la ejecución se recupera una vez al abrir, salvo que hayan pasado más de 6 horas.
+
+### Seguridad
+- Las programaciones nunca pueden usar «Sin permisos» (`bypassPermissions`), y cada una puede tener un presupuesto máximo en USD.
+
 ## [0.21.0] - 2026-11-04
 
 ### Añadido

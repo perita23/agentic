@@ -358,6 +358,21 @@ try {
   await shot("04b-task-worktree");
   await page.keyboard.press("Escape");
 
+  // Scheduled runs: create one from a preset, then launch it right away.
+  await page.goto(`${base}/schedules`);
+  await page.getByRole("heading", { name: "Programadas" }).waitFor();
+  await page.getByRole("button", { name: "Nueva programación" }).first().click();
+  await page.getByRole("button", { name: "Resumen diario" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Crear" }).click();
+  await page.getByText("Programación creada").waitFor();
+  await page.locator("main").getByText("Lunes a viernes a las 09:00").waitFor();
+  check(true, "schedule created from a preset");
+  await page.getByRole("button", { name: "Ejecutar ahora" }).click();
+  await page.getByText("«Resumen de ayer» lanzada").waitFor();
+  await page.locator("main").getByRole("link", { name: /Última:/ }).waitFor();
+  check(true, "scheduled job runs on demand and links to its run");
+  await shot("04c-schedules");
+
   // Chat with Claude outside any project; the conversation lands in the history.
   await page.goto(`${base}/chat`);
   await page.getByText("¿En qué te ayudo?").waitFor();

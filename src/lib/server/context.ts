@@ -10,6 +10,7 @@ import { ChatService, chatDir } from "./chats";
 import { McpService } from "./mcp";
 import { PermissionService } from "./permissions";
 import { worktreesRoot } from "./worktrees";
+import { ScheduleService } from "./schedules";
 import { PullService } from "./integrations/pulls";
 import { IntegrationService } from "./integrations/service";
 import { TaskQueue } from "./queue";
@@ -36,6 +37,7 @@ export interface Context {
   chats: ChatService;
   mcp: McpService;
   permissions: PermissionService;
+  schedules: ScheduleService;
   oauth: OAuthService;
 }
 
@@ -82,6 +84,7 @@ export function createContext(config: Config): Context {
     chats: new ChatService(store, runs, sessions, config.dataDir),
     mcp: new McpService(config.claudeHome, config.claudeBin, projects),
     permissions: new PermissionService(config.claudeHome, projects),
+    schedules: new ScheduleService(store, runs, (p) => projects.isKnown(p)),
     oauth: new OAuthService(store, integrations),
     queue,
     integrations,
@@ -95,7 +98,11 @@ export function createContext(config: Config): Context {
 export function ctx(): Context {
   if (!g.__agentic) {
     g.__agentic = createContext(getConfig());
-    const stop = () => g.__agentic?.runs.shutdown();
+    g.__agentic.schedules.start();
+    const stop = () => {
+      g.__agentic?.schedules.stop();
+      g.__agentic?.runs.shutdown();
+    };
     process.once("SIGINT", stop);
     process.once("SIGTERM", stop);
   }

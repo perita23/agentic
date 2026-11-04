@@ -20,7 +20,7 @@ import {
   SearchIcon,
   SettingsIcon,
   TicketIcon,
-  TerminalSquareIcon, SparklesIcon, ServerIcon, ShieldCheckIcon } from "lucide-react";
+  TerminalSquareIcon, SparklesIcon, ServerIcon, ShieldCheckIcon, AlarmClockIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { useApi, type Overview, type ProjectListItem, type SessionSummary } from "@/lib/api";
@@ -37,6 +37,7 @@ const NAV = [
   { href: "/sessions", label: "Sesiones", icon: MessagesSquareIcon, badge: "sessions" as const },
   { href: "/runs", label: "Ejecuciones", icon: TerminalSquareIcon, badge: "runs" as const },
   { href: "/tasks", label: "Tareas", icon: KanbanSquareIcon },
+  { href: "/schedules", label: "Programadas", icon: AlarmClockIcon },
   { href: "/pulls", label: "Pull requests", icon: GitPullRequestIcon },
   { href: "/jira", label: "Jira", icon: TicketIcon },
   { href: "/templates", label: "Plantillas", icon: FileStackIcon },
