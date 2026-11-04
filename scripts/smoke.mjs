@@ -571,7 +571,8 @@ try {
 
   // Save part of a session as a comment on its Jira issue (the prompt has no key: it is typed).
   await page.goto(`${base}/runs/${firstRunId}`);
-  await page.getByRole("button", { name: "Comentar en Jira" }).last().click();
+  // The page now shows the whole conversation: pick the button of the FIRST run's result, not of a reply still loading.
+  await page.locator("div.rounded-md.border", { hasText: "done: Escribe tests para el login EDIT" }).getByRole("button", { name: "Comentar en Jira" }).click();
   await page.getByLabel("Incidencia").fill("SHOP-7");
   await page.getByRole("button", { name: "Añadir comentario" }).click();
   await page.getByText("Comentario añadido a SHOP-7").waitFor();
