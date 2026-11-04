@@ -20,7 +20,7 @@ import {
   SearchIcon,
   SettingsIcon,
   TicketIcon,
-  TerminalSquareIcon, SparklesIcon, ServerIcon } from "lucide-react";
+  TerminalSquareIcon, SparklesIcon, ServerIcon, ShieldCheckIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { useApi, type Overview, type ProjectListItem, type SessionSummary } from "@/lib/api";
@@ -42,6 +42,7 @@ const NAV = [
   { href: "/templates", label: "Plantillas", icon: FileStackIcon },
   { href: "/agents", label: "Agentes", icon: BotIcon },
   { href: "/mcp", label: "MCP", icon: ServerIcon },
+  { href: "/permissions", label: "Permisos", icon: ShieldCheckIcon },
   { href: "/projects", label: "Proyectos", icon: FolderGit2Icon },
   { href: "/analytics", label: "Analítica", icon: ChartColumnIcon },
   { href: "/messages", label: "Mensajes", icon: MessageCircleIcon },

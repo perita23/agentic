@@ -363,6 +363,19 @@ try {
   check(true, "MCP server added through the claude CLI from the app");
   await shot("05c-mcp");
 
+  // Claude Code permissions: a recipe + a custom rule, saved to ~/.claude/settings.json.
+  await page.goto(`${base}/permissions`);
+  await page.getByRole("heading", { name: "Permisos" }).waitFor();
+  await page.getByRole("button", { name: "Proteger secretos" }).click();
+  await page.getByLabel("Nueva regla: Permitir siempre").fill("Bash(npm run build:*)");
+  await page.getByLabel("Nueva regla: Permitir siempre").press("Enter");
+  await page.getByRole("button", { name: /Aceptar ediciones/ }).click();
+  await page.getByRole("button", { name: "Guardar cambios" }).click();
+  await page.getByText("Permisos guardados").waitFor();
+  const perms = JSON.parse(fs.readFileSync(path.join(claudeHome, "settings.json"), "utf8")).permissions;
+  check(perms.deny.includes("Read(./.env)") && perms.allow.includes("Bash(npm run build:*)") && perms.defaultMode === "acceptEdits", "permissions saved to Claude Code settings.json");
+  await shot("05d-permissions");
+
   // Agents
   await page.goto(`${base}/agents`);
   await page.getByRole("button", { name: "Nuevo agente" }).first().click();
