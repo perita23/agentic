@@ -290,6 +290,10 @@ try {
   await page.getByRole("tab", { name: "Salida" }).click();
   await page.locator('main .orb[data-state="done"]').first().waitFor();
   check(true, "run page shows the liquid orb in its final state");
+  await page.getByText("62 % usado").waitFor();
+  await page.getByText(/Se reinicia en 2 h/).waitFor();
+  check(true, "run page shows plan usage and when it resets");
+  await shot("03d-usage-jira");
   await shot("03c-run-orb");
   const firstRunId = page.url().split("/").pop();
   const authH = { authorization: `Bearer ${token}` };
@@ -562,6 +566,14 @@ try {
       jt?.title === "SHOP-7 El checkout falla en Safari",
     "transition, comment and import a Jira issue from the app",
   );
+
+  // Save part of a session as a comment on its Jira issue (the prompt has no key: it is typed).
+  await page.goto(`${base}/runs/${firstRunId}`);
+  await page.getByRole("button", { name: "Comentar en Jira" }).last().click();
+  await page.getByLabel("Incidencia").fill("SHOP-7");
+  await page.getByRole("button", { name: "Añadir comentario" }).click();
+  await page.getByText("Comentario añadido a SHOP-7").waitFor();
+  check(jiraWrites.some((w) => w.path.endsWith("/comment") && JSON.stringify(w.body).includes("done: Escribe tests")), "comment on the session's Jira issue from a run");
 
   // Open a PR straight from a task's worktree (commit + push + GitHub PR).
   const wtTask = (await (await fetch(base + "/api/tasks", { headers: { authorization: `Bearer ${token}` } })).json()).tasks.find((t) => t.title === "Aislar en rama");

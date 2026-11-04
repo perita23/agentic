@@ -3,6 +3,15 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.27.0] - 2026-11-04
+
+### Añadido
+- **Comentar en Jira desde una sesión**: en cada respuesta de Claude (ejecuciones y sesiones) hay un botón «Comentar en Jira». Edita el texto y se guarda como comentario de la incidencia. La clave (por ejemplo INOX-2021) se toma de la tarea vinculada o se busca en la sesión; siempre puedes cambiarla.
+- **Tu uso de Claude y cuándo se reinicia**, en las ejecuciones headless y en la lista de Ejecuciones: la ventana de 5 horas y los límites semanales con su barra de uso, el estado («Cerca del límite»…) y la cuenta atrás hasta el reinicio con su hora. Son los datos que informa Claude Code al ejecutar, así que se actualizan con cada ejecución. Incluye también los tokens de hoy en tu dispositivo.
+
+### Cambiado
+- **La bola de la IA se mueve mejor**: al cambiar de estado, el color, la velocidad y el brillo se transforman poco a poco en vez de saltar. Las gotas cambian de forma, aparecen con una pequeña animación y cada estado tiene su movimiento propio: gira al pensar, late mientras espera, pulsa al ejecutar, «explota» un poco al terminar y se sacude si falla.
+
 ## [0.26.0] - 2026-11-04
 
 ### Añadido
