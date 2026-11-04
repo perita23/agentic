@@ -4,8 +4,8 @@ import * as React from "react";
 import type { Activity, OrbState } from "@/lib/orb-state";
 import { cn } from "@/lib/utils";
 
-/** How fast the orb's clock runs (rad/s) in each state. The speed eases between states. */
-const SPEED: Record<OrbState, number> = { idle: 0.6, thinking: 3.4, writing: 5.2, reading: 1.5, editing: 8, running: 10, searching: 2.2, waiting: 1.1, done: 0.35, error: 4.5 };
+/** How fast the orb's clock runs (rad/s) in each state: slow and calm. The speed eases between states. */
+const SPEED: Record<OrbState, number> = { idle: 0.18, thinking: 0.55, writing: 0.7, reading: 0.35, editing: 0.9, running: 1.2, searching: 0.45, waiting: 0.25, done: 0.12, error: 0.6 };
 
 /**
  * The liquid ball: its shape, movement, size and colour show what Claude is doing right now.
@@ -29,7 +29,7 @@ export function LiquidOrb({ state, size = 40, className }: { state: OrbState; si
     const tick = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      speed += (target.current - speed) * Math.min(1, dt * 2.2);
+      speed += (target.current - speed) * Math.min(1, dt * 1.1);
       t += dt * speed;
       el.style.setProperty("--t", t.toFixed(3));
       raf = requestAnimationFrame(tick);

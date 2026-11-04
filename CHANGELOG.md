@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.28.1] - 2026-11-04
+
+### Cambiado
+- **La bola de la IA, mucho más calmada.** Antes se movía demasiado. Ahora el movimiento es lento y continuo, casi hipnótico, y los estados se distinguen por el color, el ritmo de respiración y una forma ligeramente distinta (más alargada en horizontal al escribir, en vertical al leer, más abierta al buscar, compacta al esperar…), no por moverse más. Los cambios de estado son más pausados.
+
 ## [0.28.0] - 2026-11-04
 
 ### Corregido
