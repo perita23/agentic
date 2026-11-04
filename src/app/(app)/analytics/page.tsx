@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, PageHeader, Stat } from "@/components/app/common";
+import { BudgetCard } from "@/components/app/budget";
 import { useApi, type ProjectListItem, type Run } from "@/lib/api";
 import { baseName, cn, formatTokens } from "@/lib/utils";
 
@@ -194,6 +195,8 @@ export default function AnalyticsPage() {
         <Stat label="Sesiones" value={t ? t.sessions : <Skeleton className="h-7 w-10" />} hint={t ? `${t.messages} mensajes` : undefined} icon={MessagesSquareIcon} accent="text-success" />
         <Stat label="Coste (ejecuciones Agentic)" value={runs ? `$${runCost.toFixed(2)}` : <Skeleton className="h-7 w-14" />} hint="coste real reportado por Claude" icon={CircleDollarSignIcon} accent="text-warning" />
       </div>
+
+      <BudgetCard />
 
       {data && !hasData && !isLoading ? (
         <EmptyState icon={ChartColumnIcon} title="Sin actividad en este periodo" description="Prueba un rango mayor u otro proyecto." />

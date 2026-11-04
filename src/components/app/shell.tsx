@@ -29,6 +29,7 @@ import { Kbd, StatusDot } from "./common";
 import { LauncherProvider, useLauncher } from "./launcher";
 import { RunNotifier } from "./run-notifier";
 import { WhatsNew } from "./whats-new";
+import { BudgetBanner } from "./budget";
 import { BrandMark } from "@/components/app/brand-mark";
 
 const NAV = [
@@ -239,6 +240,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar onSearch={() => setPaletteOpen(true)} />
         <MobileNav />
+        <BudgetBanner />
         <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 md:px-8">{children}</main>
       </div>
       <CommandPalette open={paletteOpen} setOpen={setPaletteOpen} />

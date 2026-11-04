@@ -355,10 +355,11 @@ export class IntegrationService {
   }
 
   /** Fire-and-forget Agentic notification (bot channel, else webhook); never throws. */
-  async notify(event: "runFinished" | "queueFinished", textMsg: string, failed: boolean) {
+  async notify(event: "runFinished" | "queueFinished" | "budget", textMsg: string, failed: boolean) {
     const cfg = this.config().slack;
-    if (!cfg || !cfg.events?.[event]) return;
-    if (cfg.events.onlyFailures && !failed) return;
+    if (!cfg) return;
+    // Budget alerts always go out when Slack is connected; run/queue events follow the user's toggles.
+    if (event !== "budget" && (!cfg.events?.[event] || (cfg.events.onlyFailures && !failed))) return;
     try {
       if (cfg.notifyChannel) await this.slackPost(cfg.notifyChannel, textMsg);
       else if (cfg.webhookUrl) {

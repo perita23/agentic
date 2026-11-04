@@ -11,6 +11,7 @@ import { McpService } from "./mcp";
 import { PermissionService } from "./permissions";
 import { worktreesRoot } from "./worktrees";
 import { ScheduleService } from "./schedules";
+import { BudgetService } from "./budgets";
 import { PullService } from "./integrations/pulls";
 import { IntegrationService } from "./integrations/service";
 import { TaskQueue } from "./queue";
@@ -38,6 +39,7 @@ export interface Context {
   mcp: McpService;
   permissions: PermissionService;
   schedules: ScheduleService;
+  budgets: BudgetService;
   oauth: OAuthService;
 }
 
@@ -69,6 +71,9 @@ export function createContext(config: Config): Context {
   });
   // The neutral chat folder and task worktrees are not projects.
   const projects = new ProjectService(store, sessions, [chatDir(config.dataDir), worktreesRoot(config.dataDir)]);
+  const schedules = new ScheduleService(store, runs, (p) => projects.isKnown(p));
+  const budgets = new BudgetService(store, runs, sessions, (msg, over) => integrations.notify("budget", msg, over));
+  schedules.guard = queue.guard = () => budgets.assertAutomationAllowed();
   return {
     config,
     token: loadOrCreateToken(config.dataDir),
@@ -84,7 +89,8 @@ export function createContext(config: Config): Context {
     chats: new ChatService(store, runs, sessions, config.dataDir),
     mcp: new McpService(config.claudeHome, config.claudeBin, projects),
     permissions: new PermissionService(config.claudeHome, projects),
-    schedules: new ScheduleService(store, runs, (p) => projects.isKnown(p)),
+    schedules,
+    budgets,
     oauth: new OAuthService(store, integrations),
     queue,
     integrations,
@@ -99,8 +105,10 @@ export function ctx(): Context {
   if (!g.__agentic) {
     g.__agentic = createContext(getConfig());
     g.__agentic.schedules.start();
+    g.__agentic.budgets.start();
     const stop = () => {
       g.__agentic?.schedules.stop();
+      g.__agentic?.budgets.stop();
       g.__agentic?.runs.shutdown();
     };
     process.once("SIGINT", stop);

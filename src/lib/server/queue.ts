@@ -35,6 +35,8 @@ const idle = (): QueueState => ({ running: false, config: null, startedAt: null,
  * first failure by default, and never resumes by itself after a restart.
  */
 export class TaskQueue {
+  /** Checked before each run (e.g. the spending budget); a throw stops the queue. */
+  guard: (() => Promise<void>) | null = null;
   constructor(
     private store: JsonStore,
     private tasks: TaskService,
@@ -117,6 +119,14 @@ export class TaskQueue {
     if (!task) {
       this.stop("No quedan tareas pendientes");
       return;
+    }
+    if (this.guard) {
+      try {
+        await this.guard();
+      } catch (e) {
+        this.stop((e as Error).message);
+        return;
+      }
     }
     const checklist = task.checklist.length ? `\n\nChecklist:\n${task.checklist.map((i) => `- [${i.done ? "x" : " "}] ${i.text}`).join("\n")}` : "";
     try {

@@ -439,6 +439,21 @@ try {
   await page.locator("main table").waitFor();
   check(true, "analytics: table view available");
 
+  // Budget: a tiny daily USD limit is already exceeded → banner + automation paused; then lift it.
+  await page.getByRole("button", { name: "Definir límites" }).click();
+  await page.getByLabel("Al día (USD)").fill("0.0001");
+  await page.getByRole("dialog").getByRole("button", { name: "Guardar" }).click();
+  await page.getByText("Presupuesto guardado").waitFor();
+  await page.getByRole("meter", { name: /Gasto hoy/ }).waitFor();
+  await page.getByRole("status").getByText(/Presupuesto superado/).waitFor({ timeout: 70000 }).catch(async () => {
+    await page.reload();
+    await page.getByRole("status").getByText(/Presupuesto superado/).waitFor();
+  });
+  const queueRes = await fetch(base + "/api/queue/start", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: "{}" });
+  check(queueRes.status === 402, "over budget: banner shown and the task queue refuses to start");
+  await shot("10b-budget");
+  await fetch(base + "/api/budgets", { method: "PUT", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: "{}" });
+
   // Integrations: connect Slack through the UI, then read and reply from Mensajes.
   await page.goto(`${base}/integrations`);
   // Advanced options (OAuth, gh CLI) stay available under "Avanzado".

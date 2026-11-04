@@ -3,6 +3,13 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.23.0] - 2026-11-04
+
+### Añadido
+- **Presupuesto** (en Analítica): límites diarios y mensuales de gasto, en USD reales de las ejecuciones lanzadas desde Agentic, y de tokens de todo Claude Code en tu dispositivo. Cada uno tiene su barra de progreso.
+- **Avisos**: una franja en la parte superior y un mensaje por Slack (si está conectado) al llegar al umbral de aviso (80 % por defecto) y al superar el límite. Cada aviso se envía una sola vez por periodo.
+- **Pausa de lo automático**: con un límite en USD superado, la cola de tareas y las programadas no arrancan. Lo que lances tú a mano sigue funcionando. Se puede desactivar.
+
 ## [0.22.0] - 2026-11-04
 
 ### Añadido
