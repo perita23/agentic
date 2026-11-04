@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CopyIcon, GitBranchIcon, GitCommitHorizontalIcon, PlusIcon, RocketIcon, Trash2Icon, XIcon } from "lucide-react";
+import { CopyIcon, ExternalLinkIcon, GitBranchIcon, GitCommitHorizontalIcon, GitPullRequestCreateArrowIcon, PlusIcon, RocketIcon, Trash2Icon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -233,7 +233,7 @@ export function TaskDialog({ task, defaults, onClose }: { task?: Task; defaults?
           <Field label="Prompt para Claude (opcional; si está vacío se usan título y descripción)">
             <Textarea rows={4} value={d.prompt} onChange={(e) => set("prompt", e.target.value)} className="font-mono text-[13px]" />
           </Field>
-          {task?.worktree && <WorktreePanel taskId={task.id} />}
+          {task?.worktree && <WorktreePanel taskId={task.id} title={d.title} description={d.description} />}
           <DialogFooter className="items-center">
             {task && (
               <Button type="button" variant="destructive" size="icon" onClick={remove} className="mr-auto" aria-label="Borrar tarea">
@@ -263,12 +263,14 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /** Branch, pending changes and commits of the task's isolated worktree. */
-function WorktreePanel({ taskId }: { taskId: string }) {
+function WorktreePanel({ taskId, title, description }: { taskId: string; title: string; description: string }) {
   const key = `/api/tasks/${taskId}/worktree`;
-  const { data } = useApi<{ worktree: TaskWorktree | null; status: WorktreeStatus | null }>(key, { refreshInterval: 10_000 });
+  const { data } = useApi<{ worktree: TaskWorktree | null; status: WorktreeStatus | null; pullRequest: Task["pullRequest"] }>(key, { refreshInterval: 10_000 });
   const [busy, setBusy] = React.useState(false);
+  const [creating, setCreating] = React.useState(false);
   if (!data?.worktree) return null;
-  const { worktree: wt, status } = data;
+  const { worktree: wt, status, pullRequest: pr } = data;
+  const hasWork = !!status && (status.ahead > 0 || status.changedFiles.length > 0);
 
   async function remove(deleteBranch: boolean) {
     const msg = deleteBranch
@@ -294,6 +296,17 @@ function WorktreePanel({ taskId }: { taskId: string }) {
         <code className="min-w-0 truncate font-medium">{wt.branch}</code>
         {wt.base && <span className="text-xs text-muted-foreground">desde {wt.base}</span>}
         <span className="ml-auto flex gap-1">
+          {pr ? (
+            <Button asChild size="sm" variant="outline">
+              <a href={pr.url} target="_blank" rel="noreferrer">
+                <ExternalLinkIcon /> PR #{pr.number}
+              </a>
+            </Button>
+          ) : (
+            <Button type="button" size="sm" variant="outline" disabled={!hasWork || busy} title={hasWork ? undefined : "Aún no hay cambios en la rama"} onClick={() => setCreating(true)}>
+              <GitPullRequestCreateArrowIcon /> Crear PR
+            </Button>
+          )}
           <Button type="button" size="sm" variant="ghost" onClick={() => copyText(wt.path).then((ok) => (ok ? toast.success("Ruta copiada") : toast.error("No se pudo copiar")))}>
             <CopyIcon /> Ruta
           </Button>
@@ -318,6 +331,52 @@ function WorktreePanel({ taskId }: { taskId: string }) {
           ))}
         </div>
       )}
+      {creating && <CreatePrDialog taskId={taskId} defaultTitle={title} defaultBody={description} pending={status?.changedFiles.length ?? 0} onClose={() => setCreating(false)} />}
     </section>
+  );
+}
+
+function CreatePrDialog({ taskId, defaultTitle, defaultBody, pending, onClose }: { taskId: string; defaultTitle: string; defaultBody: string; pending: number; onClose: () => void }) {
+  const [title, setTitle] = React.useState(defaultTitle);
+  const [body, setBody] = React.useState(defaultBody);
+  const [draft, setDraft] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  async function submit() {
+    setBusy(true);
+    try {
+      const t = await api<Task>("POST", `/api/tasks/${taskId}/worktree/pr`, { title, body, draft });
+      toast.success(`PR #${t.pullRequest?.number} creada`, { description: "La tarea pasa a Revisión." });
+      refresh("/api/tasks");
+      onClose();
+    } catch (e) {
+      toast.error("No se pudo crear la PR", { description: errorMessage(e) });
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Crear pull request</DialogTitle>
+          <DialogDescription>
+            {pending > 0 ? `Se hará commit de ${pending} fichero${pending === 1 ? "" : "s"} pendiente${pending === 1 ? "" : "s"}, ` : ""}se sube la rama y se abre la PR en GitHub o Bitbucket.
+          </DialogDescription>
+        </DialogHeader>
+        <Input aria-label="Título de la PR" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={250} />
+        <Textarea aria-label="Descripción de la PR" rows={5} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Qué cambia y por qué…" />
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <Checkbox checked={draft} onCheckedChange={(v) => setDraft(v === true)} /> Abrir como borrador
+        </label>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="button" disabled={busy || !title.trim()} onClick={submit}>
+            <GitPullRequestCreateArrowIcon /> {busy ? "Creando…" : "Crear PR"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

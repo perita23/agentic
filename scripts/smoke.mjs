@@ -34,6 +34,10 @@ execFileSync("git", ["init", "-q", "-b", "main"], { cwd: project });
 execFileSync("git", ["-c", "user.name=demo", "-c", "user.email=d@d", "add", "."], { cwd: project });
 execFileSync("git", ["-c", "user.name=demo", "-c", "user.email=d@d", "commit", "-qm", "Initial commit"], { cwd: project });
 execFileSync("git", ["remote", "add", "origin", "https://127.0.0.1/acme/demo.git"], { cwd: project });
+// Pushes land in a local bare repo; the fetch URL still looks like GitHub for the PR inbox.
+const bareRemote = fs.mkdtempSync(path.join(os.tmpdir(), "agentic-smoke-bare-"));
+execFileSync("git", ["init", "-q", "--bare"], { cwd: bareRemote });
+execFileSync("git", ["config", `url.${bareRemote}.pushInsteadOf`, "https://127.0.0.1/acme/demo.git"], { cwd: project });
 
 const enc = project.replace(/\//g, "-");
 fs.mkdirSync(path.join(claudeHome, "projects", enc), { recursive: true });
@@ -97,7 +101,7 @@ const github = http.createServer((req, res) => {
     const pr = { number: 12, title: "Añade modo oscuro", user: { login: "ana" }, head: { ref: "feat/dark", sha: PR_SHA }, base: { ref: "main" }, updated_at: new Date().toISOString(), html_url: "https://github.com/acme/demo/pull/12", state: "open", draft: false, body: "Implementa el tema oscuro.", mergeable: true, comments: 0 };
     const routes = {
       "/user": () => ({ login: "smoke" }),
-      "/repos/acme/demo/pulls": () => [pr],
+      "/repos/acme/demo/pulls": () => (req.method === "POST" ? { number: 13, html_url: "https://github.com/acme/demo/pull/13" } : [pr]),
       "/repos/acme/demo/pulls/12": () => pr,
       "/repos/acme/demo/pulls/12/files": () => [{ filename: "src/theme.css", status: "modified", additions: 2, deletions: 0, patch: "@@ -1 +1,3 @@\n body {}\n+.dark { color: white }\n+.dark a {}" }],
       "/repos/acme/demo/pulls/12/reviews": () => (req.method === "GET" ? [] : { id: 1 }),
@@ -439,6 +443,21 @@ try {
   await page.locator("main table").waitFor();
   check(true, "analytics: table view available");
 
+  // Budget: a tiny daily USD limit is already exceeded → banner + automation paused; then lift it.
+  await page.getByRole("button", { name: "Definir límites" }).click();
+  await page.getByLabel("Al día (USD)").fill("0.0001");
+  await page.getByRole("dialog").getByRole("button", { name: "Guardar" }).click();
+  await page.getByText("Presupuesto guardado").waitFor();
+  await page.getByRole("meter", { name: /Gasto hoy/ }).waitFor();
+  await page.getByRole("status").getByText(/Presupuesto superado/).waitFor({ timeout: 70000 }).catch(async () => {
+    await page.reload();
+    await page.getByRole("status").getByText(/Presupuesto superado/).waitFor();
+  });
+  const queueRes = await fetch(base + "/api/queue/start", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: "{}" });
+  check(queueRes.status === 402, "over budget: banner shown and the task queue refuses to start");
+  await shot("10b-budget");
+  await fetch(base + "/api/budgets", { method: "PUT", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: "{}" });
+
   // Integrations: connect Slack through the UI, then read and reply from Mensajes.
   await page.goto(`${base}/integrations`);
   // Advanced options (OAuth, gh CLI) stay available under "Avanzado".
@@ -528,12 +547,38 @@ try {
     "transition, comment and import a Jira issue from the app",
   );
 
+  // Open a PR straight from a task's worktree (commit + push + GitHub PR).
+  const wtTask = (await (await fetch(base + "/api/tasks", { headers: { authorization: `Bearer ${token}` } })).json()).tasks.find((t) => t.title === "Aislar en rama");
+  fs.writeFileSync(path.join(wtTask.worktree.path, "dark.css"), ".dark {}\n");
+  await page.goto(`${base}/tasks`);
+  await page.locator("main").getByText("Aislar en rama").click();
+  await page.getByRole("button", { name: "Crear PR" }).click();
+  await page.getByRole("button", { name: "Crear PR" }).last().click();
+  await page.getByText("PR #13 creada").waitFor();
+  const prCall = ghWrites.find((w) => w.method === "POST" && w.path === "/repos/acme/demo/pulls");
+  check(prCall?.body.head === wtTask.worktree.branch && prCall?.body.base === "main" && execFileSync("git", ["log", "--format=%s", "-1", wtTask.worktree.branch], { cwd: bareRemote, encoding: "utf8" }).trim() === "Aislar en rama", "task worktree: commit, push and open a PR from the app");
+  await page.keyboard.press("Escape");
+
   await page.goto(`${base}/settings`);
   await page.getByText("9.9.9 (Fake Claude)").waitFor();
   const appVersion = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
   check((await page.locator("aside").textContent()).includes(`v${appVersion}`), `app version v${appVersion} shown`);
   check(true, "settings shows detected claude version");
   await shot("08-settings");
+
+  // Backups: save a copy, export (no credentials), then restore an exported file.
+  await page.getByRole("button", { name: "Guardar copia ahora" }).click();
+  await page.getByText("Copia guardada").waitFor();
+  await page.getByRole("button", { name: /^Restaurar agentic-.*-manual\.json$/ }).waitFor();
+  const exported = await (await fetch(base + "/api/backup", { headers: { authorization: `Bearer ${token}` } })).text();
+  check(exported.includes('"app": "agentic"') && !exported.includes("xoxp-") && !/"integrations"/.test(exported), "backup export contains data but no credentials");
+  const exportFile = path.join(tmp, "export.json");
+  fs.writeFileSync(exportFile, exported);
+  page.once("dialog", (d) => d.accept());
+  await page.getByLabel("Archivo de copia").setInputFiles(exportFile);
+  await page.getByText("Copia restaurada").waitFor();
+  check(true, "backup file restored from Settings (with a safety copy first)");
+  await shot("08b-backups");
 
   // Command palette
   await page.goto(`${base}/`);

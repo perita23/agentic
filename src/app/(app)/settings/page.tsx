@@ -10,6 +10,7 @@ import { CopyButton, PageHeader } from "@/components/app/common";
 import { DesktopCard } from "@/components/app/desktop-card";
 import { InstallTool } from "@/components/app/install-tool";
 import { AuditCard, SessionsCard, TouchIdCard } from "@/components/app/security-settings";
+import { DataCard } from "@/components/app/data-card";
 import { useApi, type SystemInfo } from "@/lib/api";
 import { useDeviceName } from "@/lib/use-device";
 
@@ -129,6 +130,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
         <AuditCard />
+        <DataCard />
         <Card className="lg:col-span-2">
           <CardHeader>
             <div>

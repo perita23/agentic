@@ -63,6 +63,8 @@ export function nextRun(when: When, from: Date, anchor?: Date): Date {
 
 export class ScheduleService {
   private timer: NodeJS.Timeout | null = null;
+  /** Checked before unattended (not manual) runs, e.g. the spending budget. */
+  guard: (() => Promise<void>) | null = null;
 
   constructor(
     private store: JsonStore,
@@ -135,6 +137,7 @@ export class ScheduleService {
   async fire(id: string, now = new Date(), { manual = true } = {}): Promise<Schedule> {
     const s = this.get(id);
     try {
+      if (!manual && this.guard) await this.guard();
       const run = await this.runs.start({ mode: "headless", projectPath: s.projectPath, prompt: s.prompt, model: s.model, agent: s.agent, permissionMode: s.permissionMode, maxBudgetUsd: s.maxBudgetUsd });
       return this.patch(id, (x) => {
         x.lastRunAt = now.toISOString();

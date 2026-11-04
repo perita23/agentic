@@ -355,10 +355,11 @@ export class IntegrationService {
   }
 
   /** Fire-and-forget Agentic notification (bot channel, else webhook); never throws. */
-  async notify(event: "runFinished" | "queueFinished", textMsg: string, failed: boolean) {
+  async notify(event: "runFinished" | "queueFinished" | "budget", textMsg: string, failed: boolean) {
     const cfg = this.config().slack;
-    if (!cfg || !cfg.events?.[event]) return;
-    if (cfg.events.onlyFailures && !failed) return;
+    if (!cfg) return;
+    // Budget alerts always go out when Slack is connected; run/queue events follow the user's toggles.
+    if (event !== "budget" && (!cfg.events?.[event] || (cfg.events.onlyFailures && !failed))) return;
     try {
       if (cfg.notifyChannel) await this.slackPost(cfg.notifyChannel, textMsg);
       else if (cfg.webhookUrl) {
@@ -379,6 +380,17 @@ export class IntegrationService {
       ...init,
       headers: { authorization: `Bearer ${cfg.token}`, accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" },
     });
+  }
+
+  /**
+   * HTTP header for `git push` over https with the connected account's token
+   * (passed to git through GIT_CONFIG_* env vars, never on the command line).
+   */
+  async gitAuthHeader(provider: "github" | "bitbucket"): Promise<string> {
+    if (provider === "github") return `Authorization: Basic ${Buffer.from(`x-access-token:${this.need("github").token}`).toString("base64")}`;
+    const cfg = await this.fresh("bitbucket");
+    const cred = cfg.username && cfg.auth !== "oauth" ? `${cfg.username}:${cfg.token}` : `x-token-auth:${cfg.token}`;
+    return `Authorization: Basic ${Buffer.from(cred).toString("base64")}`;
   }
 
   githubHost() {

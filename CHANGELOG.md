@@ -3,6 +3,32 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.25.0] - 2026-11-04
+
+### Añadido
+- **Crear la PR desde la tarea**: en una tarea con worktree, el botón «Crear PR» hace commit de los cambios pendientes, sube la rama y abre la pull request en GitHub o Bitbucket, con título, descripción y opción de borrador. La tarea pasa a Revisión y muestra el enlace a la PR, también en el tablero.
+- Si tu git no puede subir la rama por https, Agentic lo reintenta con la cuenta conectada en Integraciones. El token nunca aparece en la línea de comandos.
+
+### Cambiado
+- Dependencias al día: React 19.3.1 y las acciones de GitHub en su última versión.
+
+## [0.24.0] - 2026-11-04
+
+### Añadido
+- **Copias de seguridad** (Ajustes → Copias de seguridad y tus datos): cada día se guarda una copia automática y se conservan las 7 últimas. También puedes guardar una copia cuando quieras, descargarla o restaurarla con un clic.
+- **Exportar e importar**: lleva tus tareas, plantillas, proyectos, programadas, presupuesto, chats e historial de ejecuciones a otro equipo con un archivo JSON. Antes de restaurar se guarda siempre una copia de tus datos actuales, así que todo se puede deshacer.
+- **Borrar todos mis datos**: deja Agentic como recién instalada, incluidas las conexiones y sus credenciales. Tu acceso con contraseña y Touch ID se mantiene, y tus repos y sesiones de Claude Code no se tocan.
+
+### Seguridad
+- Las copias nunca incluyen credenciales de integraciones y se guardan con permisos 0600.
+
+## [0.23.0] - 2026-11-04
+
+### Añadido
+- **Presupuesto** (en Analítica): límites diarios y mensuales de gasto, en USD reales de las ejecuciones lanzadas desde Agentic, y de tokens de todo Claude Code en tu dispositivo. Cada uno tiene su barra de progreso.
+- **Avisos**: una franja en la parte superior y un mensaje por Slack (si está conectado) al llegar al umbral de aviso (80 % por defecto) y al superar el límite. Cada aviso se envía una sola vez por periodo.
+- **Pausa de lo automático**: con un límite en USD superado, la cola de tareas y las programadas no arrancan. Lo que lances tú a mano sigue funcionando. Se puede desactivar.
+
 ## [0.22.0] - 2026-11-04
 
 ### Añadido

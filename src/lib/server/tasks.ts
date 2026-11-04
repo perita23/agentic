@@ -53,6 +53,8 @@ export type Task = z.infer<typeof taskCreateSchema> & {
   external?: { provider: string; id: string; key: string; url: string } | null;
   /** Isolated git worktree (own branch) the task runs in, when enabled (server-managed). */
   worktree?: TaskWorktree | null;
+  /** Pull request opened from the task's worktree branch (server-managed). */
+  pullRequest?: { provider: string; number: number; url: string; createdAt: string } | null;
   createdAt: string;
   updatedAt: string;
   checklist: { id: string; text: string; done: boolean }[];
@@ -262,6 +264,20 @@ export class TaskService {
       const t = all.find((x) => x.id === id);
       if (!t) throw new HttpError(404, "Task not found");
       t.worktree = worktree;
+      t.updatedAt = nowIso();
+      updated = { ...t };
+    });
+    return updated!;
+  }
+
+  /** Remember the PR opened for a task and move it to review. */
+  setPullRequest(id: string, pr: NonNullable<Task["pullRequest"]>) {
+    let updated: Task | undefined;
+    this.store.update<Task[]>(T, [], (all) => {
+      const t = all.find((x) => x.id === id);
+      if (!t) throw new HttpError(404, "Task not found");
+      t.pullRequest = pr;
+      if (t.status !== "done") t.status = "review";
       t.updatedAt = nowIso();
       updated = { ...t };
     });
