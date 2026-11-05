@@ -43,10 +43,31 @@ jobs:
       - name: Production build
         run: npm run build
 
+      # The browser is cached between runs, so most of the time nothing is downloaded.
+      - name: Cache Chromium for the smoke test
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-1.63.0-${{ runner.os }}
+
       - name: Install Chromium for the smoke test
+        timeout-minutes: 15
         run: |
           npm install --no-save playwright@1.63.0
-          npx playwright install --with-deps chromium
+          # Only the browser: `--with-deps` also installs fonts through apt from a mirror that is sometimes very slow
+          # (minutes for a few MB), and the libraries Chromium needs already come with the runner image.
+          # Each try is cut after 4 minutes (and its children killed, so nothing keeps holding a lock) and repeated.
+          for attempt in 1 2 3; do
+            if timeout -k 5 240 npx playwright install chromium; then break; fi
+            echo "::warning::Chromium download attempt $attempt failed or timed out"
+            [ "$attempt" = 3 ] && exit 1
+            sleep 5
+          done
+          # If the image ever lacks a library, install the system dependencies then (and only then).
+          if ! node -e "require('playwright').chromium.launch().then((b) => b.close())"; then
+            echo "::warning::Chromium does not start: installing its system dependencies"
+            timeout -k 10 600 npx playwright install-deps chromium
+          fi
 
       - name: E2E smoke test
         run: npm run smoke -- --shots smoke-shots
