@@ -238,8 +238,8 @@ try {
   const shot0 = async (pg, name) => shots && pg.screenshot({ path: path.join(shots, `${name}.png`) });
 
   await page.goto(`${base}/auth?token=${token}`);
-  await page.getByRole("heading", { name: "Dashboard" }).waitFor();
-  // After an update the release notes show up once.
+  // After an update the release notes show up once. They are waited for first: while that dialog is open the rest of
+  // the page is aria-hidden, and the dashboard streams in just after the loading skeleton, so it can open before it.
   await page.getByText(/Novedades de la v/).waitFor();
   await shot("00-whats-new");
   await page.getByRole("button", { name: "Entendido" }).click();
