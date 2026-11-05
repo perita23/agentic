@@ -29,7 +29,6 @@ export function RunRow({ r }: { r: Run }) {
           </span>
           <span className="truncate font-mono">{baseName(r.projectPath)}</span>
           {r.agent && <span className="hidden sm:inline">@{r.agent}</span>}
-          {r.costUsd != null && <span className="tabular-nums">${r.costUsd.toFixed(4)}</span>}
         </div>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1 text-xs text-muted-foreground">

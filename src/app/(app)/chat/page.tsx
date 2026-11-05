@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowUpIcon, BookOpenIcon, CodeIcon, ListChecksIcon, Loader2Icon, MessageSquarePlusIcon, PinIcon, RegexIcon, SearchIcon, SparklesIcon, Trash2Icon, WrenchIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowUpIcon, BookOpenIcon, CodeIcon, ListChecksIcon, Loader2Icon, MessageSquarePlusIcon, PinIcon, RegexIcon, SearchIcon, SparklesIcon, Trash2Icon, WrenchIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,6 +10,7 @@ import { Markdown } from "@/components/app/markdown";
 import { CyclingOrb, LiquidOrb } from "@/components/app/liquid-orb";
 import { LiveStatus } from "@/components/app/live-status";
 import { Appear } from "@/components/app/appear";
+import { useStickToBottom } from "@/lib/use-stick-bottom";
 import type { LiveStats } from "@/lib/live-stats";
 import { SlashList, useSlashCommands, useSlashMenu } from "@/components/app/slash-menu";
 import { MODE_LABEL, parseSlash, type PermMode } from "@/lib/slash";
@@ -64,7 +65,7 @@ function toolLabel(t: { name: string; input: string }) {
 }
 
 /** The user's message on the right; Claude's answer as plain Markdown across the column (no avatar clutter). */
-function Bubble({ m, reveal }: { m: ChatMessage; reveal?: boolean }) {
+function BubbleImpl({ m, reveal }: { m: ChatMessage; reveal?: boolean }) {
   if (m.role === "user")
     return (
       <div className="flex justify-end">
@@ -87,6 +88,34 @@ function Bubble({ m, reveal }: { m: ChatMessage; reveal?: boolean }) {
         </div>
       )}
       {m.text.trim() && <Markdown reveal={reveal}>{m.text}</Markdown>}
+    </div>
+  );
+}
+
+/** The poll brings new message objects every 700 ms: a bubble is drawn again only if what it shows changed. */
+const Bubble = React.memo(BubbleImpl, (a, b) => a.reveal === b.reveal && a.m.role === b.m.role && a.m.text === b.m.text && (a.m.tools?.length ?? 0) === (b.m.tools?.length ?? 0));
+
+/** The conversation's scrolling area: it always follows the end (orb and status included) until you scroll up. */
+function ChatScroll({ children }: { children: React.ReactNode }) {
+  const scroller = React.useRef<HTMLDivElement>(null);
+  const body = React.useRef<HTMLDivElement>(null);
+  const { stuck, scrollToEnd } = useStickToBottom(scroller, body);
+  return (
+    <div className="relative min-h-0 flex-1">
+      <div ref={scroller} tabIndex={0} aria-label="Conversación" className="h-full overflow-y-auto outline-none">
+        <div ref={body} className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-6 px-4 py-6">
+          {children}
+        </div>
+      </div>
+      {!stuck && (
+        <button
+          type="button"
+          onClick={scrollToEnd}
+          className="appear absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border bg-card/95 px-3 py-1.5 text-xs font-medium shadow-lg backdrop-blur hover:bg-card"
+        >
+          <ArrowDownIcon className="size-3.5" /> Ir al final
+        </button>
+      )}
     </div>
   );
 }
@@ -169,13 +198,8 @@ export default function ChatPage() {
   // Shown the instant you send, before the server answers (the conversation feels immediate).
   const [optimistic, setOptimistic] = React.useState<string | null>(null);
   const { data: chat } = useApi<ChatDetail>(selected ? `/api/chats/${selected}` : null, { refreshInterval: (d) => (d?.running ? 700 : 0) });
-  const bottom = React.useRef<HTMLDivElement>(null);
   // The optimistic bubble only stands in until the server shows the same message.
   const optimisticShown = optimistic && !chat?.pendingPrompt && !chat?.messages.some((m) => m.role === "user" && m.text.trim() === optimistic.trim()) ? optimistic : null;
-
-  React.useEffect(() => {
-    bottom.current?.scrollIntoView({ block: "end" });
-  }, [chat?.messages.length, chat?.pendingPrompt, chat?.running, selected, optimisticShown]);
 
   async function newChat(prompt: string, o: SendOpts = {}) {
     setSending(true);
@@ -306,8 +330,7 @@ export default function ChatPage() {
                 <span className="truncate text-sm font-semibold">{chat?.title ?? "…"}</span>
                 {chat?.model && <span className="rounded border px-1.5 font-mono text-[11px] text-muted-foreground">{chat.model}</span>}
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto">
-                <div className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-6 px-4 py-6">
+              <ChatScroll key={selected ?? "new"}>
                   {!chat && <Skeleton className="h-40" />}
                   {chat?.messages.map((m, i) => (
                     <Appear key={i} live={!!chat.running}><Bubble m={m} reveal={i === chat.messages.length - 1} /></Appear>
@@ -320,9 +343,7 @@ export default function ChatPage() {
                     <LiquidOrb state={chat.error ? "error" : "done"} size={32} />
                   ) : null}
                   {chat?.error && !chat.running && <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{chat.error}</p>}
-                  <div ref={bottom} />
-                </div>
-              </div>
+              </ChatScroll>
               <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
                 <Composer onSend={reply} busy={sending || !!chat?.running} model={model} setModel={setModel} mode={mode} setMode={setMode} />
               </div>

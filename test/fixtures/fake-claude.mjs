@@ -91,5 +91,7 @@ if (prompt.includes("SLEEP")) {
 } else {
   // Claude Code reports plan usage as it runs.
   out({ type: "rate_limit_event", rate_limit_info: { status: "allowed_warning", resetsAt: Math.floor(Date.now() / 1000) + 2 * 3600 + 14 * 60, rateLimitType: "five_hour", utilization: 0.62 } });
-  out({ type: "result", subtype: "success", is_error: false, result: "done: " + prompt, total_cost_usd: 0.0123, duration_ms: 42, num_turns: 1, session_id: sid });
+  out({ type: "result", subtype: "success", is_error: false, result: "done: " + prompt, total_cost_usd: 0.0123, duration_ms: 42, num_turns: 1, usage: { input_tokens: 120, output_tokens: 380 }, session_id: sid });
+  // A background task keeps the process alive after the answer is complete.
+  if (prompt.includes("LINGER")) await new Promise((r) => setTimeout(r, 7000));
 }

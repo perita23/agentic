@@ -3,6 +3,21 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.46.0] - 2026-11-05
+
+### Añadido
+- **Seguimiento automático siempre activo.** El chat y las ejecuciones se desplazan solos hacia el final con un deslizamiento suave (no a saltos), así la bolita y su texto de estado se ven siempre. Si subes con la rueda, el teclado o el dedo, se pausa y aparece **«Ir al final»**; al volver abajo (o pulsarlo) sigue de nuevo. También sigue el contenido que crece después (imágenes, tarjetas).
+- **Los números cuentan hacia su nuevo valor** en lugar de saltar: tokens y contexto del estado en vivo, y tokens, duración y turnos de las métricas.
+
+### Cambiado
+- **Fuera el dinero de la página de una ejecución.** Con un plan de Claude el coste en dólares no aporta: se quita de las métricas, de la línea final del turno y de la lista de ejecuciones. En su lugar, el panel de la derecha muestra los **tokens de la sesión** (entrada + salida), con los segundos que tardó y los turnos.
+
+### Corregido
+- **Al terminar el turno, el estado deja de brillar y el contador se para.** Si Claude ya había respondido pero el proceso seguía vivo (tareas en segundo plano, monitores), el texto «Terminado» se quedaba con los colores animados del estado y el reloj seguía contando. Ahora, en cuanto acaba, el texto vuelve a color normal y desaparece el reloj.
+
+### Mejorado
+- **Mucho menos tirones cuando pasan muchas cosas.** Las tarjetas y los mensajes solo se vuelven a dibujar si cambia lo que muestran (antes se recalculaba todo en cada evento), el texto que se escribe en directo ya no recalcula la lista entera, las estadísticas se leen de forma incremental, el Markdown no se vuelve a interpretar si su texto no cambia y la escritura progresiva usa menos pasos. Además se quita un filtro de sombra costoso del texto con brillo.
+
 ## [0.45.0] - 2026-11-05
 
 ### Cambiado

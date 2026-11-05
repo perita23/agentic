@@ -273,8 +273,29 @@ try {
       return { scroll: document.documentElement.scrollWidth - w, bad: bad.slice(0, 6) };
     });
   const ov = await overflowing();
+  // The log follows its end by itself (orb and status stay in view) until you scroll up; a button brings you back.
+  const logEl = page.locator('[aria-label="Salida de Claude"]');
+  const gap = () => logEl.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop);
+  check((await gap()) <= 4, "the log follows its end while Claude writes");
+  await logEl.hover();
+  await page.mouse.wheel(0, -700);
+  await page.waitForTimeout(400);
+  check((await page.getByRole("button", { name: "Ir al final" }).count()) === 1 && (await gap()) > 20, "scrolling up pauses the follow and offers «Ir al final»");
+  await page.getByRole("button", { name: "Ir al final" }).click();
+  await page.waitForTimeout(1200);
+  check((await gap()) <= 4 && (await page.getByRole("button", { name: "Ir al final" }).count()) === 0, "«Ir al final» brings you back to the end and follows again");
   await shot("03i-curl");
   check(ov.scroll <= 1 && ov.bad.length === 0, `a long curl does not overflow the page sideways ${JSON.stringify(ov)}`);
+  // A turn that has ended while the process lingers (background tasks): calm status, no clock, no dollars.
+  const lingerRun = await (
+    await fetch(base + "/api/runs", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ projectPath: project, prompt: "LINGER" }) })
+  ).json();
+  await page.goto(`${base}/runs/${lingerRun.id}`);
+  await page.locator("main").getByText("Terminado", { exact: true }).first().waitFor({ timeout: 10000 });
+  await page.waitForTimeout(1500);
+  const lingering = await page.locator("main [role=status]").first().innerText();
+  check(!/\d+ s\b/.test(lingering) && (await page.locator("main [role=status] .orb-text").count()) === 0, "when the turn ends the status stops glowing and loses its clock");
+  check((await page.locator("main").getByText("Coste").count()) === 0 && (await page.locator("main").getByText("Tokens", { exact: true }).count()) >= 1, "the run page shows tokens instead of dollars");
   // The island (macOS app): rendered here in a plain page with a stand-in for the native bridge.
   const islCtx = await browser.newContext({ storageState: await page.context().storageState(), deviceScaleFactor: 3 });
   const isl = await islCtx.newPage();

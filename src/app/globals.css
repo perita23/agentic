@@ -138,8 +138,7 @@ html[data-desktop="mac"]:not([data-fullscreen]) .traffic-light-gap {
 @keyframes orb-text-flow { to { background-position: 200% 0; } }
 .orb-text { --g1: #d8ccff; --g2: #8b6cf5; --g3: #ff8a5b;
   background-image: linear-gradient(90deg, var(--g2), var(--g3), var(--g1), var(--g2)); background-size: 200% 100%; background-repeat: repeat-x;
-  -webkit-background-clip: text; background-clip: text; color: transparent; animation: orb-text-flow 9s linear infinite;
-  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--g2) 40%, transparent)); }
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: orb-text-flow 9s linear infinite; will-change: background-position; }
 .orb-text[data-state="writing"] { --g1: #ffe0d0; --g2: #ff8a5b; --g3: #ff6fa0; }
 .orb-text[data-state="reading"] { --g1: #cdeaff; --g2: #5aa9ff; --g3: #8b6cf5; }
 .orb-text[data-state="editing"] { --g1: #d9ffe9; --g2: #34d399; --g3: #a78bfa; }
