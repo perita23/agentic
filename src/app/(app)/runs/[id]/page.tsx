@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeftIcon, BotIcon, FileDiffIcon, FilePenLineIcon, CornerDownLeftIcon, ExternalLinkIcon, PlayIcon, SquareIcon, TerminalIcon, Trash2Icon } from "lucide-react";
+import { ArrowLeftIcon, BotIcon, FileDiffIcon, CornerDownLeftIcon, ExternalLinkIcon, PlayIcon, SquareIcon, TerminalIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,8 +30,9 @@ import { FileList, useFileMenu } from "@/components/app/file-menu";
 import { Markdown } from "@/components/app/markdown";
 import { PlanCard } from "@/components/app/plan-card";
 import { ToolCard, type ToolResult } from "@/components/app/tool-card";
+import { EditCard, FileChangeCard } from "@/components/app/file-change";
+import type { FileChange } from "@/lib/server/run-changes";
 import { extractPlan } from "@/lib/plan";
-import { changedFiles } from "@/lib/changed-files";
 
 type Ev = RunLog["events"][number];
 
@@ -41,12 +42,13 @@ function contentText(c: unknown): string {
   return "";
 }
 
-function EventView({ e, run, results, finished, paired, planId, planText }: { e: Ev; run: Run; results: Map<string, ToolResult>; finished: boolean; paired: Set<string>; planId: string | null; planText: string }) {
+function EventView({ e, run, results, finished, paired, planId, planText, changes }: { e: Ev; run: Run; results: Map<string, ToolResult>; finished: boolean; paired: Set<string>; planId: string | null; planText: string; changes: Map<string, FileChange[]> }) {
   const jira = (text: string) => <JiraCommentButton text={text} hints={[run.prompt, run.resultText]} taskId={run.taskId} />;
   if (e.type === "agentic" && e.subtype === "start")
     return <div className="font-mono text-xs text-muted-foreground">$ {(e.args as string[]).join(" ")}</div>;
   if (e.type === "agentic" && e.subtype === "exit")
     return <div className="font-mono text-xs text-muted-foreground">— proceso terminado (código {String(e.code ?? e.signal)}) —</div>;
+  if (e.type === "agentic" && e.subtype === "file_changes") return <>{((e.files ?? []) as FileChange[]).map((c) => <FileChangeCard key={c.path} change={c} />)}</>;
   if (e.type === "agentic" && e.subtype === "log_truncated") return <div className="text-xs text-warning">Log truncado: se alcanzó el tamaño máximo.</div>;
   if (e.type === "system" && e.subtype === "init")
     return (
@@ -72,7 +74,17 @@ function EventView({ e, run, results, finished, paired, planId, planText }: { e:
           ) : b.type === "tool_use" && b.name === "ExitPlanMode" && (typeof b.input?.plan === "string" || planText) ? (
             <div key={i} className="ml-6"><PlanCard plan={typeof b.input?.plan === "string" && b.input.plan ? b.input.plan : planText} run={run} actionable={planId === String(b.id) && run.status !== "running"} /></div>
           ) : b.type === "tool_use" ? (
-            <ToolCard key={i} name={String(b.name)} input={b.input} result={results.get(String(b.id))} finished={finished} />
+            <React.Fragment key={i}>
+              {b.name === "Edit" || b.name === "MultiEdit" || b.name === "Write" ? (
+                <EditCard name={String(b.name)} input={b.input} result={results.get(String(b.id))} finished={finished} projectPath={run.projectPath} />
+              ) : (
+                <ToolCard name={String(b.name)} input={b.input} result={results.get(String(b.id))} finished={finished} />
+              )}
+              {/* Files a command changed, right under it. */}
+              {(changes.get(String(b.id)) ?? []).map((c) => (
+                <FileChangeCard key={c.path} change={c} />
+              ))}
+            </React.Fragment>
           ) : null,
         )}
       </div>
@@ -213,6 +225,23 @@ function Segment({ run, index, latest, onEvents }: { run: Run; index: number; la
     return { results, paired: new Set([...results.keys()].filter((k) => used.has(k))) };
   }, [events]);
   const finished = run.status !== "running";
+  // Changes found in the working tree after a command hang under that command's card, in place.
+  const { changes, inline } = React.useMemo(() => {
+    const toolIds = new Set<string>();
+    for (const e of events) {
+      const blocks: Ev[] = e.type === "assistant" && Array.isArray(e.message?.content) ? e.message.content : [];
+      for (const b of blocks) if (b.type === "tool_use" && b.id) toolIds.add(String(b.id));
+    }
+    const changes = new Map<string, FileChange[]>();
+    const inline = new Set<Ev>();
+    for (const e of events) {
+      if (e.type === "agentic" && e.subtype === "file_changes" && typeof e.after === "string" && toolIds.has(e.after)) {
+        changes.set(e.after, [...(changes.get(e.after) ?? []), ...((e.files ?? []) as FileChange[])]);
+        inline.add(e);
+      }
+    }
+    return { changes, inline };
+  }, [events]);
   // The plan of this turn (from ExitPlanMode or from the plan file Claude wrote). Only the latest turn's can be answered.
   const found = React.useMemo(() => extractPlan(events), [events]);
   const planId = latest ? (found?.id ?? null) : null;
@@ -234,8 +263,8 @@ function Segment({ run, index, latest, onEvents }: { run: Run; index: number; la
           </div>
         </div>
       )}
-      {shown.map((e, i) => (
-        <EventView key={i} e={e} run={run} results={results} finished={finished} paired={paired} planId={planId} planText={planText} />
+      {shown.filter((e) => !inline.has(e)).map((e, i) => (
+        <EventView key={i} e={e} run={run} results={results} finished={finished} paired={paired} planId={planId} planText={planText} changes={changes} />
       ))}
       {/* Plan written to a plan file without calling ExitPlanMode: still offer it as a plan. */}
       {found && found.id === null && (
@@ -244,42 +273,6 @@ function Segment({ run, index, latest, onEvents }: { run: Run; index: number; la
         </div>
       )}
     </>
-  );
-}
-
-interface ChangeRow {
-  path: string;
-  action: "created" | "edited" | "deleted";
-  add: number | null;
-  del: number | null;
-}
-
-/** Files Claude has changed, inside the chat flow (the "Cambios" tab keeps the full diff). */
-function ChangesCard({ files, live }: { files: ChangeRow[]; live: boolean }) {
-  if (!files.length) return null;
-  const tone = { created: "bg-success/15 text-success", edited: "bg-warning/15 text-warning", deleted: "bg-destructive/15 text-destructive" } as const;
-  const label = { created: "nuevo", edited: "editado", deleted: "borrado" } as const;
-  return (
-    <details open className="ml-6 rounded-lg border bg-card px-3.5 py-2.5 text-xs" aria-label="Archivos modificados">
-      <summary className="flex cursor-pointer items-center gap-1.5 text-[13px] font-medium text-foreground">
-        <FilePenLineIcon className="size-3.5" /> Claude ha modificado {files.length} {files.length === 1 ? "archivo" : "archivos"}
-        {live && <span className="text-[11px] font-normal text-success">· en vivo</span>}
-      </summary>
-      <ul className="mt-2 flex max-h-56 flex-col gap-1 overflow-y-auto">
-        {files.map((f) => (
-          <li key={f.path} className="flex min-w-0 items-center gap-2 font-mono">
-            <span className={cn("shrink-0 rounded px-1 text-[10px] font-medium", tone[f.action])}>{label[f.action]}</span>
-            <span className="min-w-0 truncate" title={f.path}>{f.path}</span>
-            {(f.add != null || f.del != null) && (
-              <span className="ml-auto flex shrink-0 gap-1.5 tabular-nums">
-                {f.add ? <span className="text-success">+{f.add}</span> : null}
-                {f.del ? <span className="text-destructive">−{f.del}</span> : null}
-              </span>
-            )}
-          </li>
-        ))}
-      </ul>
-    </details>
   );
 }
 
@@ -294,24 +287,6 @@ function HeadlessLog({ thread }: { thread: Run[] }) {
   const scroller = React.useRef<HTMLDivElement>(null);
   const [follow, setFollow] = React.useState(true);
   const live = thread.some((r) => byRun[r.id]?.live);
-  const toolFiles = React.useMemo(() => changedFiles(thread.flatMap((r) => byRun[r.id]?.events ?? []), run.projectPath), [thread, byRun, run.projectPath]);
-  // The real changes in the working tree (git), which also include what Claude did through the terminal
-  // (sed, python, tee…); polled while Claude works. Tool calls fill in what git has not shown yet.
-  const root = thread[0];
-  const working = live || run.status === "running";
-  const { data: ch, mutate: refetchChanges } = useApi<{ available: boolean; files: { file: string; status: string; additions: number | null; deletions: number | null; preExisting: boolean }[]; newFiles: { file: string }[] }>(`/api/runs/${root.id}/changes`, { refreshInterval: working ? 3000 : 0 });
-  React.useEffect(() => {
-    if (!working) void refetchChanges();
-  }, [working, refetchChanges]);
-  const files = React.useMemo(() => {
-    const out = new Map<string, ChangeRow>();
-    if (ch?.available) {
-      for (const f of ch.files) if (!f.preExisting) out.set(f.file, { path: f.file, action: f.status === "A" ? "created" : f.status === "D" ? "deleted" : "edited", add: f.additions, del: f.deletions });
-      for (const n of ch.newFiles) if (!out.has(n.file)) out.set(n.file, { path: n.file, action: "created", add: null, del: null });
-    }
-    for (const t of toolFiles) if (!out.has(t.path)) out.set(t.path, { path: t.path, action: t.action, add: null, del: null });
-    return [...out.values()];
-  }, [ch, toolFiles]);
 
   React.useEffect(() => {
     // Scroll only the log container, never the whole window.
@@ -338,7 +313,6 @@ function HeadlessLog({ thread }: { thread: Run[] }) {
           {thread.map((r, i) => (
             <Segment key={r.id} run={r} index={i} latest={i === thread.length - 1} onEvents={onEvents} />
           ))}
-          <ChangesCard files={files} live={working} />
           {/* The orb lives at the end of the output, where Claude is writing (like in the chat). */}
           <ActivityOrb activity={run.status === "failed" ? { state: "error", label: "Ha fallado" } : stateFromEvents(byRun[run.id]?.events ?? [])} size={44} className="mt-1" />
         </div>

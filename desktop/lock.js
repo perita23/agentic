@@ -43,3 +43,42 @@ $("use-password").addEventListener("click", () => {
   $("pw").focus();
 });
 for (const b of document.querySelectorAll("[data-quit]")) b.addEventListener("click", () => window.agenticLock.quit());
+
+// The orb: one clock (--t) at a per-state speed that eases, and a new state every two to three seconds
+// so every shape shows up (same behaviour as the app's LiquidOrb).
+(() => {
+  const orb = $("orb");
+  const SPEED = { idle: 0.5, thinking: 1.5, writing: 2.4, reading: 2.6, editing: 3.4, running: 4.2, searching: 1.7, waiting: 0.9, done: 0.3, error: 5 };
+  const TOUR = ["thinking", "writing", "running", "reading", "editing", "searching", "waiting", "done", "error", "idle"];
+  // The orb fills the art panel (as large as fits above the caption).
+  const fit = () => {
+    const art = document.querySelector(".art");
+    if (!art) return;
+    const size = Math.round(Math.max(220, Math.min(art.clientWidth * 0.72, art.clientHeight - 260, 620)));
+    orb.style.width = orb.style.height = `${size}px`;
+    orb.style.setProperty("--px", `${size}px`);
+    $("ogoo-blur").setAttribute("stdDeviation", String(size / 16));
+  };
+  fit();
+  window.addEventListener("resize", fit);
+  let i = 0;
+  const next = () => {
+    i = (i + 1) % TOUR.length;
+    orb.dataset.state = TOUR[i];
+    setTimeout(next, 2000 + Math.random() * 1000);
+  };
+  setTimeout(next, 2000 + Math.random() * 1000);
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  let last = performance.now();
+  let speed = SPEED.thinking;
+  let t = Math.random() * 20;
+  const tick = (now) => {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    speed += (SPEED[orb.dataset.state] - speed) * Math.min(1, dt * 2.2);
+    t += dt * speed;
+    orb.style.setProperty("--t", t.toFixed(3));
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+})();

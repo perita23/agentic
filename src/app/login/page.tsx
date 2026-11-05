@@ -64,7 +64,7 @@ function Login() {
           <p className="mt-1 text-sm text-muted-foreground">Esta consola controla Claude Code en tu dispositivo, así que está protegida.</p>
 
           {status?.passkeys && status.localhost && (
-            <Button className="mt-6 h-11 w-full text-base" onClick={signIn} disabled={busy} autoFocus>
+            <Button className="mt-6 h-11 w-full text-base" onClick={signIn} disabled={busy}>
               <FingerprintIcon className="size-5" /> {busy ? "Esperando a Touch ID…" : "Entrar con Touch ID"}
             </Button>
           )}

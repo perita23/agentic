@@ -3,6 +3,20 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.38.1] - 2026-11-05
+
+### Cambiado
+- **Los cambios de archivos aparecen en el chat en el momento en que ocurren**, como un mensaje más, y ya no hay un panel fijo abajo. Cuando Claude edita o crea un archivo sale una tarjeta con el archivo, las líneas añadidas (+) y quitadas (−) y **el código modificado**, justo en ese punto de la conversación; se queda ahí y la siguiente modificación sale debajo. Esto vale también para lo que Claude cambia **por terminal** (`sed`, `python`, `tee`…): tras cada comando Agentic mira qué archivos han cambiado y cuelga sus cambios (con su diff) bajo ese comando. Las tarjetas grandes empiezan plegadas y la pestaña «Cambios» sigue teniendo el diff completo.
+
+## [0.38.0] - 2026-11-05
+
+### Cambiado
+- **Chat rediseñado, más integrado en la app.** Ya no es una caja flotante con sombras: el historial y la conversación son dos paneles con el mismo estilo que el resto de secciones, con un botón «Nuevo chat» en la cabecera. Las respuestas de Claude se ven en Markdown completo (títulos, listas, tablas, código), ocupan todo el ancho de la columna y sus herramientas salen con nombre legible (p. ej. «Docker · logs»). La pantalla de bienvenida tiene sugerencias en tarjetas con icono.
+- **La bolita de Agentic, a lo grande.** En la bienvenida del chat sustituye al logo. En el login (web) y en la pantalla de bloqueo de la app del Mac, el logo se queda a la izquierda y **toda la mitad derecha es la bola grande**. En los tres sitios recorre todos sus estados (pensando, escribiendo, ejecutando, leyendo, editando, buscando, esperando, hecho, error y reposo), cambiando cada dos o tres segundos. En la conversación del chat cierra el hilo: actividad en vivo mientras Claude trabaja y en calma cuando termina.
+
+### Corregido
+- **Touch ID ya no salta solo** al abrir la app del Mac ni en el login web: aparece el formulario de contraseña y Touch ID es un botón («Usar Touch ID») que pulsas cuando quieras.
+
 ## [0.37.0] - 2026-11-04
 
 ### Añadido

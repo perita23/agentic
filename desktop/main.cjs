@@ -49,7 +49,7 @@ app.on("second-instance", () => {
 /**
  * Small lock window shown before anything else:
  *  - first launch: choose an app password (Touch ID is enabled later in Ajustes);
- *  - later: Touch ID if enabled (with "Usar contraseña"), otherwise the password.
+ *  - later: the password, with "Usar Touch ID" as a button when it is enabled (never prompted by itself).
  * Resolves once verified with { touchId, password, close } so the lock stays on
  * screen ("Abriendo…") until the main window is ready.
  */
@@ -163,7 +163,7 @@ function unlock() {
       const ciPassword = process.env.CI === "true" ? process.env.AGENTIC_DESKTOP_CI_PASSWORD : undefined;
       if (!first && ciPassword && appLock.verifyPassword(DATA_DIR, ciPassword)) return done("password");
       if (first) send({ state: "setup" });
-      else if (useTouch()) promptTouch();
+      // Never prompt Touch ID by itself: the password form shows, with "Usar Touch ID" one click away.
       else send({ state: "password" });
     });
     lock.once("ready-to-show", () => {

@@ -311,15 +311,16 @@ try {
   check(true, "headless run launched from UI and finished with result");
   await page.getByText("Ejecución completada").waitFor({ timeout: 10000 });
   check(true, "finished run triggers a notification toast");
-  const changesCard = page.locator("main details[aria-label='Archivos modificados']");
-  await changesCard.getByText("created-by-claude.txt").waitFor({ timeout: 15000 });
-  // tracked.txt was changed by the process itself (like sed/python through the terminal), not by an Edit/Write tool call.
-  await changesCard.getByText("tracked.txt").waitFor({ timeout: 15000 });
-  check(true, "the chat lists the files Claude changed (also those changed through the terminal), inside the conversation");
+  // A file Claude creates shows up in the conversation right where it happened: the file, its line counts and the code.
+  const createdCard = page.locator("main").getByRole("button", { name: /Creó archivo\s*created-by-claude\.txt/ });
+  await createdCard.waitFor({ timeout: 15000 });
+  await page.locator("main").getByText("hello from claude").first().waitFor();
+  check((await createdCard.innerText()).includes("+1"), "an Edit/Write shows inline in the chat: file, lines added and the code");
+  check((await page.locator("main details[aria-label='Archivos modificados']").count()) === 0, "there is no fixed 'modified files' panel any more");
   await page.getByRole("tab", { name: "Cambios" }).click();
   await page.locator("main [role=tabpanel][data-state=active]").getByText("created-by-claude.txt").waitFor({ timeout: 10000 });
-  await page.locator("main").getByText("+hello from claude").waitFor();
-  check(await page.locator("main").getByText("+2", { exact: true }).isVisible(), "diff summary counts lines of new files");
+  await page.locator("main [role=tabpanel][data-state=active]").getByText("+hello from claude").waitFor();
+  check(await page.locator("main [role=tabpanel][data-state=active]").getByText("+2", { exact: true }).isVisible(), "diff summary counts lines of new files");
   check(true, "run diff tab shows files created by Claude");
   await shot("03b-run-diff");
   await shot("03-run");
@@ -399,6 +400,16 @@ try {
   await page.getByText("he visto la imagen").waitFor({ timeout: 15000 });
   await page.locator("main img[alt='Imagen de Claude']").first().waitFor({ timeout: 15000 });
   check(true, "a big screenshot in a tool result does not stall the chat: the picture shows and the conversation continues");
+
+  // A change made through the terminal (not an Edit tool call) appears under that command, with its diff.
+  await page.waitForFunction(() => !document.querySelector("textarea[aria-label='Responder a Claude']")?.disabled, null, { timeout: 15000 });
+  await page.getByLabel("Responder a Claude").fill("BASHCHANGE hazlo por terminal");
+  await page.getByRole("button", { name: "Enviar", exact: true }).click();
+  const terminalCard = page.locator("main").getByRole("button", { name: /Creó archivo\s*hecho-por-terminal\.txt/ });
+  await terminalCard.waitFor({ timeout: 20000 });
+  await page.locator("main").getByText("contenido nuevo").first().waitFor();
+  check(true, "a file created through the terminal shows up in the chat under that command, with its code");
+  fs.rmSync(path.join(project, "hecho-por-terminal.txt"), { force: true });
 
   // A plan renders as Markdown with three ways to answer it.
   await page.waitForFunction(() => !document.querySelector("textarea[aria-label='Responder a Claude']")?.disabled, null, { timeout: 15000 });
@@ -515,6 +526,13 @@ try {
   // Chat with Claude outside any project; the conversation lands in the history.
   await page.goto(`${base}/chat`);
   await page.getByText("¿En qué te ayudo?").waitFor();
+  const welcomeOrb = page.locator("main .orb").first();
+  const seen = new Set();
+  for (let i = 0; i < 3; i++) {
+    seen.add(await welcomeOrb.getAttribute("data-state"));
+    await page.waitForTimeout(3100);
+  }
+  check(seen.size >= 2, `the chat welcome shows the orb cycling through its states (${[...seen].join(", ")})`);
   await shot("05a-chat-empty");
   await page.getByLabel("Mensaje para Claude").fill("Hola Claude, ¿me explicas los closures?");
   await page.keyboard.press("Enter");
@@ -843,6 +861,28 @@ try {
   check(true, "logout revokes the session (redirected to /login)");
   await page.waitForTimeout(500); // let the entrance animation finish
   await shot("14-login");
+  // Touch ID must never pop up by itself: the page only waits for the click. (Counted through a hook on WebAuthn.)
+  await page.evaluate(() => {
+    window.__credGets = 0;
+    const orig = navigator.credentials.get.bind(navigator.credentials);
+    navigator.credentials.get = (...a) => (window.__credGets++, orig(...a));
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Entrar con Touch ID" }).waitFor();
+  await page.evaluate(() => {
+    window.__credGets = window.__credGets || 0;
+    const orig = navigator.credentials.get.bind(navigator.credentials);
+    navigator.credentials.get = (...a) => (window.__credGets++, orig(...a));
+  });
+  await page.waitForTimeout(2800);
+  check((await page.evaluate(() => window.__credGets)) === 0 && !(await page.getByRole("button", { name: "Entrar con Touch ID" }).isDisabled()), "the login page does not start Touch ID by itself");
+  check((await page.locator("main .orb").count()) === 1, "the login shows the AI orb");
+  const orbStates = new Set();
+  for (let i = 0; i < 4; i++) {
+    orbStates.add(await page.locator("main .orb").first().getAttribute("data-state"));
+    await page.waitForTimeout(3100);
+  }
+  check(orbStates.size >= 3, `the login orb keeps changing state (${[...orbStates].join(", ")})`);
   await page.getByRole("button", { name: "Entrar con Touch ID" }).click();
   await page.getByRole("heading", { name: "Dashboard" }).waitFor();
   check(true, "sign in with Touch ID");
