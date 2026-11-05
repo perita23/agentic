@@ -48,9 +48,11 @@ function CodeBlock({ children }: { children: React.ReactNode }) {
   const code = React.Children.toArray(children)[0];
   const lang = React.isValidElement(code) ? /language-([\w-]+)/.exec(String((code.props as { className?: string }).className ?? ""))?.[1]?.toLowerCase() : undefined;
   const label = lang ? MAIL_LANGS[lang] : undefined;
+  // Shell commands (a long curl…) wrap instead of scrolling sideways.
+  const wraps = !lang || /^(bash|sh|shell|zsh|console|curl|http|terminal)$/.test(lang);
   return (
     <CopyFrame label={label ?? lang ?? "código"} tone={label ? "mail" : "code"} text={nodeText(children).replace(/\n$/, "")}>
-      <pre className={cn("max-h-96 overflow-auto p-3 text-xs leading-relaxed", label ? "font-sans text-sm whitespace-pre-wrap" : "font-mono")}>{children}</pre>
+      <pre className={cn("max-h-96 overflow-auto p-3 text-xs leading-relaxed", label ? "font-sans text-sm whitespace-pre-wrap" : "font-mono", !label && wraps && "break-all whitespace-pre-wrap")}>{children}</pre>
     </CopyFrame>
   );
 }

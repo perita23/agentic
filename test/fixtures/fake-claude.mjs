@@ -44,6 +44,15 @@ if (prompt.includes("STREAMTEXT")) {
   }
   out({ type: "assistant", message: { id: "m1", role: "assistant", content: [{ type: "text", text: "Hola, esto se va escribiendo" }] } });
 }
+if (prompt.includes("CURLLONG")) {
+  // A long curl (a token with no spaces, a long URL) as a command, its output, and written in the answer.
+  const tok = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9".repeat(6);
+  const curl = `curl -sS -X POST -H "Authorization: Bearer ${tok}" -H "Content-Type: application/json" https://api.example.com/v1/materials/mcp/.well-known/oauth-authorization-server/${tok}?redirect_uri=https%3A%2F%2Fexample.com%2Fcallback%3Fstate%3D${tok} -d '{"a":1}'`;
+  out({ type: "assistant", message: { id: "cl1", role: "assistant", content: [{ type: "tool_use", id: "cu1", name: "Bash", input: { command: curl, description: "Prueba el endpoint" } }] } });
+  out({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "cu1", content: `HTTP/2 403 ${tok}${tok}\n{"error":"${tok}${tok}"}` }] } });
+  out({ type: "assistant", message: { id: "cl2", role: "assistant", content: [{ type: "text", text: `Lo probé así: \`${curl}\`\n\n\`\`\`bash\n${curl}\n\`\`\`\n\nY ${curl}` }] } });
+  await new Promise((r) => setTimeout(r, 6000));
+}
 if (prompt.includes("SLOW")) await new Promise((r) => setTimeout(r, 900)); // a turn that takes a moment
 if (prompt.includes("BASHCHANGE")) {
   // A change made through the terminal (not an Edit/Write tool call): the file changes, then the tool result arrives.

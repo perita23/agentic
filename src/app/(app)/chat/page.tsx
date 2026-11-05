@@ -307,7 +307,7 @@ export default function ChatPage() {
                 {chat?.model && <span className="rounded border px-1.5 font-mono text-[11px] text-muted-foreground">{chat.model}</span>}
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto">
-                <div className="mx-auto grid max-w-3xl gap-6 px-4 py-6">
+                <div className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-6 px-4 py-6">
                   {!chat && <Skeleton className="h-40" />}
                   {chat?.messages.map((m, i) => (
                     <Appear key={i} live={!!chat.running}><Bubble m={m} reveal={i === chat.messages.length - 1} /></Appear>

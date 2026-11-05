@@ -148,6 +148,12 @@ html[data-desktop="mac"]:not([data-fullscreen]) .traffic-light-gap {
 .orb-text[data-state="waiting"] { --g1: #ffe9b8; --g2: #f59e0b; --g3: #fb7185; }
 .orb-text[data-state="error"] { --g1: #ffd0d0; --g2: #ef4444; --g3: #fb923c; }
 @media (prefers-reduced-motion: reduce) { .orb-text { animation: none; } }
+/* ---- Status text morph: when the words change, the old ones blur away and the new ones blur in ---- */
+@keyframes morph-in { from { opacity: 0; filter: blur(7px); transform: translateY(6px) scale(0.98); } to { opacity: 1; filter: blur(0); transform: none; } }
+@keyframes morph-out { from { opacity: 1; filter: blur(0); transform: none; } to { opacity: 0; filter: blur(7px); transform: translateY(-6px) scale(0.98); } }
+.morph-in { animation: morph-in 0.5s cubic-bezier(0.22, 0.8, 0.3, 1) both; }
+.morph-out { animation: morph-out 0.4s ease-in both; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .morph-in, .morph-out { animation: none; } .morph-out { display: none; } }
 /* ---- Entrance: whatever appears while Claude works fades up a few pixels, so nothing pops in ---- */
 @keyframes appear { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .appear { animation: appear 0.32s cubic-bezier(0.22, 0.8, 0.3, 1) both; }
