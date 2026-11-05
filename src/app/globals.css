@@ -134,12 +134,28 @@ html[data-desktop="mac"]:not([data-fullscreen]) .traffic-light-gap {
   scrollbar-width: thin;
 }
 
-/* ---- Glowing status text: the orb's colours flow through the words while Claude works ---- */
-@keyframes orb-flow { to { background-position: 300% 0; } }
-.orb-text { background-image: linear-gradient(90deg, #8b6cf5, #ff8a5b, #5aa9ff, #8b6cf5, #ff8a5b, #5aa9ff); background-size: 300% 100%;
-  -webkit-background-clip: text; background-clip: text; color: transparent; animation: orb-flow 3.2s linear infinite;
-  filter: drop-shadow(0 0 8px rgb(139 108 245 / 0.45)); }
+/* ---- Glowing status text: slow flow through the colours of the orb's current state ---- */
+@keyframes orb-text-flow { to { background-position: 200% 0; } }
+.orb-text { --g1: #d8ccff; --g2: #8b6cf5; --g3: #ff8a5b;
+  background-image: linear-gradient(90deg, var(--g2), var(--g3), var(--g1), var(--g2)); background-size: 200% 100%; background-repeat: repeat-x;
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: orb-text-flow 9s linear infinite;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--g2) 40%, transparent)); }
+.orb-text[data-state="writing"] { --g1: #ffe0d0; --g2: #ff8a5b; --g3: #ff6fa0; }
+.orb-text[data-state="reading"] { --g1: #cdeaff; --g2: #5aa9ff; --g3: #8b6cf5; }
+.orb-text[data-state="editing"] { --g1: #d9ffe9; --g2: #34d399; --g3: #a78bfa; }
+.orb-text[data-state="running"] { --g1: #fff3c4; --g2: #fbbf24; --g3: #ff8a5b; }
+.orb-text[data-state="searching"] { --g1: #c7f9ff; --g2: #22d3ee; --g3: #a78bfa; }
+.orb-text[data-state="waiting"] { --g1: #ffe9b8; --g2: #f59e0b; --g3: #fb7185; }
+.orb-text[data-state="error"] { --g1: #ffd0d0; --g2: #ef4444; --g3: #fb923c; }
 @media (prefers-reduced-motion: reduce) { .orb-text { animation: none; } }
+/* ---- Result card: once the text is written, border and fill grow from the top-left corner ---- */
+.reveal-card { position: relative; }
+.reveal-card > * { position: relative; }
+.reveal-card::before { content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
+  border: 1px solid var(--rc); background: var(--rb); clip-path: inset(0 100% 100% 0 round 8px);
+  transition: clip-path 1.4s cubic-bezier(0.22, 0.7, 0.2, 1); }
+.reveal-card[data-on="true"]::before { clip-path: inset(0 0 0 0 round 8px); }
+@media (prefers-reduced-motion: reduce) { .reveal-card::before { transition: none; } }
 /* ---- Typing caret while an answer is being written out ---- */
 @keyframes orb-caret { 50% { opacity: 0; } }
 .typing-caret > :last-child::after { content: ""; display: inline-block; width: 7px; height: 1em; margin-left: 2px; vertical-align: text-bottom;

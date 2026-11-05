@@ -4,7 +4,6 @@ import * as React from "react";
 import type { Activity } from "@/lib/orb-state";
 import { compactTokens, formatElapsed, type LiveStats } from "@/lib/live-stats";
 import { describeTool } from "@/lib/tool-cards";
-import { cn } from "@/lib/utils";
 import { LiquidOrb } from "./liquid-orb";
 
 /**
@@ -21,13 +20,12 @@ export function LiveStatus({ activity, stats, startedAt, size = 44 }: { activity
   const step = tool ? `${tool.group}${tool.title ? ` · ${tool.title}` : ""}` : activity.label;
   const elapsed = startedAt ? formatElapsed(now - Date.parse(startedAt)) : null;
   const detail = [elapsed, stats && stats.outputTokens > 0 ? `${compactTokens(stats.outputTokens)} tokens` : null, stats && stats.contextTokens > 0 ? `contexto ${compactTokens(stats.contextTokens)}` : null].filter(Boolean).join(" · ");
-  const writing = activity.state === "thinking" || activity.state === "writing";
   return (
     <div className="grid gap-3" role="status" aria-live="polite">
       <div className="flex items-center gap-2.5">
         <LiquidOrb state={activity.state} size={size} />
         <div className="min-w-0">
-          <div className={cn("truncate text-sm", writing ? "orb-text font-medium" : "text-foreground")}>{step}</div>
+          <div data-state={activity.state} className="orb-text truncate text-sm font-medium">{step}</div>
           {detail && <div className="text-xs text-muted-foreground tabular-nums">{detail}</div>}
         </div>
       </div>
