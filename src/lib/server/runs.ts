@@ -164,7 +164,7 @@ const COPY_BLOCK_HINT = "Si redactas un correo, un mensaje o cualquier texto pen
 /** Build the argv passed to `claude` (never through a shell). */
 export function buildClaudeArgs(input: RunInput): string[] {
   const args: string[] = [];
-  if (input.mode === "headless") args.push("-p", "--output-format", "stream-json", "--verbose");
+  if (input.mode === "headless") args.push("-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages");
   if (input.mode === "headless") args.push("--append-system-prompt", COPY_BLOCK_HINT);
   if (input.model) args.push("--model", input.model);
   if (input.agent) args.push("--agent", input.agent);
@@ -373,6 +373,17 @@ export class RunManager {
         }
       }
     };
+    // Text arrives token by token (partial messages): it is written to the log in small batches so the screen
+    // shows the answer as it is produced, without a log line per token.
+    let pendingText = "";
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+    const flushText = () => {
+      if (flushTimer) clearTimeout(flushTimer);
+      flushTimer = null;
+      if (!pendingText) return;
+      writeLog({ type: "agentic", subtype: "partial", delta: pendingText });
+      pendingText = "";
+    };
     let buf = "";
     const onLine = (line: string) => {
       if (!line.trim()) return;
@@ -383,6 +394,15 @@ export class RunManager {
         writeLog({ type: "stdout", text: line.slice(0, 10_000) });
         return;
       }
+      if (o.type === "stream_event") {
+        const ev = o.event as { type?: string; delta?: { type?: string; text?: string } } | undefined;
+        if (ev?.type === "content_block_delta" && ev.delta?.type === "text_delta" && ev.delta.text) {
+          pendingText += ev.delta.text;
+          flushTimer ??= setTimeout(flushText, 150);
+        }
+        return; // the other partial events (tool input, thinking, usage) are not kept
+      }
+      flushText();
       writeLog(slimLogEvent(o, this.opts.dataDir));
       if (watcher) watchTools(o);
       if (o.type === "system" && o.subtype === "init" && typeof o.session_id === "string") this.patch(run.id, { sessionId: o.session_id });
@@ -424,6 +444,7 @@ export class RunManager {
       if (finished) return;
       finished = true;
       if (buf.trim()) onLine(buf);
+      flushText();
       this.procs.delete(run.id);
       // Let the last look at the working tree land in the log before the run is closed (bounded wait).
       const settle: Promise<unknown> = watcher ? Promise.race([watcher.idle(), new Promise((r) => setTimeout(r, 4000))]) : Promise.resolve();

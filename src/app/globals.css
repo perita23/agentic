@@ -148,6 +148,10 @@ html[data-desktop="mac"]:not([data-fullscreen]) .traffic-light-gap {
 .orb-text[data-state="waiting"] { --g1: #ffe9b8; --g2: #f59e0b; --g3: #fb7185; }
 .orb-text[data-state="error"] { --g1: #ffd0d0; --g2: #ef4444; --g3: #fb923c; }
 @media (prefers-reduced-motion: reduce) { .orb-text { animation: none; } }
+/* ---- Entrance: whatever appears while Claude works fades up a few pixels, so nothing pops in ---- */
+@keyframes appear { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.appear { animation: appear 0.32s cubic-bezier(0.22, 0.8, 0.3, 1) both; }
+@media (prefers-reduced-motion: reduce) { .appear { animation: none; } }
 /* ---- Typing caret while an answer is being written out ---- */
 @keyframes orb-caret { 50% { opacity: 0; } }
 .typing-caret > :last-child::after { content: ""; display: inline-block; width: 7px; height: 1em; margin-left: 2px; vertical-align: text-bottom;

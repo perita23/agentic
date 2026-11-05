@@ -28,6 +28,7 @@ import { AttachButton, AttachmentBar, useAttachments } from "@/components/app/at
 import { BranchSwitcher } from "@/components/app/branch-switcher";
 import { FileList, useFileMenu } from "@/components/app/file-menu";
 import { LiveStatus } from "@/components/app/live-status";
+import { Appear } from "@/components/app/appear";
 import { liveStats } from "@/lib/live-stats";
 import { Markdown } from "@/components/app/markdown";
 import { PlanCard } from "@/components/app/plan-card";
@@ -290,8 +291,10 @@ function Segment({ run, index, latest, onEvents }: { run: Run; index: number; la
           </div>
         </div>
       )}
-      {shown.filter((e) => !inline.has(e)).map((e, i) => (
-        <EventView key={i} e={e} run={run} results={results} finished={finished} paired={paired} planId={planId} planText={planText} changes={changes} lastText={lastText} />
+      {shown.filter((e) => !inline.has(e) && !(e.type === "agentic" && e.subtype === "partial")).map((e, i) => (
+        <Appear key={i} live={!finished}>
+        <EventView e={e} run={run} results={results} finished={finished} paired={paired} planId={planId} planText={planText} changes={changes} lastText={lastText} />
+        </Appear>
       ))}
       {/* Plan written to a plan file without calling ExitPlanMode: still offer it as a plan. */}
       {found && found.id === null && (
@@ -344,7 +347,7 @@ function HeadlessLog({ thread }: { thread: Run[] }) {
           ))}
           {/* At the end of the output: what Claude is doing now (step, time, tokens) while it works, a calm orb when done. */}
           {run.status === "running" ? (
-            <LiveStatus activity={stateFromEvents(byRun[run.id]?.events ?? [])} stats={stats} startedAt={run.startedAt} />
+            <Appear><LiveStatus activity={stateFromEvents(byRun[run.id]?.events ?? [])} stats={stats} startedAt={run.startedAt} /></Appear>
           ) : (
             <ActivityOrb activity={run.status === "failed" ? { state: "error", label: "Ha fallado" } : stateFromEvents(byRun[run.id]?.events ?? [])} size={44} className="mt-1" />
           )}

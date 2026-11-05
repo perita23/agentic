@@ -8,10 +8,12 @@ export interface LiveStats {
   tool: { name: string; input: unknown } | null;
   /** The tail of Claude's reasoning, when the model streams it. */
   thinking: string;
+  /** The answer being written right now, streamed piece by piece (empty between messages). */
+  partial: string;
 }
 
 type Block = { type?: string; id?: string; name?: string; input?: unknown; text?: string; thinking?: string; tool_use_id?: string };
-type Ev = { type?: string; message?: { id?: string; usage?: Record<string, unknown>; content?: unknown } } | null;
+type Ev = { type?: string; subtype?: string; delta?: string; message?: { id?: string; usage?: Record<string, unknown>; content?: unknown } } | null;
 
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 
@@ -22,11 +24,14 @@ export class LiveStatsAcc {
   private open = new Map<string, { name: string; input: unknown }>();
   private lastTool: string | null = null;
   private thinking = "";
+  private partial = "";
 
   add(ev: unknown) {
     const e = ev as Ev;
     if (!e || typeof e !== "object") return;
     const m = e.message;
+    if (e.type === "agentic" && e.subtype === "partial" && typeof e.delta === "string") this.partial = (this.partial + e.delta).slice(-20_000);
+    else if (e.type === "assistant" || e.type === "user" || e.type === "result") this.partial = "";
     if (e.type === "assistant" && m) {
       const u = m.usage;
       if (u) {
@@ -53,7 +58,7 @@ export class LiveStatsAcc {
     for (const v of this.out.values()) outputTokens += v;
     // The newest call still waiting for its result.
     const tool = this.lastTool && this.open.has(this.lastTool) ? this.open.get(this.lastTool)! : [...this.open.values()].pop() ?? null;
-    return { outputTokens, contextTokens: this.ctx, tool, thinking: this.thinking };
+    return { outputTokens, contextTokens: this.ctx, tool, thinking: this.thinking, partial: this.partial };
   }
 }
 
