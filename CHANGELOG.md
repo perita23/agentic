@@ -6,7 +6,7 @@ Cada versión se etiqueta y publica automáticamente como GitHub Release cuando 
 ## [0.47.1] - 2026-11-05
 
 ### Interno
-- **El CI ya no se queda colgado instalando Chromium.** El paso que descarga el navegador de la prueba de humo se atascaba durante 10-12 minutos (descarga o servidores de paquetes sin fallar ni responder) y frenaba las releases. Ahora el navegador se guarda en caché entre ejecuciones y, cuando hay que descargarlo, cada intento se corta a los 4 minutos y se repite hasta 3 veces. No cambia nada de la aplicación.
+- **El CI ya no se queda colgado instalando Chromium.** El paso que descarga el navegador de la prueba de humo se atascaba durante 10-12 minutos (descarga o servidores de paquetes sin fallar ni responder) y frenaba las releases. La causa era `--with-deps`, que además instala fuentes con `apt` desde un servidor a veces muy lento; las librerías que Chromium necesita ya vienen en el runner. Ahora solo se instala el navegador (en caché entre ejecuciones), cada intento se corta a los 4 minutos matando también a sus procesos hijos y se repite hasta 3 veces, y solo si Chromium no arrancase se instalan las dependencias del sistema. No cambia nada de la aplicación.
 
 ## [0.47.0] - 2026-11-05
 
