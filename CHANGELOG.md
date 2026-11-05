@@ -21,7 +21,7 @@ Cada versión se etiqueta y publica automáticamente como GitHub Release cuando 
 ## [0.45.0] - 2026-11-05
 
 ### Cambiado
-- **Nueva licencia: PolyForm Noncommercial 1.0.0.** Cualquiera puede descargar, usar y modificar Agentic gratis para fines no comerciales, pero no se puede vender ni usar comercialmente sin permiso. Las copias que se obtuvieron con licencia MIT (hasta la 0.44) conservan esos derechos. Ver `LICENSE` y la sección «Licencia» del README.
+- **Nueva licencia: PolyForm Noncommercial 1.0.0.** Cualquiera puede descargar y usar Agentic gratis para fines no comerciales, pero no se puede vender ni usar comercialmente sin permiso. Por ahora **no se aceptan contribuciones** (ver `CONTRIBUTING.md`). Las copias que se obtuvieron con licencia MIT (hasta la 0.44) conservan esos derechos. Ver `LICENSE` y la sección «Licencia» del README.
 
 ### Añadido
 - **La isla de Agentic (app de Mac).** Una píldora negra pegada al centro superior de la pantalla, alrededor de la cámara, con la silueta de la muesca de Apple: hombros cóncavos arriba que se funden con la barra de menús y esquinas inferiores «continuas». Es una ventana propia de Electron (no una API de Apple), siempre encima, también sobre apps a pantalla completa, y no roba el foco al hacer clic.
