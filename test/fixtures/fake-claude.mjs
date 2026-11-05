@@ -29,6 +29,13 @@ if (prompt.includes("EDIT")) {
   out({ type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", id: "t1", name: "Write", input: { file_path: path.join(process.cwd(), "created-by-claude.txt"), content: "hello from claude\n" } }] } });
   if (fs.existsSync("old-name.txt")) fs.renameSync("old-name.txt", "new-name.txt");
 }
+if (prompt.includes("<tarea>describir_pr</tarea>")) {
+  // The PR description, written in pieces like the real partial messages.
+  for (const piece of ["TITULO: Añade login ", "con Touch ID\n---\n## Resumen\n", "Permite entrar con la huella.\n\n## Cambios\n", "- Nuevo botón de acceso\n"]) {
+    out({ type: "stream_event", event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: piece } } });
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
 if (prompt.includes("SLOW")) await new Promise((r) => setTimeout(r, 900)); // a turn that takes a moment
 if (prompt.includes("BASHCHANGE")) {
   // A change made through the terminal (not an Edit/Write tool call): the file changes, then the tool result arrives.

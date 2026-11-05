@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.41.0] - 2026-11-05
+
+### Añadido
+- **«Generar con Claude» al crear una PR.** En «Nueva PR», un botón hace que Claude redacte el **título y la descripción** a partir de los commits, los archivos y el diff de la rama (en el idioma de tus commits, con Resumen, Cambios y Cómo probarlo). El texto **se va escribiendo en los campos en directo**, y mientras tanto los campos brillan con el degradado de la bolita (morado, coral y azul) y una bolita pequeña «escribe» a su lado. Puedes pararlo cuando quieras y se queda lo escrito; si falla, se restaura lo que tenías. Siempre lo revisas antes de crear la PR. Usa el modelo rápido (Haiku) y envía a Claude como máximo 40 KB de diff.
+
 ## [0.40.0] - 2026-11-05
 
 ### Añadido
