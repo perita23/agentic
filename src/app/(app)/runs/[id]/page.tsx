@@ -44,36 +44,23 @@ function contentText(c: unknown): string {
   return "";
 }
 
-/** Fires once on mount: lets a card that shows no text of its own run its entrance animation. */
-function ReadyEffect({ on }: { on: () => void }) {
-  React.useEffect(() => {
-    const t = setTimeout(on, 150);
-    return () => clearTimeout(t);
-  }, [on]);
-  return null;
-}
-
-/** The final result: typed out slowly; once written, its border and fill grow from the top-left corner. */
-function ResultCard({ e, run, jira, duplicate }: { e: Ev; run: Run; jira: (t: string) => React.ReactNode; duplicate: boolean }) {
-  const [fresh] = React.useState(() => run.status === "running" || (!!run.endedAt && Date.now() - Date.parse(run.endedAt) < 20000));
+/** The turn's closing line: cost, time and turns. It shows the text itself only when it is not already written above. */
+function ResultCard({ e, jira, duplicate }: { e: Ev; jira: (t: string) => React.ReactNode; duplicate: boolean }) {
   const text = String(e.result ?? "");
-  const [on, setOn] = React.useState(!fresh || !text);
-  const done = React.useCallback(() => setOn(true), []);
-  const tone = e.is_error ? "var(--color-destructive)" : "var(--color-success)";
+  const meta = (
+    <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+      <span className={e.is_error ? "text-destructive" : "text-success"}>{e.is_error ? "Error" : "Terminado"}</span>
+      {typeof e.total_cost_usd === "number" && <span>${e.total_cost_usd.toFixed(4)}</span>}
+      {typeof e.duration_ms === "number" && <span>{(e.duration_ms / 1000).toFixed(1)} s</span>}
+      {typeof e.num_turns === "number" && <span>{e.num_turns} turnos</span>}
+    </div>
+  );
+  if (duplicate && !e.is_error) return <div className="ml-6">{meta}</div>;
   return (
-    <div
-      className="reveal-card rounded-md border p-3 text-sm"
-      data-on={on}
-      style={{ "--rc": `color-mix(in srgb, ${tone} 40%, transparent)`, "--rb": `color-mix(in srgb, ${tone} 6%, transparent)` } as React.CSSProperties}
-    >
-      <div className="mb-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
-        <span className={e.is_error ? "text-destructive" : "text-success"}>{e.is_error ? "Error" : "Resultado"}</span>
-        {typeof e.total_cost_usd === "number" && <span>${e.total_cost_usd.toFixed(4)}</span>}
-        {typeof e.duration_ms === "number" && <span>{(e.duration_ms / 1000).toFixed(1)} s</span>}
-        {typeof e.num_turns === "number" && <span>{e.num_turns} turnos</span>}
-      </div>
-      {duplicate ? <ReadyEffect on={done} /> : <Markdown reveal={fresh} onTyped={done}>{text}</Markdown>}
-      {!e.is_error && !!e.result && <div className="mt-2 flex justify-end">{jira(text)}</div>}
+    <div className={cn("rounded-md border p-3 text-sm", e.is_error ? "border-destructive/40 bg-destructive/5" : "border-success/40 bg-success/5")}>
+      <div className="mb-1">{meta}</div>
+      <Markdown>{text}</Markdown>
+      {!e.is_error && !!text && <div className="mt-2 flex justify-end">{jira(text)}</div>}
     </div>
   );
 }
@@ -146,7 +133,7 @@ function EventView({ e, run, results, finished, paired, planId, planText, change
       </div>
     );
   }
-  if (e.type === "result") return <ResultCard e={e} run={run} jira={jira} duplicate={String(e.result ?? "").trim() === lastText} />;
+  if (e.type === "result") return <ResultCard e={e} jira={jira} duplicate={String(e.result ?? "").trim() === lastText} />;
   if (e.type === "stderr") return <pre className="font-mono text-xs whitespace-pre-wrap text-destructive/80">{String(e.text)}</pre>;
   if (e.type === "stdout") return <pre className="font-mono text-xs whitespace-pre-wrap text-muted-foreground">{String(e.text)}</pre>;
   return null;

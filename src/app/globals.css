@@ -148,14 +148,6 @@ html[data-desktop="mac"]:not([data-fullscreen]) .traffic-light-gap {
 .orb-text[data-state="waiting"] { --g1: #ffe9b8; --g2: #f59e0b; --g3: #fb7185; }
 .orb-text[data-state="error"] { --g1: #ffd0d0; --g2: #ef4444; --g3: #fb923c; }
 @media (prefers-reduced-motion: reduce) { .orb-text { animation: none; } }
-/* ---- Result card: once the text is written, border and fill grow from the top-left corner ---- */
-.reveal-card { position: relative; }
-.reveal-card > * { position: relative; }
-.reveal-card::before { content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
-  border: 1px solid var(--rc); background: var(--rb); clip-path: inset(0 100% 100% 0 round 8px);
-  transition: clip-path 1.4s cubic-bezier(0.22, 0.7, 0.2, 1); }
-.reveal-card[data-on="true"]::before { clip-path: inset(0 0 0 0 round 8px); }
-@media (prefers-reduced-motion: reduce) { .reveal-card::before { transition: none; } }
 /* ---- Typing caret while an answer is being written out ---- */
 @keyframes orb-caret { 50% { opacity: 0; } }
 .typing-caret > :last-child::after { content: ""; display: inline-block; width: 7px; height: 1em; margin-left: 2px; vertical-align: text-bottom;
