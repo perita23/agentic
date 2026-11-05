@@ -53,6 +53,21 @@ if (prompt.includes("CURLLONG")) {
   out({ type: "assistant", message: { id: "cl2", role: "assistant", content: [{ type: "text", text: `Lo probé así: \`${curl}\`\n\n\`\`\`bash\n${curl}\n\`\`\`\n\nY ${curl}` }] } });
   await new Promise((r) => setTimeout(r, 6000));
 }
+if (prompt.includes("OBSIDIAN")) {
+  // Writes a note in the folder it was handed with --add-dir (the vault's Agentic folder).
+  const fs = await import("node:fs");
+  const i = args.indexOf("--add-dir");
+  const dir = i >= 0 ? args[i + 1] : null;
+  if (dir) {
+    const proj = process.cwd().split("/").pop();
+    const file = `${dir}/${proj}/Decisiones.md`;
+    fs.mkdirSync(`${dir}/${proj}`, { recursive: true });
+    fs.writeFileSync(file, "---\ntitle: Decisiones\n---\n\nUsar PolyForm.\n");
+    out({ type: "assistant", message: { id: "ob1", role: "assistant", content: [{ type: "tool_use", id: "obw1", name: "Write", input: { file_path: file, content: "…" } }] } });
+    out({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "obw1", content: "ok" }] } });
+    out({ type: "assistant", message: { id: "ob2", role: "assistant", content: [{ type: "text", text: "Nota guardada." }] } });
+  }
+}
 if (prompt.includes("SLOW")) await new Promise((r) => setTimeout(r, 900)); // a turn that takes a moment
 if (prompt.includes("BASHCHANGE")) {
   // A change made through the terminal (not an Edit/Write tool call): the file changes, then the tool result arrives.

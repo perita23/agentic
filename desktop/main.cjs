@@ -318,7 +318,7 @@ function createWindow(onShown) {
     }
   };
   const openExternal = (url) => {
-    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+    if (/^https?:\/\//i.test(url) || /^obsidian:\/\/open\?/i.test(url)) shell.openExternal(url);
   };
   // Links to GitHub/Jira/Slack… open in the default browser; nothing else can navigate the app away.
   win.webContents.setWindowOpenHandler(({ url }) => {

@@ -3,6 +3,16 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.47.0] - 2026-11-05
+
+### Añadido
+- **Integración con Obsidian.** Una sesión con Claude puede ir guardando en tu bóveda las notas relevantes que genera: decisiones, hallazgos, comandos que funcionan, enlaces y pendientes.
+  - **Ajustes → Obsidian:** eliges la bóveda (Agentic detecta las que Obsidian conoce en tu Mac, o pegas la ruta), la carpeta de notas (por defecto `Agentic`) y qué puede leer, y lo activas. Viene **desactivado**.
+  - **Cómo funciona:** las ejecuciones y el chat reciben la carpeta de la bóveda y una instrucción para escribir notas Markdown con frontmatter y `[[wikilinks]]`, una por tema y editando las que ya existen, en una subcarpeta por proyecto. No usa ningún plugin ni API: son archivos.
+  - **Límites:** Claude solo puede **escribir** dentro de esa carpeta (permiso explícito solo ahí; el resto de la bóveda queda protegido) y por defecto solo **ve** esa carpeta. Hay una opción para dejarle leer toda la bóveda y enlazar tus notas, avisando de que da acceso a notas personales. No se aplica al modo terminal.
+  - **En la ejecución:** una tarjeta «Notas de Obsidian» lista las notas que Claude escribió, cada una con **Abrir en Obsidian**.
+  - La cabecera de una ejecución ya no muestra enteras la instrucción ni los permisos que Agentic le pasa a Claude.
+
 ## [0.46.2] - 2026-11-05
 
 ### Mejorado

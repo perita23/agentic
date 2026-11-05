@@ -286,6 +286,26 @@ try {
   check((await gap()) <= 4 && (await page.getByRole("button", { name: "Ir al final" }).count()) === 0, "«Ir al final» brings you back to the end and follows again");
   await shot("03i-curl");
   check(ov.scroll <= 1 && ov.bad.length === 0, `a long curl does not overflow the page sideways ${JSON.stringify(ov)}`);
+  // Obsidian: connect a vault in Ajustes; a session then writes its notes there and the run page links to them.
+  const vaultDir = path.join(tmp, "vault");
+  fs.mkdirSync(path.join(vaultDir, ".obsidian"), { recursive: true });
+  await page.goto(`${base}/settings`);
+  await page.getByLabel("Ruta de la bóveda").fill(vaultDir);
+  await page.getByLabel("Que Claude escriba en Obsidian").click();
+  await page.getByRole("button", { name: "Guardar", exact: true }).click();
+  await page.getByText(/Listo: las notas irán a/).waitFor({ timeout: 10000 });
+  check(true, "Ajustes connects an Obsidian vault");
+  const obRun = await (
+    await fetch(base + "/api/runs", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ projectPath: project, prompt: "OBSIDIAN" }) })
+  ).json();
+  await page.goto(`${base}/runs/${obRun.id}`);
+  const notes = page.getByLabel("Notas de Obsidian");
+  await notes.waitFor({ timeout: 15000 });
+  const noteHref = await notes.getByRole("link").first().getAttribute("href");
+  check((await notes.innerText()).includes("Decisiones") && /^obsidian:\/\/open\?path=/.test(noteHref ?? ""), "the run page lists the notes Claude wrote in Obsidian, each with an «Abrir en Obsidian» link");
+  await shot("03j-obsidian");
+  await fetch(base + "/api/obsidian", { method: "PUT", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ enabled: false }) });
+
   // A turn that has ended while the process lingers (background tasks): calm status, no clock, no dollars.
   const lingerRun = await (
     await fetch(base + "/api/runs", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ projectPath: project, prompt: "LINGER" }) })

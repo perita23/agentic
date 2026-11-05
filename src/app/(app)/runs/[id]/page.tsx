@@ -29,6 +29,7 @@ import { BranchSwitcher } from "@/components/app/branch-switcher";
 import { FileList, useFileMenu } from "@/components/app/file-menu";
 import { LiveStatus } from "@/components/app/live-status";
 import { Appear } from "@/components/app/appear";
+import { ObsidianNotes } from "@/components/app/obsidian";
 import { LiveStatsAcc, compactTokens, type LiveStats } from "@/lib/live-stats";
 import { useStickToBottom } from "@/lib/use-stick-bottom";
 import { AnimatedNumber } from "@/components/app/animated-number";
@@ -361,6 +362,7 @@ function HeadlessLog({ thread }: { thread: Run[] }) {
   const live = thread.some((r) => byRun[r.id]?.live);
   const latestEvents = byRun[run.id]?.events;
   const partial = byRun[run.id]?.partial ?? "";
+  const allEvents = React.useMemo(() => thread.flatMap((r) => byRun[r.id]?.events ?? []), [thread, byRun]);
   const base = byRun[run.id]?.stats;
   const stats = React.useMemo(() => (base ? { ...base, partial } : undefined), [base, partial]);
   const activity = partial ? { state: "writing" as const, label: ORB_LABEL.writing } : stateFromEvents(latestEvents ?? []);
@@ -385,6 +387,7 @@ function HeadlessLog({ thread }: { thread: Run[] }) {
           {thread.map((r, i) => (
             <Segment key={r.id} run={r} index={i} latest={i === thread.length - 1} onEvents={onEvents} />
           ))}
+          <ObsidianNotes events={allEvents} />
           {/* At the end of the output: what Claude is doing now (step, time, tokens) while it works, a calm orb when done. */}
           {run.status === "running" ? (
             <Appear><LiveStatus activity={activity} stats={stats} startedAt={run.startedAt} /></Appear>
