@@ -8,7 +8,7 @@ import { FingerprintIcon, KeyRoundIcon, LockIcon, TerminalIcon } from "lucide-re
 import { Button } from "@/components/ui/button";
 import { api, fetcher } from "@/lib/api";
 import { useLocation } from "@/lib/use-location";
-import { CyclingOrb } from "@/components/app/liquid-orb";
+import { BrandMark } from "@/components/app/brand-mark";
 import { LoginArt } from "@/components/app/login-art";
 
 /** Only same-app paths are allowed after login (no open redirects). */
@@ -55,12 +55,10 @@ function Login() {
     <main className="grid min-h-screen bg-black lg:grid-cols-2">
       <section className="flex items-center justify-center border-r border-white/5 bg-black p-6 sm:p-10">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm">
-          <div className="mb-6 flex items-center gap-2">
+          <div className="mb-10 flex items-center gap-2">
+            <BrandMark className="size-10" />
             <span className="text-lg font-semibold">Agentic</span>
             <LockIcon className="ml-auto size-4 text-muted-foreground" />
-          </div>
-          <div className="mb-6 flex justify-center">
-            <CyclingOrb size={120} />
           </div>
           <h1 className="text-3xl font-semibold tracking-tight">Inicia sesión</h1>
           <p className="mt-1 text-sm text-muted-foreground">Esta consola controla Claude Code en tu dispositivo, así que está protegida.</p>

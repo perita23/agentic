@@ -7,7 +7,7 @@ Cada versión se etiqueta y publica automáticamente como GitHub Release cuando 
 
 ### Cambiado
 - **Chat rediseñado, más integrado en la app.** Ya no es una caja flotante con sombras: el historial y la conversación son dos paneles con el mismo estilo que el resto de secciones, con un botón «Nuevo chat» en la cabecera. Las respuestas de Claude se ven en Markdown completo (títulos, listas, tablas, código), ocupan todo el ancho de la columna y sus herramientas salen con nombre legible (p. ej. «Docker · logs»). La pantalla de bienvenida tiene sugerencias en tarjetas con icono.
-- **La bolita de Agentic sustituye al logo.** En la bienvenida del chat, en el login y en la pantalla de bloqueo de la app del Mac, la bolita recorre todos sus estados (pensando, escribiendo, ejecutando, leyendo, editando, buscando, esperando, hecho, error y reposo), cambiando cada dos o tres segundos. En la conversación, cierra el chat: actividad en vivo mientras Claude trabaja y en calma cuando termina.
+- **La bolita de Agentic, a lo grande.** En la bienvenida del chat sustituye al logo. En el login (web) y en la pantalla de bloqueo de la app del Mac, el logo se queda a la izquierda y **toda la mitad derecha es la bola grande**. En los tres sitios recorre todos sus estados (pensando, escribiendo, ejecutando, leyendo, editando, buscando, esperando, hecho, error y reposo), cambiando cada dos o tres segundos. En la conversación del chat cierra el hilo: actividad en vivo mientras Claude trabaja y en calma cuando termina.
 
 ### Corregido
 - **Touch ID ya no salta solo** al abrir la app del Mac ni en el login web: aparece el formulario de contraseña y Touch ID es un botón («Usar Touch ID») que pulsas cuando quieras.

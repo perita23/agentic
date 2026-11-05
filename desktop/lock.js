@@ -50,6 +50,17 @@ for (const b of document.querySelectorAll("[data-quit]")) b.addEventListener("cl
   const orb = $("orb");
   const SPEED = { idle: 0.5, thinking: 1.5, writing: 2.4, reading: 2.6, editing: 3.4, running: 4.2, searching: 1.7, waiting: 0.9, done: 0.3, error: 5 };
   const TOUR = ["thinking", "writing", "running", "reading", "editing", "searching", "waiting", "done", "error", "idle"];
+  // The orb fills the art panel (as large as fits above the caption).
+  const fit = () => {
+    const art = document.querySelector(".art");
+    if (!art) return;
+    const size = Math.round(Math.max(220, Math.min(art.clientWidth * 0.72, art.clientHeight - 260, 620)));
+    orb.style.width = orb.style.height = `${size}px`;
+    orb.style.setProperty("--px", `${size}px`);
+    $("ogoo-blur").setAttribute("stdDeviation", String(size / 16));
+  };
+  fit();
+  window.addEventListener("resize", fit);
   let i = 0;
   const next = () => {
     i = (i + 1) % TOUR.length;
