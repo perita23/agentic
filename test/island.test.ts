@@ -52,3 +52,19 @@ describe("notch shape", () => {
     expect(d).toContain("L8 26"); // the body is inset by the shoulder radius
   });
 });
+
+const { parseNotch } = createRequire(import.meta.url)("../desktop/lib/island.cjs") as { parseNotch: (out: string) => { notchWidth: number; notchHeight: number } | null };
+
+describe("real notch", () => {
+  it("reads the notch from the areas AppKit reports around it", () => {
+    // A 14" MacBook Pro: 1512 pt wide, 32 pt tall notch, about 185 pt wide.
+    expect(parseNotch(JSON.stringify({ width: 1512, left: 663.5, right: 663.5, height: 32 }))).toEqual({ notchWidth: 185, notchHeight: 32 });
+    expect(parseNotch(`${JSON.stringify({ width: 1728, left: 770, right: 770, height: 32 })}\n`)).toEqual({ notchWidth: 188, notchHeight: 32 });
+  });
+  it("is null without a notch or with unusable output", () => {
+    expect(parseNotch(JSON.stringify({ width: 1920, left: 0, right: 0, height: 0 }))).toBeNull();
+    expect(parseNotch("")).toBeNull();
+    expect(parseNotch("not json")).toBeNull();
+    expect(parseNotch(JSON.stringify({ width: 1000, left: 100, right: 100, height: 30 }))).toBeNull(); // implausible width
+  });
+});

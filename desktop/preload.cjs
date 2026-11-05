@@ -24,6 +24,10 @@ const mark = () => {
 };
 if (document.documentElement) mark();
 else document.addEventListener("DOMContentLoaded", mark, { once: true });
+// Whether the window is really on screen: the island at the top of the screen only shows when it is not.
+const reportVisibility = () => ipcRenderer.send("agentic:visibility", document.visibilityState === "visible");
+document.addEventListener("visibilitychange", reportVisibility);
+document.addEventListener("DOMContentLoaded", reportVisibility, { once: true });
 ipcRenderer.on("agentic:fullscreen", (_e, on) => {
   if (on) document.documentElement.dataset.fullscreen = "true";
   else delete document.documentElement.dataset.fullscreen;

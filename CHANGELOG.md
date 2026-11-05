@@ -3,6 +3,14 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.46.1] - 2026-11-05
+
+### Cambiado
+- **La isla solo sale cuando la app no está a la vista.** Si la ventana de Agentic está visible, la isla no aparece ni avisa; sale cuando la ventana está minimizada, oculta, cerrada, en otro Space o tapada por completo por otras ventanas (lo que Chromium informa como «página oculta»). Al abrir de nuevo la app, la isla se retira sola. Lo que termina mientras miras la app no se te avisa después.
+
+### Corregido
+- **La isla aparecía debajo de la barra de menús en vez de en la muesca.** macOS empuja por defecto cualquier ventana fuera de la barra; ahora la ventana de la isla pide no ser «limitada» a la pantalla útil (la misma razón por la que las apps nativas de muesca sobrescriben `constrainFrameRect`) y, si aun así la bajara, se recoloca en el borde superior. Además lee la **muesca real** (ancho y alto) que macOS informa para cada pantalla, en lugar de estimarla; si no puede, usa una estimación. La píldora es de un negro puro (`#000000`, igual que la muesca) y cerrada no proyecta sombra, para que parezca fusionada con ella; solo la tarjeta abierta lleva sombra.
+
 ## [0.46.0] - 2026-11-05
 
 ### Añadido
@@ -21,7 +29,7 @@ Cada versión se etiqueta y publica automáticamente como GitHub Release cuando 
 ## [0.45.0] - 2026-11-05
 
 ### Cambiado
-- **Nueva licencia: PolyForm Noncommercial 1.0.0.** Cualquiera puede descargar, usar y modificar Agentic gratis para fines no comerciales, pero no se puede vender ni usar comercialmente sin permiso. Las copias que se obtuvieron con licencia MIT (hasta la 0.44) conservan esos derechos. Ver `LICENSE` y la sección «Licencia» del README.
+- **Nueva licencia: PolyForm Noncommercial 1.0.0.** Cualquiera puede descargar y usar Agentic gratis para fines no comerciales, pero no se puede vender ni usar comercialmente sin permiso. Por ahora **no se aceptan contribuciones** (ver `CONTRIBUTING.md`). Las copias que se obtuvieron con licencia MIT (hasta la 0.44) conservan esos derechos. Ver `LICENSE` y la sección «Licencia» del README.
 
 ### Añadido
 - **La isla de Agentic (app de Mac).** Una píldora negra pegada al centro superior de la pantalla, alrededor de la cámara, con la silueta de la muesca de Apple: hombros cóncavos arriba que se funden con la barra de menús y esquinas inferiores «continuas». Es una ventana propia de Electron (no una API de Apple), siempre encima, también sobre apps a pantalla completa, y no roba el foco al hacer clic.

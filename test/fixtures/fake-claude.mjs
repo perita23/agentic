@@ -57,6 +57,9 @@ if (prompt.includes("SLOW")) await new Promise((r) => setTimeout(r, 900)); // a 
 if (prompt.includes("BASHCHANGE")) {
   // A change made through the terminal (not an Edit/Write tool call): the file changes, then the tool result arrives.
   const fs = await import("node:fs");
+  // A real Claude takes seconds to start: the watcher's first look at the tree must happen before it acts (a slow CI
+  // runner made the fake race ahead of it, and the change then looked like it had always been there).
+  await new Promise((r) => setTimeout(r, 2500));
   out({ type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", id: "bc1", name: "Bash", input: { command: "sed -i s/uno/dos/ tracked.txt" } }] } });
   fs.appendFileSync("tracked.txt", "línea nueva por terminal\n");
   fs.writeFileSync("hecho-por-terminal.txt", "contenido nuevo\n");

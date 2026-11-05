@@ -119,6 +119,10 @@ Ambos se ejecutan en GitHub Actions en cada PR y en cada push a `main` (`.github
 
 ## Licencia
 
-Agentic se distribuye bajo la [PolyForm Noncommercial License 1.0.0](LICENSE): **cualquiera puede descargarlo, usarlo, estudiarlo y modificarlo gratis para fines no comerciales** (uso personal, aprendizaje, investigación, organizaciones sin ánimo de lucro, educativas o públicas), **pero no se puede vender ni usar con fines comerciales** (por ejemplo, revenderlo, ofrecerlo como servicio de pago o incluirlo en un producto comercial) sin permiso del autor. Si lo redistribuyes o lo modificas, debes conservar el aviso de copyright y el texto de la licencia.
+Agentic se puede **descargar y usar gratis para fines no comerciales** (uso personal, aprendizaje, investigación, organizaciones sin ánimo de lucro, educativas o públicas), bajo la [PolyForm Noncommercial License 1.0.0](LICENSE). **No se puede vender ni usar con fines comerciales** (por ejemplo, revenderlo, ofrecerlo como servicio de pago o incluirlo en un producto comercial) sin permiso del autor. Si lo redistribuyes, debes conservar el aviso de copyright y el texto de la licencia.
 
 Es una licencia de código disponible, no «open source» en el sentido estricto de la OSI, porque esa definición no admite restringir el uso comercial. Las versiones publicadas hasta la 0.44 se distribuyeron bajo licencia MIT y quien las obtuvo así conserva esos derechos sobre esas copias. Para otro tipo de uso (por ejemplo, comercial), contacta con el autor.
+
+## Contribuciones
+
+**Por ahora no se aceptan contribuciones** (pull requests, parches ni código de terceros): el proyecto lo mantiene su autor. Puedes usar la aplicación libremente, y avisar de un fallo o proponer una idea abriendo un *issue*, pero no se garantiza que se atienda. Si esto cambia, se anunciará aquí. Más detalles en [CONTRIBUTING.md](CONTRIBUTING.md).

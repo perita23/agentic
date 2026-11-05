@@ -10,4 +10,10 @@ contextBridge.exposeInMainWorld("agenticIsland", {
   hide: () => ipcRenderer.send("island:hide"),
   interactive: (on) => ipcRenderer.send("island:interactive", !!on),
   open: (path) => ipcRenderer.send("island:open", String(path)),
+  mainVisible: () => ipcRenderer.invoke("island:main-visible"),
+  onMainVisible: (cb) => {
+    const h = (_e, v) => cb(!!v);
+    ipcRenderer.on("island:main-visible", h);
+    return () => ipcRenderer.removeListener("island:main-visible", h);
+  },
 });

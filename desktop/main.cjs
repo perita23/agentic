@@ -269,6 +269,14 @@ function harden(ses) {
   ses.setPermissionCheckHandler((_wc, permission, requestingOrigin) => allowed.has(permission) && ours(requestingOrigin));
 }
 
+// Is the main window really on screen? (visible, not minimized, and the page itself reports it is not covered or in
+// another Space.) The island only shows when it is not.
+let pageVisible = true;
+function updateMainVisible() {
+  const on = !!win && !win.isDestroyed() && win.isVisible() && !win.isMinimized() && pageVisible;
+  island?.setMainVisible(on);
+}
+
 function createWindow(onShown) {
   win = new BrowserWindow({
     width: 1440,
@@ -291,6 +299,9 @@ function createWindow(onShown) {
       spellcheck: true,
     },
   });
+  pageVisible = true;
+  for (const ev of ["show", "hide", "minimize", "restore", "closed"]) win.on(ev, updateMainVisible);
+  win.webContents.on("did-finish-load", updateMainVisible);
   win.once("ready-to-show", () => {
     win.show();
     onShown?.();
@@ -464,6 +475,11 @@ app.whenReady().then(async () => {
         return false;
       }
     };
+    ipcMain.on("agentic:visibility", (e, v) => {
+      if (!win || win.isDestroyed() || e.sender !== win.webContents) return;
+      pageVisible = !!v;
+      updateMainVisible();
+    });
     ipcMain.handle("agentic:version", (e) => (fromApp(e) ? app.getVersion() : null));
     ipcMain.handle("agentic:check-for-updates", (e) => (fromApp(e) ? checkForUpdates(true) : "denied"));
     // App lock settings (Ajustes): Touch ID is only enabled after a successful

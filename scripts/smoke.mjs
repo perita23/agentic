@@ -302,12 +302,17 @@ try {
   await isl.setViewportSize({ width: 460, height: 150 });
   await isl.addInitScript(() => {
     window.__island = [];
+    window.__vis = true;
+    window.__visCb = null;
     window.agenticIsland = {
       metrics: async () => ({ notch: true, notchWidth: 200, barHeight: 37 }),
       show: () => window.__island.push("show"),
       hide: () => window.__island.push("hide"),
       interactive: (on) => window.__island.push(`interactive:${on}`),
       open: (p) => window.__island.push(`open:${p}`),
+      // The main window starts on screen: the island must stay away until it is not.
+      mainVisible: async () => window.__vis,
+      onMainVisible: (cb) => { window.__visCb = cb; return () => {}; },
     };
   });
   await isl.goto(`${base}/island`);
@@ -315,7 +320,10 @@ try {
   await (
     await fetch(base + "/api/runs", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ projectPath: project, prompt: "CURLLONG island" }) })
   ).json();
-  await isl.getByText(/Escribiendo|Ejecutando|Pensando|Leyendo/).first().waitFor({ timeout: 10000 });
+  await isl.waitForTimeout(2500);
+  check(!(await isl.evaluate(() => window.__island.includes("show"))) && (await isl.getByText(/Escribiendo|Ejecutando|Pensando|Leyendo/).count()) === 0, "the island stays hidden while the app is on screen");
+  await isl.evaluate(() => window.__visCb(false)); // the app is minimized / covered
+  await isl.waitForFunction(() => window.__island.includes("show"), null, { timeout: 10000 });
   await isl.addStyleTag({ content: "html{background:#2c2c2e !important}" });
   await isl.waitForTimeout(700);
   await shot0(isl, "06a-island-work");
