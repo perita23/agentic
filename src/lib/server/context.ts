@@ -3,6 +3,7 @@ import { hardenDataDir } from "./audit";
 import { getConfig, type Config } from "./config";
 import { queueMessage, runMessage } from "./integrations/messages";
 import { ProjectService } from "./projects";
+import { ReplyQueue } from "./reply-queue";
 import { MailService, MAIL_STORES } from "./mail";
 import { fetcher as mailFetcher, verify as mailVerify, bodyFetcher as mailBody, seenSetter as mailSeen } from "./mail-imap";
 import { JiraService } from "./integrations/jira";
@@ -39,6 +40,7 @@ export interface Context {
   runs: RunManager;
   projects: ProjectService;
   mail: MailService;
+  replies: ReplyQueue;
   queue: TaskQueue;
   integrations: IntegrationService;
   pulls: PullService;
@@ -76,9 +78,11 @@ export function createContext(config: Config): Context {
       if (run.taskId) tasks.onRunFinished(run.taskId, run.status === "completed");
       // Late-bound: the queue is created right after the run manager.
       void queue.onRunFinished(run).catch((e) => console.error("[agentic] queue error", e));
+      void replies.onRunFinished(run).catch((e) => console.error("[agentic] reply queue error", e));
       void integrations.notify("runFinished", runMessage(run), run.status !== "completed");
     },
   });
+  const replies: ReplyQueue = new ReplyQueue(store, runs);
   const queue: TaskQueue = new TaskQueue(store, tasks, runs, (st) => {
     const ok = st.processed.filter((p) => p.status === "completed").length;
     void integrations.notify("queueFinished", queueMessage(st), ok < st.processed.length);
@@ -98,6 +102,7 @@ export function createContext(config: Config): Context {
     agents: new AgentManager(config.claudeHome),
     tasks,
     mail,
+    replies,
     runs,
     projects,
     pulls: new PullService(integrations, projects),

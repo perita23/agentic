@@ -440,9 +440,22 @@ try {
   await page.locator("aside").getByText("Claude trabajando").waitFor({ timeout: 20000 });
   check(true, "sidebar shows the live orb while a run is working");
   await page.goto(`${base}/runs/${longRun.id}`);
-  await page.getByRole("button", { name: "Detener" }).click();
+  // While Claude works you can still write: the message waits in line (and is not sent yet).
+  await page.getByLabel("Responder a Claude").fill("segundo mensaje en cola");
+  await page.getByRole("button", { name: "Añadir a la cola" }).click();
+  await page.getByLabel("Mensajes en cola").getByText("segundo mensaje en cola").waitFor({ timeout: 10000 });
+  const queueApi = await (await fetch(base + `/api/runs/${longRun.id}/queue`, { headers: { authorization: `Bearer ${token}` } })).json();
+  const threadRuns = (await (await fetch(base + "/api/runs", { headers: { authorization: `Bearer ${token}` } })).json()).runs.filter((r) => (r.threadId ?? r.id) === longRun.id);
+  check(queueApi.queue.length === 1 && threadRuns.length === 1, "a message written while Claude works waits in the queue instead of being sent");
+  await shot("03f-queue");
+  // Stop from the chat box itself; the queue pauses and nothing is sent behind your back.
+  await page.locator("form").getByRole("button", { name: "Detener" }).click();
   await page.locator("main").getByText("detenida", { exact: true }).waitFor({ timeout: 15000 });
-  check(true, "stop a running run from the UI");
+  check(true, "stop a running run from the chat box");
+  await page.getByLabel("Mensajes en cola").getByText(/Cola en pausa/).waitFor({ timeout: 10000 });
+  check(true, "stopping pauses the queue (the user decides what to send)");
+  await page.getByRole("button", { name: /Quitar de la cola/ }).click();
+  await page.getByLabel("Mensajes en cola").waitFor({ state: "detached", timeout: 10000 });
 
   // Tasks: create from template, then see it on the board.
   await page.goto(`${base}/tasks`);
