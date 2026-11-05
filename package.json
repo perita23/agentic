@@ -1,6 +1,6 @@
 {
   "name": "agentic-console",
-  "version": "0.44.1",
+  "version": "0.45.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/agentic.mjs dev",
@@ -58,7 +58,7 @@
     "vitest": "^5.1.0"
   },
   "description": "Consola web local para gestionar sesiones, agentes, tareas y proyectos de Claude Code",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "engines": {
     "node": ">=20.9"
   }

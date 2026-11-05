@@ -4,7 +4,7 @@
   "version": "0.41.0",
   "description": "Agentic Console para macOS",
   "main": "main.cjs",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "devDependencies": {
     "@electron/fuses": "1.8.0",
     "electron": "^45.2.1",

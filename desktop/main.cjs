@@ -11,6 +11,7 @@ const os = require("node:os");
 const path = require("node:path");
 const fs = require("node:fs");
 const { createDesktopSession } = require("./lib/session.cjs");
+const { createIsland } = require("./lib/island.cjs");
 const { loginShellPath, pickPort, waitForPort } = require("./lib/env.cjs");
 const updater = require("./lib/updater.cjs");
 const appLock = require("./lib/lock.cjs");
@@ -30,6 +31,7 @@ const UPDATE_PUBLIC_KEY = (() => {
   }
 })();
 let win = null;
+let island = null;
 let origin = null;
 
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -510,6 +512,25 @@ app.whenReady().then(async () => {
       }
     });
     createWindow(() => lock.close());
+    // The island at the top of the screen (see lib/island.cjs). Closing the window keeps the app alive, so it stays; ⌘Q ends it.
+    island = createIsland({
+      BrowserWindow,
+      screen,
+      ipcMain,
+      getOrigin: () => origin,
+      openMain: (p) => {
+        if (!win || win.isDestroyed()) createWindow();
+        else win.loadURL(`${origin}${p}`);
+        if (win && !win.isDestroyed()) {
+          if (win.isMinimized()) win.restore();
+          win.show();
+          win.focus();
+        }
+        // A window created just now already loads "/": go to the page once it is ready.
+        if (win) win.webContents.once("did-finish-load", () => win && !win.isDestroyed() && win.webContents.getURL() !== `${origin}${p}` && win.loadURL(`${origin}${p}`));
+      },
+    });
+    island.create();
     // Check every time the user enters the app: at launch, and when it is
     // activated or a window regains focus (throttled to every 10 minutes).
     win.webContents.once("did-finish-load", () => checkOnEntry());
@@ -522,7 +543,8 @@ app.whenReady().then(async () => {
 });
 
 app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0 && origin) createWindow();
+  // The island is a window too, so "no windows" is not enough: look at the main one.
+  if (origin && (!win || win.isDestroyed())) createWindow();
   if (origin) checkOnEntry();
 });
 app.on("window-all-closed", () => {

@@ -12,9 +12,9 @@ const notarize = signed && !!process.env.APPLE_ID && !!process.env.APPLE_APP_SPE
 module.exports = {
   appId: "dev.agentic.console",
   productName: "Agentic",
-  copyright: "MIT",
+  copyright: "Copyright © 2026 Hugo Gonzalez Bedmar · PolyForm Noncommercial 1.0.0",
   directories: { output: "dist", buildResources: "build" },
-  files: ["main.cjs", "preload.cjs", "server-entry.cjs", "lock.html", "lock.js", "lock-preload.cjs", "update-key.pem", "lib/**/*", "package.json"],
+  files: ["main.cjs", "preload.cjs", "server-entry.cjs", "lock.html", "lock.js", "lock-preload.cjs", "island-preload.cjs", "update-key.pem", "lib/**/*", "package.json"],
   // The Next.js standalone server (incl. its .next folder) runs with Electron's Node.
   extraResources: [{ from: "../.next/standalone", to: "app-server", filter: ["**/*", ".next/**/*", "**/.next/**/*"] }],
   asar: true,
@@ -36,7 +36,7 @@ module.exports = {
     notarize,
     extendInfo: {
       LSApplicationCategoryType: "public.app-category.developer-tools",
-      NSHumanReadableCopyright: "Agentic Console — MIT",
+      NSHumanReadableCopyright: "Agentic Console — PolyForm Noncommercial 1.0.0",
       // Shown by macOS when Agentic first reads a project in these folders.
       NSDocumentsFolderUsageDescription: "Agentic lee tus proyectos y los agentes de Claude Code (.claude) que están en Documentos.",
       NSDesktopFolderUsageDescription: "Agentic lee tus proyectos y los agentes de Claude Code (.claude) que están en el Escritorio.",
