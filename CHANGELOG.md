@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.46.1] - 2026-11-05
+
+### Corregido
+- **La isla aparecía debajo de la barra de menús en vez de en la muesca.** macOS empuja por defecto cualquier ventana fuera de la barra; ahora la ventana de la isla pide no ser «limitada» a la pantalla útil (la misma razón por la que las apps nativas de muesca sobrescriben `constrainFrameRect`) y, si aun así la bajara, se recoloca en el borde superior. Además lee la **muesca real** (ancho y alto) que macOS informa para cada pantalla, en lugar de estimarla; si no puede, usa una estimación.
+
 ## [0.46.0] - 2026-11-05
 
 ### Añadido
