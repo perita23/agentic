@@ -38,6 +38,8 @@ export interface Run {
   sessionId: string | null;
   exitCode: number | null;
   costUsd: number | null;
+  /** Tokens the turn used (input + output), as the result event reports them. */
+  tokens?: number | null;
   durationMs: number | null;
   numTurns: number | null;
   resultText: string | null;
@@ -160,6 +162,15 @@ export function slimLogEvent(o: Record<string, unknown>, dataDir: string): Recor
 
 /** Headless answers render as Markdown: emails and ready-to-paste texts get their own box with a Copy button. */
 const COPY_BLOCK_HINT = "Si redactas un correo, un mensaje o cualquier texto pensado para copiar y pegar, ponlo dentro de un bloque de código con la etiqueta ```email (correo) o ```text (otros textos), sin nada más dentro del bloque que el texto en sí.";
+
+/** Input + output tokens of a turn, from the `usage` of its result event. */
+export function resultTokens(usage: unknown): number | null {
+  const u = usage as { input_tokens?: unknown; output_tokens?: unknown } | null | undefined;
+  if (!u || typeof u !== "object") return null;
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  const total = n(u.input_tokens) + n(u.output_tokens);
+  return total > 0 ? total : null;
+}
 
 /** Build the argv passed to `claude` (never through a shell). */
 export function buildClaudeArgs(input: RunInput): string[] {
@@ -285,6 +296,7 @@ export class RunManager {
       sessionId: input.resumeSessionId ?? null,
       exitCode: null,
       costUsd: null,
+      tokens: null,
       durationMs: null,
       numTurns: null,
       resultText: null,
@@ -411,6 +423,7 @@ export class RunManager {
       if (o.type === "result") {
         this.patch(run.id, {
           costUsd: typeof o.total_cost_usd === "number" ? o.total_cost_usd : null,
+          tokens: resultTokens(o.usage),
           durationMs: typeof o.duration_ms === "number" ? o.duration_ms : null,
           numTurns: typeof o.num_turns === "number" ? o.num_turns : null,
           resultText: typeof o.result === "string" ? o.result.slice(0, 20_000) : null,

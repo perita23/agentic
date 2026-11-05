@@ -23,3 +23,18 @@ describe("streamed text", () => {
     expect(liveStats(events).partial).toBe(""); // the complete message replaced the pieces
   });
 });
+
+import { resultTokens } from "@/lib/server/runs";
+
+describe("resultTokens", () => {
+  it("adds input and output tokens of the result's usage", () => {
+    expect(resultTokens({ input_tokens: 120, output_tokens: 380, cache_read_input_tokens: 90000 })).toBe(500);
+    expect(resultTokens({ output_tokens: 7 })).toBe(7);
+  });
+  it("is null when there is nothing usable", () => {
+    expect(resultTokens(undefined)).toBeNull();
+    expect(resultTokens({})).toBeNull();
+    expect(resultTokens("x")).toBeNull();
+    expect(resultTokens({ input_tokens: "3" })).toBeNull();
+  });
+});

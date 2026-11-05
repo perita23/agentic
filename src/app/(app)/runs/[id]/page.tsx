@@ -29,7 +29,7 @@ import { BranchSwitcher } from "@/components/app/branch-switcher";
 import { FileList, useFileMenu } from "@/components/app/file-menu";
 import { LiveStatus } from "@/components/app/live-status";
 import { Appear } from "@/components/app/appear";
-import { LiveStatsAcc, type LiveStats } from "@/lib/live-stats";
+import { LiveStatsAcc, compactTokens, type LiveStats } from "@/lib/live-stats";
 import { useStickToBottom } from "@/lib/use-stick-bottom";
 import { AnimatedNumber } from "@/components/app/animated-number";
 import { Markdown } from "@/components/app/markdown";
@@ -47,13 +47,12 @@ function contentText(c: unknown): string {
   return "";
 }
 
-/** The turn's closing line: cost, time and turns. It shows the text itself only when it is not already written above. */
+/** The turn's closing line: time and turns. It shows the text itself only when it is not already written above. */
 function ResultCard({ e, jira, duplicate }: { e: Ev; jira: (t: string) => React.ReactNode; duplicate: boolean }) {
   const text = String(e.result ?? "");
   const meta = (
     <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
       <span className={e.is_error ? "text-destructive" : "text-success"}>{e.is_error ? "Error" : "Terminado"}</span>
-      {typeof e.total_cost_usd === "number" && <span>${e.total_cost_usd.toFixed(4)}</span>}
       {typeof e.duration_ms === "number" && <span>{(e.duration_ms / 1000).toFixed(1)} s</span>}
       {typeof e.num_turns === "number" && <span>{e.num_turns} turnos</span>}
     </div>
@@ -663,7 +662,7 @@ export default function RunPage() {
   const root = thread[0];
   const run = thread[thread.length - 1];
   const sum = (f: (r: Run) => number | null) => (thread.some((r) => f(r) != null) ? thread.reduce((a, r) => a + (f(r) ?? 0), 0) : null);
-  const cost = sum((r) => r.costUsd);
+  const tokens = sum((r) => r.tokens ?? null);
   const duration = sum((r) => r.durationMs);
   const turns = sum((r) => r.numTurns);
 
@@ -771,7 +770,7 @@ export default function RunPage() {
               <CardTitle>Métricas</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-3 text-sm">
-              <Metric k="Coste" v={cost != null ? <AnimatedNumber value={cost} format={(n) => `$${n.toFixed(4)}`} /> : "—"} />
+              <Metric k="Tokens" v={tokens != null ? <AnimatedNumber value={tokens} format={(n) => compactTokens(Math.round(n))} /> : "—"} />
               <Metric k="Duración" v={duration != null ? <AnimatedNumber value={duration / 1000} format={(n) => `${n.toFixed(1)} s`} /> : "—"} />
               <Metric k="Turnos" v={turns != null ? <AnimatedNumber value={turns} /> : "—"} />
               <Metric k="Código salida" v={run.exitCode != null ? String(run.exitCode) : "—"} />
