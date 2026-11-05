@@ -235,6 +235,7 @@ try {
   page.on("console", (m) => m.type() === "error" && consoleErrors.push(m.text()));
   page.on("pageerror", (e) => consoleErrors.push(e.message));
   const shot = async (name) => shots && page.screenshot({ path: path.join(shots, `${name}.png`) });
+  const shot0 = async (pg, name) => shots && pg.screenshot({ path: path.join(shots, `${name}.png`) });
 
   await page.goto(`${base}/auth?token=${token}`);
   await page.getByRole("heading", { name: "Dashboard" }).waitFor();
@@ -274,6 +275,36 @@ try {
   const ov = await overflowing();
   await shot("03i-curl");
   check(ov.scroll <= 1 && ov.bad.length === 0, `a long curl does not overflow the page sideways ${JSON.stringify(ov)}`);
+  // The island (macOS app): rendered here in a plain page with a stand-in for the native bridge.
+  const islCtx = await browser.newContext({ storageState: await page.context().storageState(), deviceScaleFactor: 3 });
+  const isl = await islCtx.newPage();
+  await isl.setViewportSize({ width: 460, height: 150 });
+  await isl.addInitScript(() => {
+    window.__island = [];
+    window.agenticIsland = {
+      metrics: async () => ({ notch: true, notchWidth: 200, barHeight: 37 }),
+      show: () => window.__island.push("show"),
+      hide: () => window.__island.push("hide"),
+      interactive: (on) => window.__island.push(`interactive:${on}`),
+      open: (p) => window.__island.push(`open:${p}`),
+    };
+  });
+  await isl.goto(`${base}/island`);
+  await isl.waitForTimeout(1800);
+  await (
+    await fetch(base + "/api/runs", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ projectPath: project, prompt: "CURLLONG island" }) })
+  ).json();
+  await isl.getByText(/Escribiendo|Ejecutando|Pensando|Leyendo/).first().waitFor({ timeout: 10000 });
+  await isl.addStyleTag({ content: "html{background:#2c2c2e !important}" });
+  await isl.waitForTimeout(700);
+  await shot0(isl, "06a-island-work");
+  check(await isl.evaluate(() => window.__island.includes("show")), "the island opens while Claude works");
+  await isl.getByText("Claude ha terminado").waitFor({ timeout: 20000 });
+  await isl.waitForTimeout(900);
+  await shot0(isl, "06b-island-alert");
+  await isl.getByRole("button", { name: "Abrir" }).click();
+  check(await isl.evaluate(() => window.__island.some((c) => /^open:\/runs\/[0-9a-f-]+$/.test(c))), "the island's Abrir button opens the run in the main window");
+  await islCtx.close();
   await page.setViewportSize({ width: 820, height: 900 });
   await page.waitForTimeout(400);
   const ovNarrow = await overflowing();

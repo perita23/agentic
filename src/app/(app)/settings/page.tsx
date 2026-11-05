@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { CopyButton, PageHeader } from "@/components/app/common";
 import { DesktopCard } from "@/components/app/desktop-card";
+import { IslandCard } from "@/components/app/island-card";
 import { InstallTool } from "@/components/app/install-tool";
 import { AuditCard, SessionsCard, TouchIdCard } from "@/components/app/security-settings";
 import { DataCard } from "@/components/app/data-card";
@@ -70,6 +71,7 @@ export default function SettingsPage() {
         {/* Notifications spans both columns when there is no desktop card (browser). */}
         <div className="grid gap-4 lg:col-span-2 lg:grid-cols-2 lg:[&>*:only-child]:col-span-2">
           <DesktopCard />
+          <IslandCard />
           <NotificationsCard />
         </div>
         <Card>

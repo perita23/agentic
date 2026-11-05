@@ -3,6 +3,17 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.45.0] - 2026-11-05
+
+### Añadido
+- **La isla de Agentic (app de Mac).** Una píldora negra pegada al centro superior de la pantalla, alrededor de la cámara, con la silueta de la muesca de Apple: hombros cóncavos arriba que se funden con la barra de menús y esquinas inferiores «continuas». Es una ventana propia de Electron (no una API de Apple), siempre encima, también sobre apps a pantalla completa, y no roba el foco al hacer clic.
+  - **Mientras Claude trabaja** muestra la bolita animada con su estado y el paso en el que va (pensando, escribiendo, ejecutando, leyendo, editando…).
+  - **Al terminar, al fallar o cuando te espera** (un plan o un permiso) se expande con animación, con el proyecto y el título, y los botones **Abrir** (lleva la ventana principal a esa ejecución) y **Descartar**.
+  - Se esconde sola cuando no hay nada que contar. Solo avisa de lo que termina mientras la app está abierta, no de lo antiguo.
+  - **Ajustes → Isla de Agentic**: interruptor general y por tipo de aviso (mientras trabaja / al terminar). Viene activada.
+  - Cerrar la ventana deja la app en segundo plano (la isla sigue); ⌘Q la apaga. El Dock vuelve a abrir la ventana.
+  - Electron no da la geometría de la muesca: se estima por la altura de la barra de menús; en Macs sin muesca la píldora queda centrada bajo la barra.
+
 ## [0.44.1] - 2026-11-05
 
 ### Añadido
