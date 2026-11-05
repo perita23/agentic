@@ -435,9 +435,9 @@ try {
   await page.getByText("en vivo").waitFor({ timeout: 10000 });
   await page.locator("main").getByText("some stderr line").waitFor({ timeout: 10000 });
   check((await fetch(base + `/api/runs/${longRun.id}`, { headers: { authorization: `Bearer ${token}` } }).then((r) => r.json())).status === "running", "live log streams over SSE while the run is still running");
-  // Live feedback while Claude works: the step, how long it has taken, the tokens written, and the answer's skeleton.
+  // Live feedback while Claude works: the step, how long it has taken, the tokens written; the status text glows.
   await page.locator("main").getByText(/42 tokens/).waitFor({ timeout: 10000 });
-  check(/\d+ s/.test(await page.locator("main [role=status]").first().innerText()) && (await page.locator("main .orb-skeleton").count()) >= 3, "while Claude works the chat shows elapsed time, tokens and a skeleton of the coming answer");
+  check(/\d+ s/.test(await page.locator("main [role=status]").first().innerText()) && (await page.locator("main .orb-text").count()) >= 1, "while Claude works the chat shows elapsed time, tokens and glowing status text");
   check((await page.locator("aside").getByText("Claude trabajando").count()) === 0, "sidebar hides the live card on the run page (it already shows its own orb)");
   await page.goto(`${base}/tasks`);
   await page.locator("aside").getByText("Claude trabajando").waitFor({ timeout: 20000 });
