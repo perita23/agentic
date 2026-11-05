@@ -3,6 +3,12 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.39.0] - 2026-11-05
+
+### Añadido
+- **Detener desde la propia caja del chat.** Mientras Claude trabaja aparece un botón «Detener» junto al de enviar (antes sólo estaba arriba, en la cabecera).
+- **Mensajes en cola.** La caja ya no se bloquea mientras Claude trabaja: escribe, pulsa «Añadir a la cola» (o Ctrl/⌘+Enter) y el mensaje espera. Cuando el turno termina bien, se envían de uno en uno y en orden (hasta 10 por conversación). La cola se guarda en el servidor, así que sigue ahí aunque salgas de la pantalla. Cada mensaje en cola se puede quitar. Si detienes a Claude o falla, la **cola se pausa** y no se envía nada a tus espaldas: tú eliges «Enviar ahora» o quitar mensajes. Los mensajes en cola nunca usan el modo que se salta los permisos.
+
 ## [0.38.1] - 2026-11-05
 
 ### Cambiado

@@ -29,6 +29,7 @@ if (prompt.includes("EDIT")) {
   out({ type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", id: "t1", name: "Write", input: { file_path: path.join(process.cwd(), "created-by-claude.txt"), content: "hello from claude\n" } }] } });
   if (fs.existsSync("old-name.txt")) fs.renameSync("old-name.txt", "new-name.txt");
 }
+if (prompt.includes("SLOW")) await new Promise((r) => setTimeout(r, 900)); // a turn that takes a moment
 if (prompt.includes("BASHCHANGE")) {
   // A change made through the terminal (not an Edit/Write tool call): the file changes, then the tool result arrives.
   const fs = await import("node:fs");

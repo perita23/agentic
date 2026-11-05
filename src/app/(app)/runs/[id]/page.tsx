@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeftIcon, BotIcon, FileDiffIcon, CornerDownLeftIcon, ExternalLinkIcon, PlayIcon, SquareIcon, TerminalIcon, Trash2Icon } from "lucide-react";
+import { ArrowLeftIcon, BotIcon, FileDiffIcon, CornerDownLeftIcon, ListPlusIcon, ExternalLinkIcon, PlayIcon, SquareIcon, TerminalIcon, Trash2Icon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -337,13 +337,38 @@ function ReplyBox({ run }: { run: Run }) {
   const files = useFileMenu(text, setText, boxRef, run.projectPath);
   const att = useAttachments();
   const [drag, setDrag] = React.useState(false);
-  if (run.mode !== "headless") return null;
   const waiting = run.status === "running";
+  const { data: queued, mutate: refetchQueue } = useApi<{ queue: { id: string; prompt: string; images?: string[] }[] }>(run.mode === "headless" ? `/api/runs/${run.id}/queue` : null, { refreshInterval: waiting ? 2500 : 0 });
+  if (run.mode !== "headless") return null;
   const noSession = !run.sessionId;
+  const queue = queued?.queue ?? [];
+
+  async function stop() {
+    try {
+      await api("POST", `/api/runs/${run.id}/stop`);
+      refresh("/api/runs", "/api/overview");
+      toast.success("Detenido", { description: queue.length ? "La cola queda en pausa: tú decides qué enviar." : undefined });
+    } catch (err) {
+      toast.error("No se pudo detener", { description: errorMessage(err) });
+    }
+  }
+  async function dropQueued(id: string) {
+    await api("DELETE", `/api/runs/${run.id}/queue/${id}`);
+    void refetchQueue();
+  }
+  async function sendQueuedNow() {
+    try {
+      await api("PUT", `/api/runs/${run.id}/queue`);
+      refresh("/api/runs", "/api/overview");
+      void refetchQueue();
+    } catch (err) {
+      toast.error("No se pudo enviar", { description: errorMessage(err) });
+    }
+  }
 
   async function send(e?: React.SyntheticEvent) {
     e?.preventDefault();
-    if ((!text.trim() && !att.any) || waiting || noSession || att.uploading) return;
+    if ((!text.trim() && !att.any) || (noSession && !waiting) || att.uploading) return;
     const cmd = parseSlash(text);
     if (cmd.error) {
       toast.error(cmd.error);
@@ -361,6 +386,21 @@ function ReplyBox({ run }: { run: Run }) {
     }
     setBusy(true);
     try {
+      if (waiting) {
+        // Claude is working: the message waits in line and goes out when this turn finishes.
+        const r = await api<{ started?: Run; queue: unknown[] }>("POST", `/api/runs/${run.id}/queue`, {
+          prompt: att.withPastes(cmd.prompt) || "Mira lo que te adjunto.",
+          images: att.imageIds.length ? att.imageIds : undefined,
+          permissionMode: nextMode,
+          model: nextModel || undefined,
+        });
+        setText("");
+        att.clear();
+        void refetchQueue();
+        refresh("/api/runs", "/api/overview");
+        toast.success(r.started ? "Enviado" : `En cola (${r.queue.length})`, { description: r.started ? undefined : "Saldrá en cuanto Claude termine." });
+        return;
+      }
       await api<Run>("POST", "/api/runs", {
         mode: "headless",
         projectPath: run.projectPath,
@@ -381,7 +421,8 @@ function ReplyBox({ run }: { run: Run }) {
     }
   }
 
-  const off = waiting || noSession;
+  // While Claude works you can still write: the message is queued. Only a conversation without a session is closed.
+  const off = noSession && !waiting;
   return (
     <form
       onSubmit={send}
@@ -390,6 +431,30 @@ function ReplyBox({ run }: { run: Run }) {
       onDrop={(e) => { setDrag(false); if (off || !e.dataTransfer.files.length) return; e.preventDefault(); void att.addFiles([...e.dataTransfer.files]); }}
       className={cn("grid gap-2 border-t bg-card p-3 transition-colors", drag && "bg-accent/40 outline-2 -outline-offset-4 outline-dashed outline-primary/60")}
     >
+      {queue.length > 0 && (
+        <div className="grid gap-1.5 rounded-lg border bg-inset p-2.5 text-xs" aria-label="Mensajes en cola">
+          <div className="flex items-center gap-2 font-medium">
+            <ListPlusIcon className="size-3.5 text-muted-foreground" />
+            {waiting ? `En cola (${queue.length}) · se envían uno a uno al terminar` : `Cola en pausa (${queue.length}) · Claude no está trabajando`}
+            {!waiting && (
+              <Button type="button" size="sm" variant="outline" className="ml-auto h-7" onClick={() => void sendQueuedNow()}>
+                Enviar ahora
+              </Button>
+            )}
+          </div>
+          <ol className="grid gap-1">
+            {queue.map((q, n) => (
+              <li key={q.id} className="flex min-w-0 items-start gap-2 rounded-md bg-card px-2 py-1">
+                <span className="mt-px shrink-0 tabular-nums text-muted-foreground">{n + 1}.</span>
+                <span className="line-clamp-2 min-w-0 flex-1 break-words">{q.prompt}{q.images?.length ? ` · ${q.images.length} imagen${q.images.length === 1 ? "" : "es"}` : ""}</span>
+                <button type="button" aria-label={`Quitar de la cola: ${q.prompt.slice(0, 40)}`} onClick={() => void dropQueued(q.id)} className="shrink-0 cursor-pointer text-muted-foreground hover:text-destructive">
+                  <XIcon className="size-3.5" />
+                </button>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
       <AttachmentBar att={att} disabled={off} />
       <div className="relative">
         {menu.open && <SlashList items={menu.items} active={menu.active} onPick={menu.pick} />}
@@ -411,7 +476,7 @@ function ReplyBox({ run }: { run: Run }) {
             if (menu.onKeyDown(e)) return;
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void send(e);
           }}
-          placeholder={waiting ? "Claude está trabajando; podrás responder cuando termine…" : noSession ? "Esta ejecución no tiene sesión que continuar." : "Responde a Claude. Escribe / para comandos y @ para archivos, o pega o arrastra imágenes y textos largos."}
+          placeholder={waiting ? "Claude está trabajando. Escribe y tu mensaje se enviará en cuanto termine (puedes dejar varios en cola)." : noSession ? "Esta ejecución no tiene sesión que continuar." : "Responde a Claude. Escribe / para comandos y @ para archivos, o pega o arrastra imágenes y textos largos."}
           className="min-h-32 w-full resize-y rounded-md border bg-inset p-3 text-sm disabled:opacity-60"
         />
       </div>
@@ -432,10 +497,17 @@ function ReplyBox({ run }: { run: Run }) {
             </option>
           ))}
         </select>
-        <span className="hidden text-xs text-muted-foreground sm:inline">Ctrl/⌘ + Enter para enviar</span>
-        <Button type="submit" size="sm" className="ml-auto" disabled={busy || off || att.uploading || (!text.trim() && !att.any)}>
-          <CornerDownLeftIcon /> {busy ? "Enviando…" : "Enviar"}
-        </Button>
+        <span className="hidden text-xs text-muted-foreground sm:inline">Ctrl/⌘ + Enter para {waiting ? "dejarlo en cola" : "enviar"}</span>
+        <div className="ml-auto flex items-center gap-2">
+          {waiting && (
+            <Button type="button" size="sm" variant="outline" className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => void stop()}>
+              <SquareIcon /> Detener
+            </Button>
+          )}
+          <Button type="submit" size="sm" disabled={busy || off || att.uploading || (!text.trim() && !att.any)}>
+            {waiting ? <ListPlusIcon /> : <CornerDownLeftIcon />} {busy ? "Enviando…" : waiting ? "Añadir a la cola" : "Enviar"}
+          </Button>
+        </div>
       </div>
     </form>
   );
