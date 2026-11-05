@@ -354,7 +354,9 @@ export class RunManager {
     run.pid = child.pid ?? null;
     this.saveNew(run);
     this.procs.set(run.id, child);
-    writeLog({ type: "agentic", subtype: "start", args: [this.opts.claudeBin, ...args.slice(0, -1), "<prompt>"], cwd, at: run.startedAt });
+    // The long instruction passed with --append-system-prompt would flood the header: it is shown shortened.
+    const shownArgs = args.slice(0, -1).map((a, i, all) => (all[i - 1] === "--append-system-prompt" ? "<instrucciones>" : a));
+    writeLog({ type: "agentic", subtype: "start", args: [this.opts.claudeBin, ...shownArgs, "<prompt>"], cwd, at: run.startedAt });
 
     // Changes made through the terminal show up in the chat where they happened (see ChangeWatcher).
     const base = run.git?.head;

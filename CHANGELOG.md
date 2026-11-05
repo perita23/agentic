@@ -3,6 +3,15 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.44.1] - 2026-11-05
+
+### Añadido
+- **El texto de estado se transforma al cambiar.** Cuando pasa de «Pensando…» a «Terminal · comando» (o a cualquier otro paso), las palabras viejas se difuminan y salen las nuevas con un desenfoque suave, en vez de cambiar de golpe.
+
+### Corregido
+- **Un texto largo sin espacios (un `curl` con token o URL) ya no ensancha la pantalla.** El chat usaba una rejilla cuya columna crecía con el texto más largo; ahora la columna se ajusta al ancho disponible. Los bloques de código de shell (`bash`, `sh`…) parten las líneas largas en vez de desplazarse de lado.
+- **La cabecera de una ejecución ya no enseña entero** el texto de la instrucción que Agentic añade a Claude: se acorta a `<instrucciones>`.
+
 ## [0.44.0] - 2026-11-05
 
 ### Añadido

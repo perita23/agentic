@@ -252,6 +252,35 @@ try {
   await page.waitForTimeout(600);
   await shot("01-dashboard");
 
+  // A long curl (command, output and answer) must never push the page sideways, live or finished.
+  const curlRun = await (
+    await fetch(base + "/api/runs", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ projectPath: project, prompt: "CURLLONG" }) })
+  ).json();
+  await page.goto(`${base}/runs/${curlRun.id}`);
+  await page.locator("main").getByText(/Lo probé así/).waitFor({ timeout: 15000 });
+  await page.waitForTimeout(600);
+  const overflowing = () =>
+    page.evaluate(() => {
+      const w = document.documentElement.clientWidth;
+      const bad = [];
+      for (const el of document.querySelectorAll("main *")) {
+        const r = el.getBoundingClientRect();
+        let p = el.parentElement, clipped = false;
+        while (p && p !== document.body) { const o = getComputedStyle(p); if (/(hidden|auto|scroll|clip)/.test(o.overflowX)) { clipped = true; break; } p = p.parentElement; }
+        if (!clipped && r.width > 0 && r.right > w + 1) bad.push(`${el.tagName.toLowerCase()}.${String(el.className).slice(0, 60)} right=${Math.round(r.right)}`);
+      }
+      return { scroll: document.documentElement.scrollWidth - w, bad: bad.slice(0, 6) };
+    });
+  const ov = await overflowing();
+  await shot("03i-curl");
+  check(ov.scroll <= 1 && ov.bad.length === 0, `a long curl does not overflow the page sideways ${JSON.stringify(ov)}`);
+  await page.setViewportSize({ width: 820, height: 900 });
+  await page.waitForTimeout(400);
+  const ovNarrow = await overflowing();
+  check(ovNarrow.scroll <= 1 && ovNarrow.bad.length === 0, `…nor in a narrow window ${JSON.stringify(ovNarrow)}`);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  if (process.env.SMOKE_ONLY_OVERFLOW) { await browser.close(); process.exit(0); }
+
   // macOS app: what the Electron preload does. The brand must clear the traffic
   // lights (≈ 18–70px) and the top bars must drag the window, except controls.
   const chrome = await page.evaluate(() => {
@@ -309,7 +338,7 @@ try {
   await page.waitForURL(/\/runs\/[0-9a-f-]{36}$/);
   await page.getByText("done: Escribe tests para el login EDIT").waitFor({ timeout: 15000 });
   check(true, "headless run launched from UI and finished with result");
-  await page.getByText("Ejecución completada").waitFor({ timeout: 10000 });
+  await page.getByText("Ejecución completada").first().waitFor({ timeout: 10000 });
   check(true, "finished run triggers a notification toast");
   // A file Claude creates shows up in the conversation right where it happened: the file, its line counts and the code.
   const createdCard = page.locator("main").getByRole("button", { name: /Creó archivo\s*created-by-claude\.txt/ });
@@ -438,6 +467,7 @@ try {
   // Live feedback while Claude works: the step, how long it has taken, the tokens written; the status text glows.
   await page.locator("main").getByText(/42 tokens/).waitFor({ timeout: 10000 });
   check(/\d+ s/.test(await page.locator("main [role=status]").first().innerText()) && (await page.locator("main .orb-text").count()) >= 1, "while Claude works the chat shows elapsed time, tokens and glowing status text");
+  await shot("03g-live-status");
   check((await page.locator("aside").getByText("Claude trabajando").count()) === 0, "sidebar hides the live card on the run page (it already shows its own orb)");
   await page.goto(`${base}/tasks`);
   await page.locator("aside").getByText("Claude trabajando").waitFor({ timeout: 20000 });
@@ -459,6 +489,15 @@ try {
   check(true, "stopping pauses the queue (the user decides what to send)");
   await page.getByRole("button", { name: /Quitar de la cola/ }).click();
   await page.getByLabel("Mensajes en cola").waitFor({ state: "detached", timeout: 10000 });
+
+  // Text streams in while Claude writes it (partial messages), before the complete message exists.
+  const streamRun = await (
+    await fetch(base + "/api/runs", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ projectPath: project, prompt: "STREAMTEXT" }) })
+  ).json();
+  await page.goto(`${base}/runs/${streamRun.id}`);
+  await page.locator("main").getByText(/esto se va/).first().waitFor({ timeout: 10000 });
+  await shot("03h-streaming");
+  check(true, "the answer shows up while Claude is still writing it");
 
   // Tasks: create from template, then see it on the board.
   await page.goto(`${base}/tasks`);
@@ -557,6 +596,16 @@ try {
   const chatRun = (await (await fetch(base + "/api/runs", { headers: { authorization: `Bearer ${token}` } })).json()).runs.find((r) => r.prompt.startsWith("Hola Claude"));
   check(chats.chats.length === 1 && chatRun && chatRun.projectPath.endsWith("/chat"), "chat starts a Claude conversation outside any project and keeps it in the history");
   await shot("05b-chat");
+  // A long curl pasted into the chat must not widen the conversation either.
+  await page.getByRole("button", { name: /Nuevo chat/ }).first().click();
+  const tok = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9".repeat(8);
+  await page.getByLabel("Mensaje para Claude").fill(`CURLLONG curl -sS -H "Authorization: Bearer ${tok}" https://api.example.com/v1/${tok}?x=${tok}`);
+  await page.keyboard.press("Enter");
+  await page.locator("main").getByText(/Authorization: Bearer/).first().waitFor({ timeout: 10000 });
+  await page.waitForTimeout(500);
+  const chatOv = await page.evaluate(() => { const w = document.documentElement.clientWidth; const c = document.querySelector("main .overflow-y-auto"); return { page: document.documentElement.scrollWidth - w, pane: c ? c.scrollWidth - c.clientWidth : 0 }; });
+  await shot("05e-chat-curl");
+  check(chatOv.page <= 1 && chatOv.pane <= 1, `a long curl in the chat does not overflow sideways ${JSON.stringify(chatOv)}`);
 
   // MCP servers: add a popular one through `claude mcp add`.
   await page.goto(`${base}/mcp`);

@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 export function Appear({ live = true, className, children }: { live?: boolean; className?: string; children: React.ReactNode }) {
   // Decided once, when the item first shows up.
   const [on] = React.useState(() => live && pastBoot());
-  return <div className={cn("empty:hidden", on && "appear", className)}>{children}</div>;
+  return <div className={cn("min-w-0 empty:hidden", on && "appear", className)}>{children}</div>;
 }
 
 const BOOT = Date.now();
