@@ -118,7 +118,7 @@ export const runCreateSchema = z
     images: z.array(z.uuid()).max(6).optional(),
   })
   .refine((r) => r.mode === "tmux" || r.prompt.trim().length > 0, { message: "prompt is required for headless runs", path: ["prompt"] });
-export type RunInput = z.infer<typeof runCreateSchema> & { addDirs?: string[] };
+export type RunInput = z.infer<typeof runCreateSchema> & { addDirs?: string[]; allowedTools?: string[]; appendPrompt?: string };
 
 export interface RunOptions {
   dataDir: string;
@@ -126,6 +126,8 @@ export interface RunOptions {
   maxConcurrent: number;
   maxLogBytes: number;
   onFinished?: (run: Run) => void;
+  /** Obsidian: what a headless run in this folder needs to write notes (null = off). */
+  obsidian?: (cwd: string) => { addDir: string; allow: string[]; hint: string } | null;
 }
 
 const R = "runs";
@@ -176,7 +178,8 @@ export function resultTokens(usage: unknown): number | null {
 export function buildClaudeArgs(input: RunInput): string[] {
   const args: string[] = [];
   if (input.mode === "headless") args.push("-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages");
-  if (input.mode === "headless") args.push("--append-system-prompt", COPY_BLOCK_HINT);
+  if (input.mode === "headless") args.push("--append-system-prompt", input.appendPrompt ? `${COPY_BLOCK_HINT}\n\n${input.appendPrompt}` : COPY_BLOCK_HINT);
+  for (const rule of input.allowedTools ?? []) args.push("--allowedTools", rule);
   if (input.model) args.push("--model", input.model);
   if (input.agent) args.push("--agent", input.agent);
   for (const d of input.addDirs ?? []) args.push("--add-dir", d);
@@ -313,6 +316,9 @@ export class RunManager {
       claudeInput = { ...input, prompt: `${input.prompt}\n\n[Imágenes adjuntas: míralas con la herramienta Read]\n${files.join("\n")}`, addDirs: [uploadsDir(this.opts.dataDir)] };
       run.images = input.images;
     }
+    // Obsidian: the vault's Agentic folder is handed to Claude, with permission to write notes there (and only there).
+    const ob = input.mode === "headless" ? this.opts.obsidian?.(cwd) : null;
+    if (ob) claudeInput = { ...claudeInput, addDirs: [...(claudeInput.addDirs ?? []), ob.addDir], allowedTools: ob.allow, appendPrompt: ob.hint };
     const args = buildClaudeArgs(claudeInput);
     run.git = await captureBaseline(cwd);
 
@@ -367,7 +373,7 @@ export class RunManager {
     this.saveNew(run);
     this.procs.set(run.id, child);
     // The long instruction passed with --append-system-prompt would flood the header: it is shown shortened.
-    const shownArgs = args.slice(0, -1).map((a, i, all) => (all[i - 1] === "--append-system-prompt" ? "<instrucciones>" : a));
+    const shownArgs = args.slice(0, -1).map((a, i, all) => (all[i - 1] === "--append-system-prompt" ? "<instrucciones>" : all[i - 1] === "--allowedTools" ? "<permiso>" : a));
     writeLog({ type: "agentic", subtype: "start", args: [this.opts.claudeBin, ...shownArgs, "<prompt>"], cwd, at: run.startedAt });
 
     // Changes made through the terminal show up in the chat where they happened (see ChangeWatcher).

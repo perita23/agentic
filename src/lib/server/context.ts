@@ -19,6 +19,7 @@ import { BackupService } from "./backup";
 import { CommandService } from "./commands";
 import { LibraryService } from "./library";
 import { PrefsService } from "./prefs";
+import { ObsidianService } from "./obsidian";
 import { SessionTrash } from "./trash";
 import pkg from "../../../package.json";
 import { PullService } from "./integrations/pulls";
@@ -55,6 +56,7 @@ export interface Context {
   commands: CommandService;
   library: LibraryService;
   prefs: PrefsService;
+  obsidian: ObsidianService;
   trash: SessionTrash;
   oauth: OAuthService;
 }
@@ -69,8 +71,10 @@ export function createContext(config: Config): Context {
   const sessions = new SessionIndex(config.claudeHome);
   const tasks = new TaskService(store);
   const integrations = new IntegrationService(store, tasks);
+  const obsidian = new ObsidianService(store);
   const runs = new RunManager(store, {
     dataDir: config.dataDir,
+    obsidian: (cwd) => obsidian.forRun(cwd),
     claudeBin: config.claudeBin,
     maxConcurrent: config.maxConcurrentRuns,
     maxLogBytes: config.maxLogBytes,
@@ -117,6 +121,7 @@ export function createContext(config: Config): Context {
     commands: new CommandService(config.claudeHome, projects),
     library: new LibraryService(sessions),
     prefs: new PrefsService(store),
+    obsidian,
     trash: new SessionTrash(config.dataDir, config.claudeHome, sessions),
     oauth: new OAuthService(store, integrations),
     queue,
