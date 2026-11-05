@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.38.1] - 2026-11-05
+
+### Cambiado
+- **Los cambios de archivos aparecen en el chat en el momento en que ocurren**, como un mensaje más, y ya no hay un panel fijo abajo. Cuando Claude edita o crea un archivo sale una tarjeta con el archivo, las líneas añadidas (+) y quitadas (−) y **el código modificado**, justo en ese punto de la conversación; se queda ahí y la siguiente modificación sale debajo. Esto vale también para lo que Claude cambia **por terminal** (`sed`, `python`, `tee`…): tras cada comando Agentic mira qué archivos han cambiado y cuelga sus cambios (con su diff) bajo ese comando. Las tarjetas grandes empiezan plegadas y la pestaña «Cambios» sigue teniendo el diff completo.
+
 ## [0.38.0] - 2026-11-05
 
 ### Cambiado

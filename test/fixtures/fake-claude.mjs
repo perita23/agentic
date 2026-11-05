@@ -29,6 +29,18 @@ if (prompt.includes("EDIT")) {
   out({ type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", id: "t1", name: "Write", input: { file_path: path.join(process.cwd(), "created-by-claude.txt"), content: "hello from claude\n" } }] } });
   if (fs.existsSync("old-name.txt")) fs.renameSync("old-name.txt", "new-name.txt");
 }
+if (prompt.includes("BASHCHANGE")) {
+  // A change made through the terminal (not an Edit/Write tool call): the file changes, then the tool result arrives.
+  const fs = await import("node:fs");
+  out({ type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", id: "bc1", name: "Bash", input: { command: "sed -i s/uno/dos/ tracked.txt" } }] } });
+  fs.appendFileSync("tracked.txt", "línea nueva por terminal\n");
+  fs.writeFileSync("hecho-por-terminal.txt", "contenido nuevo\n");
+  out({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "bc1", content: "ok" }] } });
+  await new Promise((r) => setTimeout(r, 500)); // a real model takes a moment before its next step
+  out({ type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", id: "ed1", name: "Edit", input: { file_path: process.cwd() + "/tracked.txt", old_string: "x", new_string: "y" } }] } });
+  fs.appendFileSync("tracked.txt", "línea por Edit\n");
+  out({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "ed1", content: "ok" }] } });
+}
 if (prompt.includes("BIGIMG")) {
   // A screenshot read by Claude: one huge line of base64 (twice, like the real CLI), then more events.
   const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(700_000, 7)]).toString("base64");

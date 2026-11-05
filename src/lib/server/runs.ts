@@ -1,3 +1,4 @@
+import { ChangeWatcher } from "./run-changes";
 import { saveUpload } from "./uploads";
 import { spawn, execFile, type ChildProcess } from "node:child_process";
 import { findUpload, uploadsDir } from "./uploads";
@@ -350,6 +351,23 @@ export class RunManager {
     this.procs.set(run.id, child);
     writeLog({ type: "agentic", subtype: "start", args: [this.opts.claudeBin, ...args.slice(0, -1), "<prompt>"], cwd, at: run.startedAt });
 
+    // Changes made through the terminal show up in the chat where they happened (see ChangeWatcher).
+    const base = run.git?.head;
+    const watcher = base && /^[0-9a-f]{40,64}$/.test(base) ? new ChangeWatcher(cwd, base, new Set(run.git?.preUntracked ?? []), (after, files) => writeLog({ type: "agentic", subtype: "file_changes", after, files })) : null;
+    const toolNames = new Map<string, string>();
+    const WATCHED = new Set(["Bash", "BashOutput", "Edit", "Write", "MultiEdit", "NotebookEdit", "Task", "Agent"]);
+    const EXACT = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]); // the chat shows these exactly from the tool input
+    const watchTools = (o: Record<string, unknown>) => {
+      const blocks = ((o.message as { content?: unknown } | undefined)?.content ?? []) as { type?: string; id?: string; name?: string; tool_use_id?: string }[];
+      if (!Array.isArray(blocks)) return;
+      for (const b of blocks) {
+        if (o.type === "assistant" && b?.type === "tool_use" && b.id && b.name) toolNames.set(b.id, b.name);
+        else if (o.type === "user" && b?.type === "tool_result" && b.tool_use_id) {
+          const name = toolNames.get(b.tool_use_id);
+          if (name && (WATCHED.has(name) || name.startsWith("mcp__"))) watcher!.scan(b.tool_use_id, !EXACT.has(name));
+        }
+      }
+    };
     let buf = "";
     const onLine = (line: string) => {
       if (!line.trim()) return;
@@ -361,6 +379,7 @@ export class RunManager {
         return;
       }
       writeLog(slimLogEvent(o, this.opts.dataDir));
+      if (watcher) watchTools(o);
       if (o.type === "system" && o.subtype === "init" && typeof o.session_id === "string") this.patch(run.id, { sessionId: o.session_id });
       if (o.type === "result") {
         this.patch(run.id, {
@@ -401,19 +420,24 @@ export class RunManager {
       finished = true;
       if (buf.trim()) onLine(buf);
       this.procs.delete(run.id);
-      const current = this.get(run.id);
-      const stopped = current.status === "stopped";
-      const status: RunStatus = stopped ? "stopped" : code === 0 && !current.error ? "completed" : "failed";
-      const error = err ? `No se pudo ejecutar ${this.opts.claudeBin}: ${err.message}` : current.error || (status === "failed" ? `exit ${code ?? signal}` : null);
-      writeLog({ type: "agentic", subtype: "exit", code, signal, at: nowIso() });
-      const endedAt = nowIso();
-      // Mark the run finished only once the log is flushed, so whoever reacts to
-      // the new status (UI, tests, notifications) reads the complete log.
-      log.once("close", () => {
-        const done = this.patch(run.id, { status, exitCode: code, endedAt, error, logBytes: bytes });
-        if (done) this.opts.onFinished?.(done);
+      // Let the last look at the working tree land in the log before the run is closed (bounded wait).
+      const settle: Promise<unknown> = watcher ? Promise.race([watcher.idle(), new Promise((r) => setTimeout(r, 4000))]) : Promise.resolve();
+      void settle.then(() => {
+        if (watcher) watcher.closed = true;
+        const current = this.get(run.id);
+        const stopped = current.status === "stopped";
+        const status: RunStatus = stopped ? "stopped" : code === 0 && !current.error ? "completed" : "failed";
+        const error = err ? `No se pudo ejecutar ${this.opts.claudeBin}: ${err.message}` : current.error || (status === "failed" ? `exit ${code ?? signal}` : null);
+        writeLog({ type: "agentic", subtype: "exit", code, signal, at: nowIso() });
+        const endedAt = nowIso();
+        // Mark the run finished only once the log is flushed, so whoever reacts to
+        // the new status (UI, tests, notifications) reads the complete log.
+        log.once("close", () => {
+          const done = this.patch(run.id, { status, exitCode: code, endedAt, error, logBytes: bytes });
+          if (done) this.opts.onFinished?.(done);
+        });
+        log.end();
       });
-      log.end();
     };
     child.on("error", (e) => finish(null, null, e));
     child.on("close", (code, signal) => finish(code, signal));
