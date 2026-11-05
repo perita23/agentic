@@ -515,6 +515,13 @@ try {
   // Chat with Claude outside any project; the conversation lands in the history.
   await page.goto(`${base}/chat`);
   await page.getByText("¿En qué te ayudo?").waitFor();
+  const welcomeOrb = page.locator("main .orb").first();
+  const seen = new Set();
+  for (let i = 0; i < 3; i++) {
+    seen.add(await welcomeOrb.getAttribute("data-state"));
+    await page.waitForTimeout(3100);
+  }
+  check(seen.size >= 2, `the chat welcome shows the orb cycling through its states (${[...seen].join(", ")})`);
   await shot("05a-chat-empty");
   await page.getByLabel("Mensaje para Claude").fill("Hola Claude, ¿me explicas los closures?");
   await page.keyboard.press("Enter");
@@ -843,6 +850,28 @@ try {
   check(true, "logout revokes the session (redirected to /login)");
   await page.waitForTimeout(500); // let the entrance animation finish
   await shot("14-login");
+  // Touch ID must never pop up by itself: the page only waits for the click. (Counted through a hook on WebAuthn.)
+  await page.evaluate(() => {
+    window.__credGets = 0;
+    const orig = navigator.credentials.get.bind(navigator.credentials);
+    navigator.credentials.get = (...a) => (window.__credGets++, orig(...a));
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Entrar con Touch ID" }).waitFor();
+  await page.evaluate(() => {
+    window.__credGets = window.__credGets || 0;
+    const orig = navigator.credentials.get.bind(navigator.credentials);
+    navigator.credentials.get = (...a) => (window.__credGets++, orig(...a));
+  });
+  await page.waitForTimeout(2800);
+  check((await page.evaluate(() => window.__credGets)) === 0 && !(await page.getByRole("button", { name: "Entrar con Touch ID" }).isDisabled()), "the login page does not start Touch ID by itself");
+  check((await page.locator("main .orb").count()) === 1, "the login shows the AI orb");
+  const orbStates = new Set();
+  for (let i = 0; i < 4; i++) {
+    orbStates.add(await page.locator("main .orb").first().getAttribute("data-state"));
+    await page.waitForTimeout(3100);
+  }
+  check(orbStates.size >= 3, `the login orb keeps changing state (${[...orbStates].join(", ")})`);
   await page.getByRole("button", { name: "Entrar con Touch ID" }).click();
   await page.getByRole("heading", { name: "Dashboard" }).waitFor();
   check(true, "sign in with Touch ID");

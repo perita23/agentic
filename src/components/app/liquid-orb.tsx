@@ -70,3 +70,21 @@ export function ActivityOrb({ activity, size = 40, className }: { activity: Acti
     </span>
   );
 }
+
+/** The states a showcase orb walks through (all of them), in an order that keeps neighbours very different. */
+export const ORB_TOUR: OrbState[] = ["thinking", "writing", "running", "reading", "editing", "searching", "waiting", "done", "error", "idle"];
+
+/**
+ * The orb on its own, changing state every two to three seconds so every shape and colour shows up.
+ * Used where there is no real activity (welcome screens, login).
+ */
+export function CyclingOrb({ size = 96, className, onState }: { size?: number; className?: string; onState?: (s: OrbState) => void }) {
+  const [i, setI] = React.useState(0);
+  React.useEffect(() => {
+    const t = setTimeout(() => setI((n) => (n + 1) % ORB_TOUR.length), 2000 + Math.random() * 1000);
+    return () => clearTimeout(t);
+  }, [i]);
+  const state = ORB_TOUR[i];
+  React.useEffect(() => onState?.(state), [state, onState]);
+  return <LiquidOrb state={state} size={size} className={className} />;
+}

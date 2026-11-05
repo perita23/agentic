@@ -49,7 +49,7 @@
       }
       /* Liquid: bright spheres merge and split through a "goo" filter (metaballs). */
       .liquid { position: absolute; inset: -12%; filter: url(#goo) saturate(1.25); }
-      .orb { position: absolute; aspect-ratio: 1; border-radius: 50%; will-change: transform; }
+      .blob { position: absolute; aspect-ratio: 1; border-radius: 50%; will-change: transform; }
       .o1 { width: 38%; left: 8%; top: 6%; background: radial-gradient(circle at 35% 30%, #fff 0%, #d8ccff 38%, #a78bfa 100%); animation: p1 9s ease-in-out infinite; }
       .o2 { width: 30%; left: 52%; top: 12%; background: radial-gradient(circle at 40% 35%, #e9e2ff 0%, #8b6cf5 60%, #6d4ae0 100%); animation: p2 12s ease-in-out infinite; }
       .o3 { width: 34%; left: 40%; top: 46%; background: radial-gradient(circle at 40% 30%, #ffd0b8 0%, #ff8a5b 55%, #e0553f 100%); animation: p3 10s ease-in-out infinite; }
@@ -89,17 +89,69 @@
       .glass strong { display: block; font-size: 18px; font-weight: 600; color: #fff; }
       .glass span { display: block; margin-top: 4px; font-size: 13px; color: rgb(255 255 255 / 0.7); }
       @media (prefers-reduced-motion: reduce) {
-        .orb, .sheen { animation: none; }
+        .blob, .sheen { animation: none; }
       }
       @media (max-width: 760px) {
         body { grid-template-columns: 1fr; }
         .art { display: none; }
       }
-      .logo {
-        width: 84px;
-        height: 84px;
-        filter: drop-shadow(0 8px 24px rgb(167 139 250 / 0.25));
-      }
+      /* orb:start (keep identical to the orb section of src/app/globals.css: test/lock-orb.test.ts checks it) */
+/* ---- Liquid orb: Claude's live status ----
+   Eight blobs share one clock (--t, advanced from JS at a per-state speed that eases). A state decides
+   HOW MANY blobs are alive (--k), how big (--bs), their orbit (--ax/--ay) and spacing (--gap), so each
+   state has its own silhouette: one ball sweeping sideways, a swarm circling, two scanning up and down...
+   All of it is registered properties that CSS transitions, so blobs split and merge instead of jumping. */
+@property --c1 { syntax: "<color>"; inherits: true; initial-value: #d8ccff; }
+@property --c2 { syntax: "<color>"; inherits: true; initial-value: #8b6cf5; }
+@property --c3 { syntax: "<color>"; inherits: true; initial-value: #ff8a5b; }
+@property --k { syntax: "<number>"; inherits: true; initial-value: 1; }
+@property --bs { syntax: "<number>"; inherits: true; initial-value: 0.5; }
+@property --ax { syntax: "<number>"; inherits: true; initial-value: 0; }
+@property --ay { syntax: "<number>"; inherits: true; initial-value: 0; }
+@property --gap { syntax: "<number>"; inherits: true; initial-value: 1; }
+@property --pulse { syntax: "<number>"; inherits: true; initial-value: 0.05; }
+@property --shake { syntax: "<number>"; inherits: true; initial-value: 0; }
+@property --tilt { syntax: "<angle>"; inherits: true; initial-value: 0deg; }
+.orb { position: relative; flex: none; display: inline-block; --t: 0;
+  --c1: #d8ccff; --c2: #8b6cf5; --c3: #ff8a5b; --k: 1; --bs: 0.5; --ax: 0; --ay: 0; --gap: 1; --pulse: 0.05; --shake: 0; --tilt: 0deg;
+  transition: --c1 1.2s ease, --c2 1.2s ease, --c3 1.2s ease, --k 1.2s ease, --bs 1.2s ease, --ax 1.2s ease, --ay 1.2s ease, --gap 1.2s ease, --pulse 1.2s ease, --shake 1.2s ease, --tilt 1.2s ease;
+  animation: orb-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+/* Silhouettes. ax/ay are orbit radii in % of the orb's size. */
+.orb[data-state="idle"] { --k: 1; --bs: 0.5; --ax: 0; --ay: 0; --pulse: 0.05; }
+/* thinking: four blobs merged into one wobbling jelly */
+.orb[data-state="thinking"] { --c1: #d8ccff; --c2: #8b6cf5; --c3: #ff8a5b; --k: 4; --gap: 1.57; --bs: 0.42; --ax: 17; --ay: 17; --pulse: 0; }
+/* writing: the ball breaks into a swarm of small balls circling */
+.orb[data-state="writing"] { --c1: #ffe0d0; --c2: #ff8a5b; --c3: #ff6fa0; --k: 8; --gap: 0.785; --bs: 0.24; --ax: 36; --ay: 36; --pulse: 0; }
+/* reading: two balls scanning up and down, like eyes on a page */
+.orb[data-state="reading"] { --c1: #cdeaff; --c2: #5aa9ff; --c3: #8b6cf5; --k: 2; --gap: 3.14; --bs: 0.3; --ax: 0; --ay: 36; --pulse: 0; }
+/* editing: three balls tracing a flat, tilted ellipse (a pen stroke) */
+.orb[data-state="editing"] { --c1: #d9ffe9; --c2: #34d399; --c3: #a78bfa; --k: 3; --gap: 2.09; --bs: 0.27; --ax: 38; --ay: 12; --tilt: -24deg; --pulse: 0; }
+/* running a command: one small ball sweeping left and right */
+.orb[data-state="running"] { --c1: #fff3c4; --c2: #fbbf24; --c3: #ff8a5b; --k: 1; --bs: 0.24; --ax: 40; --ay: 0; --pulse: 0; }
+/* searching: two small balls on a wide orbit, like a radar */
+.orb[data-state="searching"] { --c1: #c7f9ff; --c2: #22d3ee; --c3: #a78bfa; --k: 2; --gap: 3.14; --bs: 0.22; --ax: 40; --ay: 40; --pulse: 0; }
+/* waiting for you: one big ball pulsing like a heartbeat */
+.orb[data-state="waiting"] { --c1: #ffe9b8; --c2: #f59e0b; --c3: #fb7185; --k: 1; --bs: 0.62; --ax: 0; --ay: 0; --pulse: 0.16; }
+.orb[data-state="done"] { --c1: #d9ffe9; --c2: #34d399; --c3: #bef264; --k: 1; --bs: 0.5; --ax: 0; --ay: 0; --pulse: 0.03; }
+/* error: three balls shaking */
+.orb[data-state="error"] { --c1: #ffd0d0; --c2: #ef4444; --c3: #fb923c; --k: 3; --gap: 2.09; --bs: 0.3; --ax: 9; --ay: 9; --shake: 14; --tilt: -18deg; --pulse: 0; }
+.orb-goo { position: absolute; inset: 0; }
+.orb-pose { position: absolute; inset: 0;
+  transform: rotate(var(--tilt)) translateX(calc(sin(calc(var(--t) * 6rad)) * var(--shake) * 0.01 * var(--px)))
+    scale(calc(1 + var(--pulse) * sin(calc(var(--t) * 1.4rad)))); }
+.orb-ball { position: absolute; left: 50%; top: 50%; aspect-ratio: 1; border-radius: 50%;
+  width: calc(var(--px) * var(--bs));
+  margin: calc(var(--px) * var(--bs) * -0.5) 0 0 calc(var(--px) * var(--bs) * -0.5);
+  scale: clamp(0, calc(var(--k) - var(--i)), 1);
+  background: radial-gradient(circle at 35% 30%, #fff, var(--c1) 40%, var(--c2));
+  transform: translate(
+    calc(cos(calc(var(--t) * (1 + var(--i) * 0.04) * 1rad + var(--i) * var(--gap) * 1rad)) * var(--ax) * 0.01 * var(--px)),
+    calc(sin(calc(var(--t) * (1 + var(--i) * 0.04) * 1rad + var(--i) * var(--gap) * 1rad)) * var(--ay) * 0.01 * var(--px))); }
+.orb-ball:nth-child(3n + 2) { background: radial-gradient(circle at 40% 30%, var(--c1), var(--c2) 75%); }
+.orb-ball:nth-child(3n) { background: radial-gradient(circle at 40% 30%, #fff, var(--c3) 65%); }
+@keyframes orb-in { from { opacity: 0; scale: 0.6; } to { opacity: 1; scale: 1; } }
+@media (prefers-reduced-motion: reduce) { .orb { animation: none; } }
+      /* orb:end */
       h1 {
         margin: 6px 0 0;
         font-size: 21px;
@@ -190,13 +242,10 @@
   </head>
   <body data-state="">
     <main class="pane"><div class="inner">
-    <svg class="logo" viewBox="100 100 824 824" aria-hidden="true">
-      <defs>
-        <linearGradient id="g" x1="230" y1="0" x2="800" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#f2f2f2" /><stop offset=".55" stop-color="#a78bfa" /><stop offset="1" stop-color="#ff8a5b" /></linearGradient>
-      </defs>
-      <path d="M512 100c228 0 300 0 356 56s56 128 56 356 0 300-56 356-128 56-356 56-300 0-356-56-56-128-56-356 0-300 56-356 128-56 356-56z" fill="#000" stroke="#fff" stroke-opacity=".16" stroke-width="10" />
-      <g fill="url(#g)"><path d="M220 774 450 250H530L300 774Z" /><path d="M318 774 548 250H600L370 774Z" /><path d="M746 774 556 250H600L790 774Z" /><path d="M332 600H848V636H332Z" /></g>
-    </svg>
+    <span class="orb" id="orb" data-state="thinking" style="width:140px;height:140px;--px:140px;margin-bottom:10px" aria-hidden="true">
+      <svg width="0" height="0" style="position:absolute" focusable="false"><defs><filter id="ogoo" x="-45%" y="-45%" width="190%" height="190%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="8.75" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7"/></filter></defs></svg>
+      <span class="orb-goo" style="filter:url(#ogoo)"><span class="orb-pose"><i class="orb-ball" style="--i:0"></i><i class="orb-ball" style="--i:1"></i><i class="orb-ball" style="--i:2"></i><i class="orb-ball" style="--i:3"></i><i class="orb-ball" style="--i:4"></i><i class="orb-ball" style="--i:5"></i><i class="orb-ball" style="--i:6"></i><i class="orb-ball" style="--i:7"></i></span></span>
+    </span>
     <h1 id="title">Agentic</h1>
     <p id="hint"></p>
 
@@ -237,7 +286,7 @@
     </div></main>
     <aside class="art" aria-hidden="true">
       <svg width="0" height="0" style="position:absolute" focusable="false"><defs><filter id="goo" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="26" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 26 -11"/></filter></defs></svg>
-      <div class="liquid"><i class="orb o1"></i><i class="orb o2"></i><i class="orb o3"></i><i class="orb o4"></i><i class="orb o5"></i><i class="orb o6"></i></div>
+      <div class="liquid"><i class="blob o1"></i><i class="blob o2"></i><i class="blob o3"></i><i class="blob o4"></i><i class="blob o5"></i><i class="blob o6"></i></div>
       <div class="sheen"></div>
       <div class="grain"></div>
       <div class="glass"><strong>Claude Code, bajo tu control.</strong><span>Todo se ejecuta en tu dispositivo. Nada sale de él.</span></div>

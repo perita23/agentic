@@ -1,16 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { ArrowUpIcon, Loader2Icon, MessageSquarePlusIcon, PinIcon, SearchIcon, SparklesIcon, Trash2Icon, WrenchIcon } from "lucide-react";
+import { ArrowUpIcon, BookOpenIcon, CodeIcon, ListChecksIcon, Loader2Icon, MessageSquarePlusIcon, PinIcon, RegexIcon, SearchIcon, SparklesIcon, Trash2Icon, WrenchIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { BrandMark } from "@/components/app/brand-mark";
-import { linkify } from "@/components/app/linkify";
-import { ActivityOrb } from "@/components/app/liquid-orb";
+import { Markdown } from "@/components/app/markdown";
+import { ActivityOrb, CyclingOrb, LiquidOrb } from "@/components/app/liquid-orb";
 import { SlashList, useSlashCommands, useSlashMenu } from "@/components/app/slash-menu";
 import { MODE_LABEL, parseSlash, type PermMode } from "@/lib/slash";
+import { describeTool } from "@/lib/tool-cards";
 import type { Activity } from "@/lib/orb-state";
 import { errorMessage, PageHeader } from "@/components/app/common";
 import { api, refresh, useApi } from "@/lib/api";
@@ -43,106 +43,46 @@ const MODELS = [
   { value: "opus", label: "Opus" },
   { value: "haiku", label: "Haiku" },
 ];
-const SUGGESTIONS = ["Explícame la diferencia entre rebase y merge", "Escribe un script que renombre fotos por fecha", "Revisa esta expresión regular y explícamela", "Ayúdame a planificar una migración a TypeScript"];
+const SUGGESTIONS = [
+  { icon: BookOpenIcon, text: "Explícame la diferencia entre rebase y merge" },
+  { icon: CodeIcon, text: "Escribe un script que renombre fotos por fecha" },
+  { icon: RegexIcon, text: "Revisa esta expresión regular y explícamela" },
+  { icon: ListChecksIcon, text: "Ayúdame a planificar una migración a TypeScript" },
+];
 
-/** **bold** and `code` inside a line, as React nodes (never HTML). */
-function inline(t: string, key: string): React.ReactNode[] {
-  const out: React.ReactNode[] = [];
-  let last = 0;
-  let k = 0;
-  for (const m of t.matchAll(/(\*\*[^*\n]+\*\*|`[^`\n]+`)/g)) {
-    if (m.index! > last) out.push(...linkify(t.slice(last, m.index), `${key}-t${k++}`));
-    out.push(
-      m[0].startsWith("**") ? (
-        <strong key={`${key}-${k++}`} className="font-semibold">
-          {m[0].slice(2, -2)}
-        </strong>
-      ) : (
-        <code key={`${key}-${k++}`} className="rounded bg-secondary px-1 py-0.5 font-mono text-[0.85em]">
-          {m[0].slice(1, -1)}
-        </code>
-      ),
-    );
-    last = m.index! + m[0].length;
-  }
-  if (last < t.length) out.push(...linkify(t.slice(last), `${key}-t${k++}`));
-  return out;
+function toolLabel(t: { name: string; input: string }) {
+  let input: unknown = null;
+  try {
+    input = JSON.parse(t.input);
+  } catch {}
+  const info = describeTool(t.name, input);
+  return { group: info.group, title: info.title };
 }
 
-/** Claude's Markdown, rendered safely: code fences, headings, lists and paragraphs. */
-function RichText({ text }: { text: string }) {
-  const parts = text.split(/```/);
-  return (
-    <div className="grid gap-2 text-sm leading-relaxed">
-      {parts.map((part, i) => {
-        if (i % 2 === 1) {
-          const nl = part.indexOf("\n");
-          const lang = nl > 0 ? part.slice(0, nl).trim() : "";
-          const code = nl >= 0 ? part.slice(nl + 1) : part;
-          return (
-            <div key={i} className="overflow-hidden rounded-lg border bg-inset">
-              {lang && <div className="border-b px-3 py-1 font-mono text-[11px] text-muted-foreground">{lang}</div>}
-              <pre className="overflow-x-auto p-3 font-mono text-xs leading-relaxed">{code.replace(/\n$/, "")}</pre>
-            </div>
-          );
-        }
-        return part
-          .split(/\n{2,}/)
-          .filter((b) => b.trim())
-          .map((block, j) => {
-            const lines = block.split("\n");
-            const key = `${i}-${j}`;
-            if (lines.every((l) => /^\s*([-*]|\d+\.)\s+/.test(l)))
-              return (
-                <ul key={key} className="grid gap-1 pl-1">
-                  {lines.map((l, n) => (
-                    <li key={n} className="flex gap-2">
-                      <span className="text-muted-foreground">{/^\s*\d+\./.test(l) ? l.trim().split(/\s/)[0] : "•"}</span>
-                      <span>{inline(l.replace(/^\s*([-*]|\d+\.)\s+/, ""), `${key}-${n}`)}</span>
-                    </li>
-                  ))}
-                </ul>
-              );
-            if (/^#{1,4}\s/.test(lines[0]))
-              return (
-                <div key={key} className="grid gap-1">
-                  <h3 className="font-semibold">{lines[0].replace(/^#+\s/, "")}</h3>
-                  {lines.length > 1 && <p className="whitespace-pre-wrap">{inline(lines.slice(1).join("\n"), key)}</p>}
-                </div>
-              );
-            return (
-              <p key={key} className="whitespace-pre-wrap">
-                {inline(block, key)}
-              </p>
-            );
-          });
-      })}
-    </div>
-  );
-}
-
+/** The user's message on the right; Claude's answer as plain Markdown across the column (no avatar clutter). */
 function Bubble({ m }: { m: ChatMessage }) {
   if (m.role === "user")
     return (
       <div className="flex justify-end">
-        <div className="max-w-[80%] rounded-2xl rounded-br-md bg-secondary px-4 py-2.5 text-sm whitespace-pre-wrap">{m.text}</div>
+        <div className="max-w-[80%] rounded-2xl rounded-br-md bg-secondary px-4 py-2.5 text-sm break-words whitespace-pre-wrap">{m.text}</div>
       </div>
     );
   return (
-    <div className="flex gap-3">
-      <BrandMark className="mt-0.5 size-7" />
-      <div className="min-w-0 flex-1">
-        {m.tools && m.tools.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-1.5">
-            {m.tools.map((t, i) => (
-              <span key={i} className="flex items-center gap-1 rounded-md border bg-inset px-2 py-0.5 font-mono text-[11px] text-muted-foreground" title={t.input}>
-                <WrenchIcon className="size-3" /> {t.name}
+    <div className="min-w-0">
+      {m.tools && m.tools.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {m.tools.map((t, i) => {
+            const l = toolLabel(t);
+            return (
+              <span key={i} className="flex max-w-full items-center gap-1.5 rounded-md border bg-inset px-2 py-0.5 text-[11px] text-muted-foreground" title={t.input}>
+                <WrenchIcon className="size-3 shrink-0" /> <span className="shrink-0 font-medium text-foreground/80">{l.group}</span>
+                {l.title && <span className="truncate font-mono">{l.title}</span>}
               </span>
-            ))}
-          </div>
-        )}
-        {m.text.trim() && <RichText text={m.text} />}
-      </div>
+            );
+          })}
+        </div>
+      )}
+      {m.text.trim() && <Markdown>{m.text}</Markdown>}
     </div>
   );
 }
@@ -172,7 +112,7 @@ function Composer({ onSend, busy, autoFocus, model, setModel, mode, setMode }: {
     if (await onSend(cmd.prompt, { model: cmd.model, mode: cmd.mode })) setText("");
   }
   return (
-    <div className="relative rounded-2xl border bg-inset shadow-lg shadow-black/20 transition-colors focus-within:border-border-strong">
+    <div className="relative rounded-xl border bg-card transition-colors focus-within:border-border-strong">
       {menu.open && <SlashList items={menu.items} active={menu.active} onPick={menu.pick} className="mx-2" />}
       <Textarea
         autoFocus={autoFocus}
@@ -276,25 +216,29 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader icon={SparklesIcon} title="Chat" description="Habla con Claude sin elegir proyecto. Tus conversaciones se guardan en tu dispositivo." />
-      <div className="flex h-[calc(100vh-13rem)] min-h-[480px] overflow-hidden rounded-xl border bg-card shadow-2xl shadow-black/30">
-        <nav className="hidden w-68 shrink-0 flex-col border-r bg-sidebar/60 md:flex" aria-label="Historial de chats">
-          <div className="flex h-14 items-center gap-2 border-b px-3">
-            <div className="relative flex-1">
-              <SearchIcon className="absolute top-2 left-2.5 size-3.5 text-muted-foreground" />
-              <input
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-                placeholder="Buscar chats"
-                aria-label="Buscar chats"
-                className="h-8 w-full rounded-md border bg-inset pr-2 pl-8 text-xs outline-none focus:border-border-strong"
-              />
-            </div>
-            <Button size="icon-sm" variant="outline" aria-label="Nuevo chat" onClick={() => setSelected(null)}>
-              <MessageSquarePlusIcon />
-            </Button>
+      <PageHeader
+        icon={SparklesIcon}
+        title="Chat"
+        description="Habla con Claude sin elegir proyecto. Tus conversaciones se guardan en tu dispositivo."
+        actions={
+          <Button variant="outline" onClick={() => setSelected(null)}>
+            <MessageSquarePlusIcon /> Nuevo chat
+          </Button>
+        }
+      />
+      <div className="grid h-[calc(100vh-13rem)] min-h-[480px] min-w-0 grid-cols-1 gap-4 md:grid-cols-[16rem_minmax(0,1fr)]">
+        <nav className="hidden min-h-0 flex-col md:flex" aria-label="Historial de chats">
+          <div className="relative mb-2">
+            <SearchIcon className="absolute top-2.5 left-2.5 size-3.5 text-muted-foreground" />
+            <input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Buscar chats"
+              aria-label="Buscar chats"
+              className="h-9 w-full rounded-md border bg-inset pr-2 pl-8 text-sm outline-none focus:border-border-strong"
+            />
           </div>
-          <div className="flex-1 overflow-y-auto p-2">
+          <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border bg-card p-1.5">
             {!list && <Skeleton className="m-1 h-40" />}
             {list && !shown.length && <p className="p-3 text-center text-xs text-muted-foreground">{q ? "Sin resultados." : "Aún no hay conversaciones."}</p>}
             {shown.map((c) => (
@@ -305,7 +249,7 @@ export default function ChatPage() {
                   c.id === selected ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
                 )}
               >
-                {c.id === selected && <span className="absolute top-1.5 bottom-1.5 -left-1.5 w-0.5 rounded-full bg-foreground" />}
+                {c.id === selected && <span className="absolute top-1.5 bottom-1.5 -left-1 w-0.5 rounded-full bg-foreground" />}
                 <button className="min-w-0 flex-1 cursor-pointer text-left" onClick={() => setSelected(c.id)}>
                   <span className="flex items-center gap-1.5">
                     {c.pinned && <PinIcon className="size-3 shrink-0" />}
@@ -327,43 +271,47 @@ export default function ChatPage() {
           </div>
         </nav>
 
-        <section className="flex min-w-0 flex-1 flex-col">
+        <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border bg-card">
           {!selected ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-6 p-6">
-              <BrandMark className="size-14" />
+            <div className="flex flex-1 flex-col items-center justify-center gap-5 overflow-y-auto p-6">
+              {/* The orb walks through all its states, a new one every two or three seconds. */}
+              <CyclingOrb size={120} />
               <h2 className="text-xl font-semibold tracking-tight">¿En qué te ayudo?</h2>
               <div className="w-full max-w-2xl">
                 <Composer onSend={newChat} busy={sending} autoFocus model={model} setModel={setModel} mode={mode} setMode={setMode} />
               </div>
-              <div className="flex max-w-2xl flex-wrap justify-center gap-2">
+              <div className="grid w-full max-w-2xl gap-2 sm:grid-cols-2">
                 {SUGGESTIONS.map((s) => (
-                  <button key={s} onClick={() => newChat(s)} disabled={sending} className="cursor-pointer rounded-full border px-3 py-1 text-xs text-muted-foreground hover:border-border-strong hover:text-foreground">
-                    {s}
+                  <button key={s.text} onClick={() => newChat(s.text)} disabled={sending} className="flex cursor-pointer items-start gap-2.5 rounded-lg border bg-inset px-3 py-2.5 text-left text-sm text-muted-foreground transition-colors hover:border-border-strong hover:text-foreground disabled:opacity-60">
+                    <s.icon className="mt-0.5 size-4 shrink-0" /> {s.text}
                   </button>
                 ))}
               </div>
             </div>
           ) : (
             <>
-              <div className="flex h-14 items-center gap-2 border-b px-4">
+              <div className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
                 <span className="truncate text-sm font-semibold">{chat?.title ?? "…"}</span>
                 {chat?.model && <span className="rounded border px-1.5 font-mono text-[11px] text-muted-foreground">{chat.model}</span>}
               </div>
-              <div className="flex-1 overflow-y-auto">
+              <div className="min-h-0 flex-1 overflow-y-auto">
                 <div className="mx-auto grid max-w-3xl gap-6 px-4 py-6">
                   {!chat && <Skeleton className="h-40" />}
                   {chat?.messages.map((m, i) => (
                     <Bubble key={i} m={m} />
                   ))}
                   {chat?.pendingPrompt && <Bubble m={{ role: "user", text: chat.pendingPrompt }} />}
-                  {chat?.running && (
+                  {/* The orb closes the conversation: live activity while Claude works, calm when it is done. */}
+                  {chat?.running ? (
                     <ActivityOrb activity={chat.activity ?? { state: "thinking", label: "Pensando…" }} size={44} />
-                  )}
+                  ) : chat && chat.messages.length > 0 ? (
+                    <LiquidOrb state={chat.error ? "error" : "done"} size={32} />
+                  ) : null}
                   {chat?.error && !chat.running && <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{chat.error}</p>}
                   <div ref={bottom} />
                 </div>
               </div>
-              <div className="mx-auto w-full max-w-3xl px-4 pb-4">
+              <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
                 <Composer onSend={reply} busy={sending || !!chat?.running} model={model} setModel={setModel} mode={mode} setMode={setMode} />
               </div>
             </>

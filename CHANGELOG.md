@@ -3,6 +3,15 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.38.0] - 2026-11-05
+
+### Cambiado
+- **Chat rediseñado, más integrado en la app.** Ya no es una caja flotante con sombras: el historial y la conversación son dos paneles con el mismo estilo que el resto de secciones, con un botón «Nuevo chat» en la cabecera. Las respuestas de Claude se ven en Markdown completo (títulos, listas, tablas, código), ocupan todo el ancho de la columna y sus herramientas salen con nombre legible (p. ej. «Docker · logs»). La pantalla de bienvenida tiene sugerencias en tarjetas con icono.
+- **La bolita de Agentic sustituye al logo.** En la bienvenida del chat, en el login y en la pantalla de bloqueo de la app del Mac, la bolita recorre todos sus estados (pensando, escribiendo, ejecutando, leyendo, editando, buscando, esperando, hecho, error y reposo), cambiando cada dos o tres segundos. En la conversación, cierra el chat: actividad en vivo mientras Claude trabaja y en calma cuando termina.
+
+### Corregido
+- **Touch ID ya no salta solo** al abrir la app del Mac ni en el login web: aparece el formulario de contraseña y Touch ID es un botón («Usar Touch ID») que pulsas cuando quieras.
+
 ## [0.37.0] - 2026-11-04
 
 ### Añadido
