@@ -3,6 +3,16 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.43.0] - 2026-11-05
+
+### Cambiado
+- **El brillo del texto de estado es más lento** y toma los **colores del estado de la bolita** (morado al pensar, coral al escribir, verde al editar, ámbar al ejecutar…).
+- **El resultado final se escribe despacio** y, cuando termina, el borde y el fondo verdes aparecen desde la esquina superior izquierda.
+- Las respuestas nuevas se escriben a un ritmo más pausado.
+
+### Añadido
+- **Cajas con botón «Copiar».** Los bloques de código llevan botón de copiar, y los **correos y textos listos para pegar** salen en una caja de otro color (morada) con su etiqueta. Las ejecuciones headless le piden a Claude que los entregue así.
+
 ## [0.42.0] - 2026-11-05
 
 ### Cambiado

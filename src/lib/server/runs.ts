@@ -158,10 +158,14 @@ export function slimLogEvent(o: Record<string, unknown>, dataDir: string): Recor
   return o;
 }
 
+/** Headless answers render as Markdown: emails and ready-to-paste texts get their own box with a Copy button. */
+const COPY_BLOCK_HINT = "Si redactas un correo, un mensaje o cualquier texto pensado para copiar y pegar, ponlo dentro de un bloque de código con la etiqueta ```email (correo) o ```text (otros textos), sin nada más dentro del bloque que el texto en sí.";
+
 /** Build the argv passed to `claude` (never through a shell). */
 export function buildClaudeArgs(input: RunInput): string[] {
   const args: string[] = [];
   if (input.mode === "headless") args.push("-p", "--output-format", "stream-json", "--verbose");
+  if (input.mode === "headless") args.push("--append-system-prompt", COPY_BLOCK_HINT);
   if (input.model) args.push("--model", input.model);
   if (input.agent) args.push("--agent", input.agent);
   for (const d of input.addDirs ?? []) args.push("--add-dir", d);
