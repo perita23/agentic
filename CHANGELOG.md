@@ -3,6 +3,12 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.44.0] - 2026-11-05
+
+### Añadido
+- **La respuesta se ve mientras Claude la escribe.** Antes el texto solo aparecía cuando cada mensaje estaba completo, y entre medias solo se veía «Pensando…» (de ahí la sensación de lentitud). Ahora Agentic pide a Claude el texto en streaming y lo muestra en directo en las ejecuciones y en el chat, y la bolita pasa a «Escribiendo» en cuanto empieza.
+- **Todo entra con una animación sutil.** Cada mensaje, herramienta usada (Docker, Git, terminal…), cambio de archivo y el estado en vivo aparecen con un pequeño desvanecimiento hacia arriba, en vez de saltar de golpe. No se anima el historial al abrirlo, y respeta «reducir movimiento».
+
 ## [0.43.1] - 2026-11-05
 
 ### Corregido

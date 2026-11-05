@@ -46,6 +46,7 @@ export function stateFromEvents(events: unknown[]): Activity {
       const denied = Array.isArray(e.permission_denials) && e.permission_denials.length > 0;
       state = e.is_error ? "error" : asks || denied ? "waiting" : "done";
     }
+    else if (e.type === "agentic" && e.subtype === "partial") state = "writing";
     else if (e.type === "agentic" && e.subtype === "exit") state = e.code === 0 ? "done" : "error";
     else if (e.type === "assistant") {
       const blocks = Array.isArray(e.message?.content) ? (e.message!.content as { type?: string; name?: string }[]) : [];

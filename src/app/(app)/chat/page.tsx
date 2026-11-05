@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Markdown } from "@/components/app/markdown";
 import { CyclingOrb, LiquidOrb } from "@/components/app/liquid-orb";
 import { LiveStatus } from "@/components/app/live-status";
+import { Appear } from "@/components/app/appear";
 import type { LiveStats } from "@/lib/live-stats";
 import { SlashList, useSlashCommands, useSlashMenu } from "@/components/app/slash-menu";
 import { MODE_LABEL, parseSlash, type PermMode } from "@/lib/slash";
@@ -309,12 +310,12 @@ export default function ChatPage() {
                 <div className="mx-auto grid max-w-3xl gap-6 px-4 py-6">
                   {!chat && <Skeleton className="h-40" />}
                   {chat?.messages.map((m, i) => (
-                    <Bubble key={i} m={m} reveal={i === chat.messages.length - 1} />
+                    <Appear key={i} live={!!chat.running}><Bubble m={m} reveal={i === chat.messages.length - 1} /></Appear>
                   ))}
-                  {(chat?.pendingPrompt ?? optimisticShown) && <Bubble m={{ role: "user", text: (chat?.pendingPrompt ?? optimisticShown)! }} />}
+                  {(chat?.pendingPrompt ?? optimisticShown) && <Appear><Bubble m={{ role: "user", text: (chat?.pendingPrompt ?? optimisticShown)! }} /></Appear>}
                   {/* The orb closes the conversation: step, time and tokens while Claude works (with the answer's skeleton), calm when done. */}
                   {chat?.running || optimisticShown ? (
-                    <LiveStatus activity={chat?.activity ?? { state: "thinking", label: "Pensando…" }} stats={chat?.live} startedAt={chat?.live?.startedAt} />
+                    <Appear><LiveStatus activity={chat?.activity ?? { state: "thinking", label: "Pensando…" }} stats={chat?.live} startedAt={chat?.live?.startedAt} /></Appear>
                   ) : chat && chat.messages.length > 0 ? (
                     <LiquidOrb state={chat.error ? "error" : "done"} size={32} />
                   ) : null}

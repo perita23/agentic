@@ -36,6 +36,14 @@ if (prompt.includes("<tarea>describir_pr</tarea>")) {
     await new Promise((r) => setTimeout(r, 500));
   }
 }
+if (prompt.includes("STREAMTEXT")) {
+  // Text written token by token (partial messages), then the complete message.
+  for (const piece of ["Hola, ", "esto se va ", "escribiendo"]) {
+    out({ type: "stream_event", event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: piece } } });
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  out({ type: "assistant", message: { id: "m1", role: "assistant", content: [{ type: "text", text: "Hola, esto se va escribiendo" }] } });
+}
 if (prompt.includes("SLOW")) await new Promise((r) => setTimeout(r, 900)); // a turn that takes a moment
 if (prompt.includes("BASHCHANGE")) {
   // A change made through the terminal (not an Edit/Write tool call): the file changes, then the tool result arrives.

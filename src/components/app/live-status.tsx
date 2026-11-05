@@ -5,6 +5,7 @@ import type { Activity } from "@/lib/orb-state";
 import { compactTokens, formatElapsed, type LiveStats } from "@/lib/live-stats";
 import { describeTool } from "@/lib/tool-cards";
 import { LiquidOrb } from "./liquid-orb";
+import { Markdown } from "./markdown";
 
 /**
  * What Claude is doing right now: the orb, the step in plain words (the command or file it is on), how long the
@@ -29,6 +30,7 @@ export function LiveStatus({ activity, stats, startedAt, size = 44 }: { activity
           {detail && <div className="text-xs text-muted-foreground tabular-nums">{detail}</div>}
         </div>
       </div>
+      {stats?.partial && <div className="ml-1 max-w-3xl"><Markdown>{stats.partial}</Markdown></div>}
       {stats?.thinking && activity.state === "thinking" && <p className="line-clamp-3 border-l-2 border-purple/40 pl-3 text-xs text-muted-foreground italic">{stats.thinking}</p>}
     </div>
   );
