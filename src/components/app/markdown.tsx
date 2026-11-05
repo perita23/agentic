@@ -20,13 +20,9 @@ function nodeText(n: React.ReactNode): string {
   return "";
 }
 
-/** A fenced block with a Copy button. Emails and messages get their own colour and label so they stand out. */
-function CodeBlock({ children }: { children: React.ReactNode }) {
+/** A framed block with a Copy button. Emails and messages get their own colour and label so they stand out. */
+function CopyFrame({ label, tone, text, children }: { label: string; tone: "mail" | "code"; text: string; children: React.ReactNode }) {
   const [copied, setCopied] = React.useState(false);
-  const code = React.Children.toArray(children)[0];
-  const lang = React.isValidElement(code) ? /language-([\w-]+)/.exec(String((code.props as { className?: string }).className ?? ""))?.[1]?.toLowerCase() : undefined;
-  const label = lang ? MAIL_LANGS[lang] : undefined;
-  const text = nodeText(children).replace(/\n$/, "");
   async function copy() {
     try {
       await navigator.clipboard.writeText(text);
@@ -34,18 +30,57 @@ function CodeBlock({ children }: { children: React.ReactNode }) {
       setTimeout(() => setCopied(false), 1600);
     } catch {}
   }
+  const mail = tone === "mail";
   return (
-    <div className={cn("my-2 overflow-hidden rounded-lg border", label ? "border-purple/40 bg-purple/[0.07]" : "bg-inset")}>
-      <div className={cn("flex items-center justify-between gap-2 border-b px-3 py-1 text-[11px]", label ? "border-purple/30 text-purple" : "text-muted-foreground")}>
-        <span className="font-medium">{label ?? lang ?? "código"}</span>
+    <div className={cn("my-3 overflow-hidden rounded-lg border", mail ? "border-purple/40 bg-purple/[0.07]" : "bg-inset")}>
+      <div className={cn("flex items-center justify-between gap-2 border-b px-3 py-1.5 text-[11px]", mail ? "border-purple/30 text-purple" : "text-muted-foreground")}>
+        <span className="font-medium">{label}</span>
         <button type="button" onClick={copy} className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-foreground/10 hover:text-foreground">
           {copied ? <CheckIcon className="size-3" /> : <CopyIcon className="size-3" />} {copied ? "Copiado" : "Copiar"}
         </button>
       </div>
-      <pre className={cn("max-h-96 overflow-auto p-3 text-xs leading-relaxed", label ? "font-sans text-sm whitespace-pre-wrap" : "font-mono")}>{children}</pre>
+      {children}
     </div>
   );
 }
+
+function CodeBlock({ children }: { children: React.ReactNode }) {
+  const code = React.Children.toArray(children)[0];
+  const lang = React.isValidElement(code) ? /language-([\w-]+)/.exec(String((code.props as { className?: string }).className ?? ""))?.[1]?.toLowerCase() : undefined;
+  const label = lang ? MAIL_LANGS[lang] : undefined;
+  return (
+    <CopyFrame label={label ?? lang ?? "código"} tone={label ? "mail" : "code"} text={nodeText(children).replace(/\n$/, "")}>
+      <pre className={cn("max-h-96 overflow-auto p-3 text-xs leading-relaxed", label ? "font-sans text-sm whitespace-pre-wrap" : "font-mono")}>{children}</pre>
+    </CopyFrame>
+  );
+}
+
+const SUBJECT = /^\s*(?:[*_>#\s-]*)(?:subject|asunto|assunto|objet)\s*[*_]*\s*:/i;
+const SIGNOFF = /^\s*[*_\s]*(?:best regards|kind regards|warm regards|regards|sincerely|cheers|saludos cordiales|saludos|un saludo|cordialmente|atentamente|un abrazo)[*_\s]*[,.!]?[*_\s]*$/i;
+
+/** Splits out an email Claude wrote as plain text (from its Subject/Asunto line to its sign-off) so it can get its own box. */
+export function splitMail(text: string): { before: string; mail: string; after: string } | null {
+  const lines = text.split("\n");
+  const start = lines.findIndex((l) => SUBJECT.test(l));
+  if (start < 0) return null;
+  if ((lines.slice(0, start).join("\n").match(/```/g) ?? []).length % 2) return null; // inside a code fence
+  let end = -1;
+  for (let i = start + 1; i < lines.length; i++) {
+    if (SIGNOFF.test(lines[i])) {
+      end = i;
+      // The line after a sign-off is usually the name.
+      let j = i + 1;
+      while (j < lines.length && !lines[j].trim()) j++;
+      if (j < lines.length && lines[j].trim().length <= 40 && !/[.:?!]$/.test(lines[j].trim())) end = j;
+      break;
+    }
+  }
+  const stop = end < 0 ? lines.length - 1 : end;
+  if (end < 0 && lines.length - start < 4) return null;
+  return { before: lines.slice(0, start).join("\n"), mail: lines.slice(start, stop + 1).join("\n"), after: lines.slice(stop + 1).join("\n") };
+}
+
+const plain = (md: string) => md.replace(/\*\*|__/g, "").replace(/^\s*#+\s*/gm, "").trim();
 
 const components: Components = {
   a: ({ href, children }) => (
@@ -94,6 +129,8 @@ function useTyped(text: string, on: boolean): string {
 export function Markdown({ children, className, reveal, onTyped }: { children: string; className?: string; reveal?: boolean; onTyped?: () => void }) {
   const shown = useTyped(children, !!reveal);
   const typing = shown.length < children.length;
+  const split = React.useMemo(() => splitMail(shown), [shown]);
+  const parts = split ?? { before: shown, mail: "", after: "" };
   React.useEffect(() => {
     if (typing) return;
     typedSeen.add(children);
@@ -103,9 +140,25 @@ export function Markdown({ children, className, reveal, onTyped }: { children: s
   const links = [...new Set(children.match(artifact) ?? [])];
   return (
     <div className={cn("text-sm leading-relaxed break-words", typing && "typing-caret", className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-        {shown}
-      </ReactMarkdown>
+      {parts.before.trim() && (
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+          {parts.before}
+        </ReactMarkdown>
+      )}
+      {parts.mail && (
+        <CopyFrame label="Correo" tone="mail" text={plain(parts.mail)}>
+          <div className="p-3 text-sm">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+              {parts.mail}
+            </ReactMarkdown>
+          </div>
+        </CopyFrame>
+      )}
+      {parts.after.trim() && (
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+          {parts.after}
+        </ReactMarkdown>
+      )}
       {links.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{links.map((u) => <React.Fragment key={u}>{linkify(u, u)}</React.Fragment>)}</div>}
     </div>
   );

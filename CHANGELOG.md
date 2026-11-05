@@ -3,6 +3,12 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.43.1] - 2026-11-05
+
+### Corregido
+- **Fuera la tarjeta verde de «Resultado».** Repetía lo que Claude ya había escrito y su animación se veía mal. Ahora, al terminar, solo queda una línea discreta con el coste, la duración y los turnos; el texto aparece una única vez. Si el resultado fuera distinto de lo último que escribió Claude, se muestra en una tarjeta normal, sin animación.
+- **Los correos van en su caja con «Copiar» aunque Claude no use un bloque de código.** Se reconoce el correo (desde la línea «Subject:» / «Asunto:» hasta la despedida) y se enmarca en una caja morada que se puede copiar de una vez.
+
 ## [0.43.0] - 2026-11-05
 
 ### Cambiado
