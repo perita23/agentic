@@ -40,13 +40,28 @@ const components: Components = {
 };
 
 /** Claude artifact links keep their recognisable button: pull them out of the markdown flow. */
-export function Markdown({ children, className }: { children: string; className?: string }) {
+const BOOT = Date.now();
+
+/** Reveals `text` progressively (faster when far behind) so new answers look typed instead of popping in. */
+function useTyped(text: string, on: boolean): string {
+  const [n, setN] = React.useState(() => (on && Date.now() - BOOT > 2500 ? 0 : text.length));
+  React.useEffect(() => {
+    if (n >= text.length) return;
+    const t = setTimeout(() => setN((v) => Math.min(text.length, v + Math.max(2, Math.ceil((text.length - v) / 30)))), 16);
+    return () => clearTimeout(t);
+  }, [n, text]);
+  return n >= text.length ? text : text.slice(0, n);
+}
+
+export function Markdown({ children, className, reveal }: { children: string; className?: string; reveal?: boolean }) {
+  const shown = useTyped(children, !!reveal);
+  const typing = shown.length < children.length;
   const artifact = /https:\/\/claude\.ai\/(?:code\/)?artifact\/[A-Za-z0-9_-]+/g;
   const links = [...new Set(children.match(artifact) ?? [])];
   return (
-    <div className={cn("text-sm leading-relaxed break-words", className)}>
+    <div className={cn("text-sm leading-relaxed break-words", typing && "typing-caret", className)}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-        {children}
+        {shown}
       </ReactMarkdown>
       {links.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{links.map((u) => <React.Fragment key={u}>{linkify(u, u)}</React.Fragment>)}</div>}
     </div>

@@ -7,20 +7,9 @@ import { describeTool } from "@/lib/tool-cards";
 import { cn } from "@/lib/utils";
 import { LiquidOrb } from "./liquid-orb";
 
-/** Placeholder lines for the answer that is still being written, in the orb's colours. */
-export function ResponseSkeleton({ className }: { className?: string }) {
-  return (
-    <div className={cn("grid gap-2.5", className)} role="presentation" aria-hidden>
-      <div className="orb-skeleton w-[92%]" />
-      <div className="orb-skeleton w-[78%]" style={{ animationDelay: "-0.5s" }} />
-      <div className="orb-skeleton w-[55%]" style={{ animationDelay: "-1s" }} />
-    </div>
-  );
-}
-
 /**
  * What Claude is doing right now: the orb, the step in plain words (the command or file it is on), how long the
- * turn has taken and how many tokens it has written, a glimpse of its reasoning, and the skeleton of the answer.
+ * turn has taken and how many tokens it has written, a glimpse of its reasoning.
  */
 export function LiveStatus({ activity, stats, startedAt, size = 44 }: { activity: Activity; stats?: LiveStats | null; startedAt?: string | null; size?: number }) {
   const [now, setNow] = React.useState(() => Date.now());
@@ -38,12 +27,11 @@ export function LiveStatus({ activity, stats, startedAt, size = 44 }: { activity
       <div className="flex items-center gap-2.5">
         <LiquidOrb state={activity.state} size={size} />
         <div className="min-w-0">
-          <div className="truncate text-sm text-foreground">{step}</div>
+          <div className={cn("truncate text-sm", writing ? "orb-text font-medium" : "text-foreground")}>{step}</div>
           {detail && <div className="text-xs text-muted-foreground tabular-nums">{detail}</div>}
         </div>
       </div>
       {stats?.thinking && activity.state === "thinking" && <p className="line-clamp-3 border-l-2 border-purple/40 pl-3 text-xs text-muted-foreground italic">{stats.thinking}</p>}
-      {writing && <ResponseSkeleton className="ml-1 max-w-xl" />}
     </div>
   );
 }
