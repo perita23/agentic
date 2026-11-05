@@ -63,7 +63,7 @@ function toolLabel(t: { name: string; input: string }) {
 }
 
 /** The user's message on the right; Claude's answer as plain Markdown across the column (no avatar clutter). */
-function Bubble({ m }: { m: ChatMessage }) {
+function Bubble({ m, reveal }: { m: ChatMessage; reveal?: boolean }) {
   if (m.role === "user")
     return (
       <div className="flex justify-end">
@@ -85,7 +85,7 @@ function Bubble({ m }: { m: ChatMessage }) {
           })}
         </div>
       )}
-      {m.text.trim() && <Markdown>{m.text}</Markdown>}
+      {m.text.trim() && <Markdown reveal={reveal}>{m.text}</Markdown>}
     </div>
   );
 }
@@ -309,7 +309,7 @@ export default function ChatPage() {
                 <div className="mx-auto grid max-w-3xl gap-6 px-4 py-6">
                   {!chat && <Skeleton className="h-40" />}
                   {chat?.messages.map((m, i) => (
-                    <Bubble key={i} m={m} />
+                    <Bubble key={i} m={m} reveal={i === chat.messages.length - 1} />
                   ))}
                   {(chat?.pendingPrompt ?? optimisticShown) && <Bubble m={{ role: "user", text: (chat?.pendingPrompt ?? optimisticShown)! }} />}
                   {/* The orb closes the conversation: step, time and tokens while Claude works (with the answer's skeleton), calm when done. */}

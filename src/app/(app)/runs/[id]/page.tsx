@@ -69,7 +69,7 @@ function EventView({ e, run, results, finished, paired, planId, planText, change
             <div key={i} className="flex gap-2">
               <BotIcon className="mt-0.5 size-4 shrink-0 text-orange" />
               <div className="min-w-0 flex-1">
-                <Markdown>{String(b.text ?? "")}</Markdown>
+                <Markdown reveal={!finished}>{String(b.text ?? "")}</Markdown>
                 <div className="mt-1 flex">{jira(String(b.text ?? ""))}</div>
               </div>
             </div>

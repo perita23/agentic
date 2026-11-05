@@ -3,6 +3,12 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.42.0] - 2026-11-05
+
+### Cambiado
+- **Fuera el esqueleto de barras del chat.** Ahora, mientras Claude piensa o escribe, es **el propio texto de estado** («Pensando…», «Escribiendo…») el que brilla con el degradado de la bolita.
+- **Las respuestas nuevas se escriben poco a poco**, con un cursor luminoso, en vez de aparecer de golpe (en el chat y en las ejecuciones). Al abrir un historial no se anima nada.
+
 ## [0.41.0] - 2026-11-05
 
 ### Añadido
