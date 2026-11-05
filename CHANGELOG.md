@@ -7,7 +7,7 @@ Cada versión se etiqueta y publica automáticamente como GitHub Release cuando 
 
 ### Añadido
 - **Seguimiento automático siempre activo.** El chat y las ejecuciones se desplazan solos hacia el final con un deslizamiento suave (no a saltos), así la bolita y su texto de estado se ven siempre. Si subes con la rueda, el teclado o el dedo, se pausa y aparece **«Ir al final»**; al volver abajo (o pulsarlo) sigue de nuevo. También sigue el contenido que crece después (imágenes, tarjetas).
-- **Los números cuentan hacia su nuevo valor** en lugar de saltar: tokens y contexto del estado en vivo, y coste, duración y turnos de las métricas.
+- **Los números cuentan hacia su nuevo valor** en lugar de saltar: tokens y contexto del estado en vivo, y tokens, duración y turnos de las métricas.
 
 ### Cambiado
 - **Fuera el dinero de la página de una ejecución.** Con un plan de Claude el coste en dólares no aporta: se quita de las métricas, de la línea final del turno y de la lista de ejecuciones. En su lugar, el panel de la derecha muestra los **tokens de la sesión** (entrada + salida), con los segundos que tardó y los turnos.
