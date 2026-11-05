@@ -3,6 +3,14 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.48.0] - 2026-11-06
+
+### Añadido
+- **Mi cuenta.** Una página nueva, y un menú con tu avatar arriba a la derecha (Mi cuenta, Ajustes, Cerrar sesión) y tu nombre en la barra lateral. Pon tu **nombre** (se guarda solo al salir del campo) y tu **imagen**: elige una de **12 avatares predeterminados** (degradados con motivos: aurora, brasa, orquídea…) o **sube una foto**, que se recorta en cuadrado y se reduce en tu navegador. Si cambias o quitas la foto, el archivo antiguo se borra. La página también muestra tu actividad (ejecuciones, tokens, sesiones, proyectos), tu uso del plan de Claude, qué servicios tienes conectados (Slack, GitHub, Bitbucket, Jira, Obsidian) y tus ajustes de seguridad. Todo se guarda solo en este dispositivo. También en el buscador de comandos (Ctrl K).
+- **Pantallas de carga y esqueletos nuevos.** Todos los marcadores de posición tienen ahora un barrido de luz suave (antes parpadeaban). Hay esqueletos con la forma de cada pantalla (cabecera, cifras, listas, la conversación del chat, la página de una ejecución) y pantallas de carga instantáneas al navegar. Una **barra de progreso fina** arriba avanza al pulsar un enlace y se completa cuando llega la página.
+- **Animaciones por toda la app.** Las cifras y las listas entran de forma escalonada (dashboard, sesiones, ejecuciones, cuenta), los números del dashboard cuentan hasta su valor, las tarjetas de cifras se elevan al pasar el ratón, los botones se aprietan al pulsarlos y el contenido de las pestañas entra con un fundido. Respetan «reducir movimiento».
+- La bolita de Agentic no se ha tocado.
+
 ## [0.47.1] - 2026-11-05
 
 ### Interno

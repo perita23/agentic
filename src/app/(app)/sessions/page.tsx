@@ -6,6 +6,8 @@ import { CheckSquareIcon, MessagesSquareIcon, SearchIcon, Trash2Icon } from "luc
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonRows } from "@/components/app/skeletons";
+import { Stagger, StaggerItem } from "@/components/app/reveal";
 import { EmptyState, PageHeader } from "@/components/app/common";
 import { SessionRow } from "@/components/app/session-row";
 import { deleteSessions, TrashButton } from "@/components/app/session-trash";
@@ -126,20 +128,17 @@ export default function SessionsPage() {
           )}
         </div>
         {isLoading && !data ? (
-          <div className="space-y-2 p-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-11" />
-            ))}
-          </div>
+          <SkeletonRows n={7} />
         ) : data?.sessions.length ? (
-          <div className="divide-y">{data.sessions.map((s) => (
-              <SessionRow
-                key={s.id}
-                s={s}
-                onDelete={(x) => void deleteSessions([x.id])}
-                select={selecting ? { checked: picked.has(s.id), onToggle: () => setPicked((p) => { const n = new Set(p); if (n.has(s.id)) n.delete(s.id); else if (!s.active) n.add(s.id); return n; }) } : undefined}
-              />
-            ))}</div>
+          <Stagger gap={0.03} className="divide-y">{data.sessions.map((s) => (
+              <StaggerItem key={s.id}>
+                <SessionRow
+                  s={s}
+                  onDelete={(x) => void deleteSessions([x.id])}
+                  select={selecting ? { checked: picked.has(s.id), onToggle: () => setPicked((p) => { const n = new Set(p); if (n.has(s.id)) n.delete(s.id); else if (!s.active) n.add(s.id); return n; }) } : undefined}
+                />
+              </StaggerItem>
+            ))}</Stagger>
         ) : (
           <div className="p-6">
             <EmptyState icon={MessagesSquareIcon} title="No hay sesiones" description="No se encontraron sesiones con estos filtros." />

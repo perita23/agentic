@@ -20,6 +20,7 @@ import { CommandService } from "./commands";
 import { LibraryService } from "./library";
 import { PrefsService } from "./prefs";
 import { ObsidianService } from "./obsidian";
+import { ProfileService } from "./profile";
 import { SessionTrash } from "./trash";
 import pkg from "../../../package.json";
 import { PullService } from "./integrations/pulls";
@@ -57,6 +58,7 @@ export interface Context {
   library: LibraryService;
   prefs: PrefsService;
   obsidian: ObsidianService;
+  profile: ProfileService;
   trash: SessionTrash;
   oauth: OAuthService;
 }
@@ -122,6 +124,7 @@ export function createContext(config: Config): Context {
     library: new LibraryService(sessions),
     prefs: new PrefsService(store),
     obsidian,
+    profile: new ProfileService(store, config.dataDir),
     trash: new SessionTrash(config.dataDir, config.claudeHome, sessions),
     oauth: new OAuthService(store, integrations),
     queue,

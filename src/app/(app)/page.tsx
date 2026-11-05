@@ -5,10 +5,12 @@ import { motion } from "motion/react";
 import { ActivityIcon, ArrowRightIcon, CircleDollarSignIcon, KanbanSquareIcon, LayoutDashboardIcon, MessagesSquareIcon, RocketIcon, TerminalSquareIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, PageHeader, Stat, StatusDot } from "@/components/app/common";
 import { useLauncher } from "@/components/app/launcher";
+import { AnimatedNumber } from "@/components/app/animated-number";
+import { Reveal, Stagger, StaggerItem } from "@/components/app/reveal";
 import { RunRow } from "@/components/app/run-row";
+import { SkeletonRows, SkeletonStats } from "@/components/app/skeletons";
 import { SessionRow } from "@/components/app/session-row";
 import { useApi, type Overview } from "@/lib/api";
 import { baseName, shortPath } from "@/lib/utils";
@@ -31,25 +33,31 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
+      <Reveal y={6}>
+        <PageHeader
         icon={LayoutDashboardIcon}
         title="Dashboard"
         description={`Visión general de tu actividad con Claude Code en ${device}.`}
       />
+      </Reveal>
       {error && <p className="text-sm text-destructive">Error cargando datos: {error.message}</p>}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[
-          { label: "Sesiones activas", value: c?.activeSessions, hint: `${c?.sessions ?? 0} en total · ${c?.sessionsToday ?? 0} hoy`, icon: ActivityIcon, accent: "text-success" },
-          { label: "Ejecuciones en curso", value: c?.runningRuns, hint: "lanzadas desde Agentic", icon: TerminalSquareIcon, accent: "text-warning" },
-          { label: "Tareas abiertas", value: c?.openTasks, hint: `${c?.tasks ?? 0} tareas en total`, icon: KanbanSquareIcon, accent: "text-primary" },
-          { label: "Coste acumulado", value: c ? `$${c.costUsd.toFixed(2)}` : undefined, hint: `${c?.projects ?? 0} proyectos`, icon: CircleDollarSignIcon, accent: "text-purple" },
-        ].map((s, i) => (
-          <motion.div key={s.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-            <Stat label={s.label} value={s.value ?? <Skeleton className="h-7 w-12" />} hint={s.hint} icon={s.icon} accent={s.accent} />
-          </motion.div>
-        ))}
-      </div>
+      {!data ? (
+        <SkeletonStats n={4} />
+      ) : (
+        <Stagger className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[
+            { label: "Sesiones activas", value: <AnimatedNumber value={c!.activeSessions} />, hint: `${c!.sessions} en total · ${c!.sessionsToday} hoy`, icon: ActivityIcon, accent: "text-success" },
+            { label: "Ejecuciones en curso", value: <AnimatedNumber value={c!.runningRuns} />, hint: "lanzadas desde Agentic", icon: TerminalSquareIcon, accent: "text-warning" },
+            { label: "Tareas abiertas", value: <AnimatedNumber value={c!.openTasks} />, hint: `${c!.tasks} tareas en total`, icon: KanbanSquareIcon, accent: "text-primary" },
+            { label: "Coste acumulado", value: <AnimatedNumber value={c!.costUsd} format={(n) => `$${n.toFixed(2)}`} />, hint: `${c!.projects} proyectos`, icon: CircleDollarSignIcon, accent: "text-purple" },
+          ].map((s) => (
+            <StaggerItem key={s.label}>
+              <Stat label={s.label} value={s.value} hint={s.hint} icon={s.icon} accent={s.accent} />
+            </StaggerItem>
+          ))}
+        </Stagger>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3 [&>*]:min-w-0">
         <Card className="lg:col-span-2">
@@ -61,10 +69,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="px-0">
             {!data ? (
-              <div className="space-y-2 px-4">
-                <Skeleton className="h-10" />
-                <Skeleton className="h-10" />
-              </div>
+              <SkeletonRows n={2} />
             ) : data.activeProcesses.length === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-muted-foreground">No hay ninguna sesión de Claude Code abierta ahora mismo.</p>
             ) : (
@@ -133,8 +138,16 @@ export default function DashboardPage() {
               <div className="px-4">
                 <EmptyState icon={MessagesSquareIcon} title="Sin sesiones todavía" description={`Cuando uses Claude Code en ${device} aparecerán aquí.`} />
               </div>
+            ) : !data ? (
+              <SkeletonRows n={4} className="border-y" />
             ) : (
-              <div className="scroll-area divide-y border-y">{data?.recentSessions.map((s) => <SessionRow key={s.id} s={s} />)}</div>
+              <Stagger gap={0.04} className="scroll-area divide-y border-y">
+                {data.recentSessions.map((s) => (
+                  <StaggerItem key={s.id}>
+                    <SessionRow s={s} />
+                  </StaggerItem>
+                ))}
+              </Stagger>
             )}
           </CardContent>
         </Card>
@@ -161,8 +174,16 @@ export default function DashboardPage() {
                   }
                 />
               </div>
+            ) : !data ? (
+              <SkeletonRows n={4} className="border-y" />
             ) : (
-              <div className="scroll-area divide-y border-y">{data?.recentRuns.map((r) => <RunRow key={r.id} r={r} />)}</div>
+              <Stagger gap={0.04} className="scroll-area divide-y border-y">
+                {data.recentRuns.map((r) => (
+                  <StaggerItem key={r.id}>
+                    <RunRow r={r} />
+                  </StaggerItem>
+                ))}
+              </Stagger>
             )}
           </CardContent>
         </Card>

@@ -1,5 +1,8 @@
 "use client";
 
+import { AccountMenu } from "./account-menu";
+import { Avatar, useProfile } from "./avatar";
+import { RouteProgress } from "./route-progress";
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -21,7 +24,7 @@ import {
   SettingsIcon,
   TicketIcon,
   EyeIcon, EyeOffIcon, MailIcon, SlidersHorizontalIcon, CheckIcon,
-  TerminalSquareIcon, SparklesIcon, ServerIcon, ShieldCheckIcon, AlarmClockIcon, LibraryIcon } from "lucide-react";
+  TerminalSquareIcon, SparklesIcon, ServerIcon, ShieldCheckIcon, AlarmClockIcon, LibraryIcon, UserRoundIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { api, refresh, useApi, type Overview, type ProjectListItem, type SessionSummary } from "@/lib/api";
@@ -84,6 +87,16 @@ function Logo() {
       <BrandMark className="drop-shadow-[0_2px_8px_rgba(167,139,250,0.25)]" />
       <span className="font-semibold tracking-tight">Agentic</span>
       <span className="rounded border px-1 font-mono text-[10px] text-muted-foreground">local</span>
+    </Link>
+  );
+}
+
+function SidebarAccount() {
+  const { profile } = useProfile();
+  return (
+    <Link href="/account" className="press mx-2 mb-2 flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors hover:bg-accent">
+      <Avatar profile={profile} size={28} />
+      <span className="min-w-0 flex-1 truncate">{profile?.name || "Mi cuenta"}</span>
     </Link>
   );
 }
@@ -167,6 +180,7 @@ function Sidebar({ overview }: { overview?: Overview }) {
           </span>
         </Link>
       )}
+      <SidebarAccount />
       <div className="border-t p-3 text-[11px] text-muted-foreground">
         <div className="flex items-center gap-1.5">
           <span className="size-1.5 rounded-full bg-success" /> Todo se ejecuta en tu dispositivo
@@ -219,6 +233,9 @@ function CommandPalette({ open, setOpen }: { open: boolean; setOpen: (o: boolean
           <CommandItem onSelect={() => go(() => router.push("/agents?new=1"))}>
             <BotIcon /> Nuevo agente
           </CommandItem>
+          <CommandItem onSelect={() => go(() => router.push("/account"))}>
+            <UserRoundIcon /> Mi cuenta
+          </CommandItem>
         </CommandGroup>
         <CommandGroup heading="Ir a">
           {NAV.map((n) => (
@@ -270,6 +287,7 @@ function Topbar({ onSearch }: { onSearch: () => void }) {
         <Button onClick={() => launcher.open()} size="sm">
           <RocketIcon /> <span className="hidden sm:inline">Nueva sesión</span>
         </Button>
+        <AccountMenu />
       </div>
     </header>
   );
@@ -307,6 +325,7 @@ function ShellInner({ children }: { children: React.ReactNode }) {
         <BudgetBanner />
         <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 md:px-8">{children}</main>
       </div>
+      <RouteProgress />
       <CommandPalette open={paletteOpen} setOpen={setPaletteOpen} />
       <RunNotifier />
       <WhatsNew />

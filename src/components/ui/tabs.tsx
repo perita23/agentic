@@ -23,7 +23,7 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
   );
 }
 function TabsContent({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Content>) {
-  return <TabsPrimitive.Content data-slot="tabs-content" className={cn("flex-1 outline-none", className)} {...props} />;
+  return <TabsPrimitive.Content data-slot="tabs-content" className={cn("flex-1 outline-none data-[state=active]:animate-[fade-up_0.3s_cubic-bezier(0.22,0.8,0.3,1)_both] motion-reduce:animate-none", className)} {...props} />;
 }
 
 export { Tabs, TabsContent, TabsList, TabsTrigger };

@@ -97,7 +97,7 @@ export function Kbd({ children, className }: { children: React.ReactNode; classN
 
 export function Stat({ label, value, hint, icon: Icon, accent }: { label: string; value: React.ReactNode; hint?: React.ReactNode; icon: React.ElementType; accent?: string }) {
   return (
-    <div className="group relative overflow-hidden rounded-lg border bg-card p-4 transition-colors hover:border-border-strong">
+    <div className="group lift relative overflow-hidden rounded-lg border bg-card p-4 hover:border-border-strong">
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         {label}
         <Icon className={cn("size-4", accent)} />
