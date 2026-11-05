@@ -756,10 +756,18 @@ try {
   await page.getByLabel("Título").waitFor();
   await page.waitForFunction(() => document.querySelector("#pr-title")?.value === "Nueva desde la UI");
   check((await page.locator("#pr-head").inputValue()) === "feat/nueva", "new PR dialog proposes the branch that has commits and its last commit as the title");
+  // Claude writes the title and description (streamed into the fields).
+  await page.getByRole("button", { name: "Generar con Claude" }).click();
+  await page.locator("#pr-body").evaluate((el) => new Promise((r) => { const t = setInterval(() => { if (el.value.includes("Resumen")) { clearInterval(t); r(0); } }, 50); }));
+  check((await page.locator(".orb-border").count()) >= 1, "while Claude writes the description the fields glow in the orb colours");
+  await shot("12c-pr-generating");
+  await page.waitForFunction(() => document.querySelector("#pr-title")?.value === "Añade login con Touch ID" && document.querySelector("#pr-body")?.value.includes("Nuevo botón de acceso"), null, { timeout: 20000 });
+  await page.getByRole("button", { name: "Generar con Claude" }).waitFor();
+  check(true, "the new PR dialog can have Claude write the title and description");
   await page.getByRole("button", { name: "Crear pull request" }).click();
   await page.getByText("PR #13 creada").waitFor();
   const uiPr = ghWrites.find((w) => w.method === "POST" && w.path === "/repos/acme/demo/pulls" && w.body.head === "feat/nueva");
-  check(uiPr?.body.base === "main" && uiPr.body.title === "Nueva desde la UI" && execFileSync("git", ["branch", "--list", "feat/nueva"], { cwd: bareRemote, encoding: "utf8" }).includes("feat/nueva"), "new PR from the Pull requests page: branch pushed and PR opened");
+  check(uiPr?.body.base === "main" && uiPr.body.title === "Añade login con Touch ID" && uiPr.body.body.includes("Permite entrar con la huella.") && execFileSync("git", ["branch", "--list", "feat/nueva"], { cwd: bareRemote, encoding: "utf8" }).includes("feat/nueva"), "new PR from the Pull requests page: branch pushed and PR opened");
   await page.getByText("PR #13 creada").waitFor({ state: "detached", timeout: 15000 });
 
   // Jira: search, open an issue, move it, comment and import it as a task.
