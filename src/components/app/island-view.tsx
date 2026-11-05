@@ -19,6 +19,8 @@ interface IslandBridge {
   hide(): void;
   interactive(on: boolean): void;
   open(path: string): void;
+  mainVisible(): Promise<boolean | null>;
+  onMainVisible(cb: (v: boolean) => void): () => void;
 }
 declare global {
   interface Window {
@@ -65,11 +67,19 @@ export function IslandView() {
   const [alert, setAlert] = React.useState<IslandRun | null>(null);
   const [now, setNow] = React.useState(() => Date.now());
   const seen = React.useRef<Set<string> | null>(null);
+  // The island only shows while the main window is not on screen (minimized, hidden, closed, another Space, covered).
+  // Until we know, assume it is on screen: nothing pops up by mistake.
+  const [mainVisible, setMainVisible] = React.useState(true);
 
   React.useEffect(() => {
     document.documentElement.style.background = "transparent";
     document.body.style.background = "transparent";
     void bridge?.metrics().then(setMetrics);
+    void bridge?.mainVisible().then((v) => setMainVisible(v !== false));
+    return bridge?.onMainVisible((v) => {
+      setMainVisible(v);
+      if (v) setAlert(null); // opening the app takes the notice away
+    });
   }, [bridge]);
   React.useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -87,15 +97,17 @@ export function IslandView() {
     const fresh = snap.recent.find((r) => !seen.current!.has(r.id));
     if (!fresh) return;
     seen.current.add(fresh.id);
-    if (island.enabled && island.alerts) setAlert(fresh);
-  }, [snap, island.enabled, island.alerts]);
+    // With the app in view you do not need the notice: it is marked as seen and not shown later.
+    if (island.enabled && island.alerts && !mainVisible) setAlert(fresh);
+  }, [snap, island.enabled, island.alerts, mainVisible]);
+
   React.useEffect(() => {
     if (!alert) return;
     const t = setTimeout(() => setAlert(null), ALERT_MS[alert.state] ?? 8000);
     return () => clearTimeout(t);
   }, [alert]);
 
-  const running = island.enabled && island.working ? (snap?.running ?? []) : [];
+  const running = island.enabled && island.working && !mainVisible ? (snap?.running ?? []) : [];
   const main = running[running.length - 1];
   const mode: "alert" | "work" | "hidden" = alert ? "alert" : main ? "work" : "hidden";
 

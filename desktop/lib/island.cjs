@@ -51,6 +51,9 @@ const SAFE_PATH = /^\/[A-Za-z0-9/_-]*$/;
 function createIsland({ BrowserWindow, screen, ipcMain, getOrigin, openMain }) {
   let win = null;
   let wanted = false;
+  // Whether the main window is on screen. The island only shows when it is not (minimized, hidden, closed,
+  // in another Space or fully covered).
+  let mainVisible = true;
 
   // The real notch when AppKit tells us (see readNotch); otherwise a guess from the height of the menu bar.
   let real = null;
@@ -133,6 +136,7 @@ function createIsland({ BrowserWindow, screen, ipcMain, getOrigin, openMain }) {
     await notchReady;
     return metrics();
   });
+  ipcMain.handle("island:main-visible", (e) => (mine(e) ? mainVisible : null));
   ipcMain.on("island:show", (e) => {
     if (!mine(e)) return;
     wanted = true;
@@ -157,7 +161,15 @@ function createIsland({ BrowserWindow, screen, ipcMain, getOrigin, openMain }) {
   screen.on("display-added", place);
   screen.on("display-removed", place);
 
-  return { create, isVisible: () => wanted, destroy: () => win && !win.isDestroyed() && win.destroy() };
+  /** Called by the main process whenever the main window shows, hides, minimizes, closes or gets covered. */
+  function setMainVisible(v) {
+    v = !!v;
+    if (v === mainVisible) return;
+    mainVisible = v;
+    if (win && !win.isDestroyed()) win.webContents.send("island:main-visible", v);
+  }
+
+  return { create, setMainVisible, isVisible: () => wanted, destroy: () => win && !win.isDestroyed() && win.destroy() };
 }
 
 module.exports = { createIsland, SAFE_PATH, parseNotch };

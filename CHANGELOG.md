@@ -5,6 +5,9 @@ Cada versión se etiqueta y publica automáticamente como GitHub Release cuando 
 
 ## [0.46.1] - 2026-11-05
 
+### Cambiado
+- **La isla solo sale cuando la app no está a la vista.** Si la ventana de Agentic está visible, la isla no aparece ni avisa; sale cuando la ventana está minimizada, oculta, cerrada, en otro Space o tapada por completo por otras ventanas (lo que Chromium informa como «página oculta»). Al abrir de nuevo la app, la isla se retira sola. Lo que termina mientras miras la app no se te avisa después.
+
 ### Corregido
 - **La isla aparecía debajo de la barra de menús en vez de en la muesca.** macOS empuja por defecto cualquier ventana fuera de la barra; ahora la ventana de la isla pide no ser «limitada» a la pantalla útil (la misma razón por la que las apps nativas de muesca sobrescriben `constrainFrameRect`) y, si aun así la bajara, se recoloca en el borde superior. Además lee la **muesca real** (ancho y alto) que macOS informa para cada pantalla, en lugar de estimarla; si no puede, usa una estimación. La píldora es de un negro puro (`#000000`, igual que la muesca) y cerrada no proyecta sombra, para que parezca fusionada con ella; solo la tarjeta abierta lleva sombra.
 
