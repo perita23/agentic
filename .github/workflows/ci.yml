@@ -43,10 +43,25 @@ jobs:
       - name: Production build
         run: npm run build
 
+      # The browser is cached between runs, so most of the time nothing is downloaded.
+      - name: Cache Chromium for the smoke test
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-1.63.0-${{ runner.os }}
+
       - name: Install Chromium for the smoke test
+        timeout-minutes: 15
         run: |
           npm install --no-save playwright@1.63.0
-          npx playwright install --with-deps chromium
+          # The download and the apt mirrors sometimes stall for many minutes without failing: each try is cut at
+          # 4 minutes and repeated (a stalled connection is usually fine on the next one).
+          for attempt in 1 2 3; do
+            if timeout 240 npx playwright install --with-deps chromium; then exit 0; fi
+            echo "::warning::Chromium install attempt $attempt failed or timed out"
+            sleep 5
+          done
+          exit 1
 
       - name: E2E smoke test
         run: npm run smoke -- --shots smoke-shots
