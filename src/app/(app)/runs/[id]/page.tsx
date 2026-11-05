@@ -27,6 +27,8 @@ import { cn, shortPath, timeAgo } from "@/lib/utils";
 import { AttachButton, AttachmentBar, useAttachments } from "@/components/app/attachments";
 import { BranchSwitcher } from "@/components/app/branch-switcher";
 import { FileList, useFileMenu } from "@/components/app/file-menu";
+import { LiveStatus } from "@/components/app/live-status";
+import { liveStats } from "@/lib/live-stats";
 import { Markdown } from "@/components/app/markdown";
 import { PlanCard } from "@/components/app/plan-card";
 import { ToolCard, type ToolResult } from "@/components/app/tool-card";
@@ -71,6 +73,11 @@ function EventView({ e, run, results, finished, paired, planId, planText, change
                 <div className="mt-1 flex">{jira(String(b.text ?? ""))}</div>
               </div>
             </div>
+          ) : b.type === "thinking" && typeof b.thinking === "string" && b.thinking.trim() ? (
+            <details key={i} className="ml-6 rounded-lg border bg-inset text-xs">
+              <summary className="cursor-pointer px-2.5 py-1.5 text-muted-foreground italic">Razonamiento</summary>
+              <p className="max-h-60 overflow-auto px-3 pb-2.5 whitespace-pre-wrap text-muted-foreground italic">{b.thinking}</p>
+            </details>
           ) : b.type === "tool_use" && b.name === "ExitPlanMode" && (typeof b.input?.plan === "string" || planText) ? (
             <div key={i} className="ml-6"><PlanCard plan={typeof b.input?.plan === "string" && b.input.plan ? b.input.plan : planText} run={run} actionable={planId === String(b.id) && run.status !== "running"} /></div>
           ) : b.type === "tool_use" ? (
@@ -287,6 +294,8 @@ function HeadlessLog({ thread }: { thread: Run[] }) {
   const scroller = React.useRef<HTMLDivElement>(null);
   const [follow, setFollow] = React.useState(true);
   const live = thread.some((r) => byRun[r.id]?.live);
+  const latestEvents = byRun[run.id]?.events;
+  const stats = React.useMemo(() => liveStats(latestEvents ?? []), [latestEvents]);
 
   React.useEffect(() => {
     // Scroll only the log container, never the whole window.
@@ -313,8 +322,12 @@ function HeadlessLog({ thread }: { thread: Run[] }) {
           {thread.map((r, i) => (
             <Segment key={r.id} run={r} index={i} latest={i === thread.length - 1} onEvents={onEvents} />
           ))}
-          {/* The orb lives at the end of the output, where Claude is writing (like in the chat). */}
-          <ActivityOrb activity={run.status === "failed" ? { state: "error", label: "Ha fallado" } : stateFromEvents(byRun[run.id]?.events ?? [])} size={44} className="mt-1" />
+          {/* At the end of the output: what Claude is doing now (step, time, tokens) while it works, a calm orb when done. */}
+          {run.status === "running" ? (
+            <LiveStatus activity={stateFromEvents(byRun[run.id]?.events ?? [])} stats={stats} startedAt={run.startedAt} />
+          ) : (
+            <ActivityOrb activity={run.status === "failed" ? { state: "error", label: "Ha fallado" } : stateFromEvents(byRun[run.id]?.events ?? [])} size={44} className="mt-1" />
+          )}
         </div>
       </CardContent>
       <ReplyBox run={run} />
