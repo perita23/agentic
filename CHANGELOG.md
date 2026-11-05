@@ -3,6 +3,15 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.46.0] - 2026-11-05
+
+### Añadido
+- **Seguimiento automático siempre activo.** El chat y las ejecuciones se desplazan solos hacia el final con un deslizamiento suave (no a saltos), así la bolita y su texto de estado se ven siempre. Si subes con la rueda, el teclado o el dedo, se pausa y aparece **«Ir al final»**; al volver abajo (o pulsarlo) sigue de nuevo. También sigue el contenido que crece después (imágenes, tarjetas).
+- **Los números cuentan hacia su nuevo valor** en lugar de saltar: tokens y contexto del estado en vivo, y coste, duración y turnos de las métricas.
+
+### Mejorado
+- **Mucho menos tirones cuando pasan muchas cosas.** Las tarjetas y los mensajes solo se vuelven a dibujar si cambia lo que muestran (antes se recalculaba todo en cada evento), el texto que se escribe en directo ya no recalcula la lista entera, las estadísticas se leen de forma incremental, el Markdown no se vuelve a interpretar si su texto no cambia y la escritura progresiva usa menos pasos. Además se quita un filtro de sombra costoso del texto con brillo.
+
 ## [0.45.0] - 2026-11-05
 
 ### Cambiado

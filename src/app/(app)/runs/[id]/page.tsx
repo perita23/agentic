@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeftIcon, BotIcon, FileDiffIcon, CornerDownLeftIcon, ListPlusIcon, ExternalLinkIcon, PlayIcon, SquareIcon, TerminalIcon, Trash2Icon, XIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowLeftIcon, BotIcon, FileDiffIcon, CornerDownLeftIcon, ListPlusIcon, ExternalLinkIcon, PlayIcon, SquareIcon, TerminalIcon, Trash2Icon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import { JiraCommentButton } from "@/components/app/jira-comment";
 import { UsageCard } from "@/components/app/usage-card";
 import { SlashList, useSlashCommands, useSlashMenu } from "@/components/app/slash-menu";
 import { MODELS, parseSlash, type PermMode } from "@/lib/slash";
-import { stateFromEvents } from "@/lib/orb-state";
+import { ORB_LABEL, stateFromEvents } from "@/lib/orb-state";
 import { RUN_STATUS_LABEL, RUN_STATUS_VARIANT } from "@/components/app/run-row";
 import { api, fetcher, refresh, useApi, type Run, type RunLog } from "@/lib/api";
 import { cn, shortPath, timeAgo } from "@/lib/utils";
@@ -29,7 +29,9 @@ import { BranchSwitcher } from "@/components/app/branch-switcher";
 import { FileList, useFileMenu } from "@/components/app/file-menu";
 import { LiveStatus } from "@/components/app/live-status";
 import { Appear } from "@/components/app/appear";
-import { liveStats } from "@/lib/live-stats";
+import { LiveStatsAcc, type LiveStats } from "@/lib/live-stats";
+import { useStickToBottom } from "@/lib/use-stick-bottom";
+import { AnimatedNumber } from "@/components/app/animated-number";
 import { Markdown } from "@/components/app/markdown";
 import { PlanCard } from "@/components/app/plan-card";
 import { ToolCard, type ToolResult } from "@/components/app/tool-card";
@@ -66,7 +68,7 @@ function ResultCard({ e, jira, duplicate }: { e: Ev; jira: (t: string) => React.
   );
 }
 
-function EventView({ e, run, results, finished, paired, planId, planText, changes, lastText }: { e: Ev; run: Run; results: Map<string, ToolResult>; finished: boolean; paired: Set<string>; planId: string | null; planText: string; changes: Map<string, FileChange[]>; lastText: string }) {
+function EventViewImpl({ e, run, results, finished, paired, planId, planText, changes, lastText }: { e: Ev; run: Run; results: Map<string, ToolResult>; finished: boolean; paired: Set<string>; planId: string | null; planText: string; changes: Map<string, FileChange[]>; lastText: string }) {
   const jira = (text: string) => <JiraCommentButton text={text} hints={[run.prompt, run.resultText]} taskId={run.taskId} />;
   if (e.type === "agentic" && e.subtype === "start")
     return <div className="font-mono text-xs text-muted-foreground">$ {(e.args as string[]).join(" ")}</div>;
@@ -140,10 +142,32 @@ function EventView({ e, run, results, finished, paired, planId, planText, change
   return null;
 }
 
+type EventViewProps = Parameters<typeof EventViewImpl>[0];
+/** A card is drawn again only when something that shows in it changed (not at every new event of the run). */
+const EventView = React.memo(EventViewImpl, (a: EventViewProps, b: EventViewProps) => {
+  if (a.e !== b.e || a.finished !== b.finished || a.planId !== b.planId || a.planText !== b.planText || a.lastText !== b.lastText) return false;
+  if (a.run.id !== b.run.id || a.run.status !== b.run.status || a.run.resultText !== b.run.resultText || a.run.projectPath !== b.run.projectPath) return false;
+  const blocks: Ev[] = a.e.type === "assistant" && Array.isArray(a.e.message?.content) ? a.e.message.content : [];
+  for (const blk of blocks) {
+    if (blk.type !== "tool_use" || !blk.id) continue;
+    const id = String(blk.id);
+    const ra = a.results.get(id);
+    const rb = b.results.get(id);
+    if (ra?.content !== rb?.content || ra?.isError !== rb?.isError || a.paired.has(id) !== b.paired.has(id)) return false;
+    if ((a.changes.get(id)?.length ?? 0) !== (b.changes.get(id)?.length ?? 0)) return false;
+  }
+  return true;
+});
+
 /** Events of one run: live over SSE, with incremental polling as fallback. */
 function useRunEvents(runId: string) {
   const [events, setEvents] = React.useState<Ev[]>([]);
+  // The answer being written token by token: kept apart from the events so writing it does not recompute the whole list.
+  const [partial, setPartial] = React.useState("");
   const offset = React.useRef(0);
+  const partialRef = React.useRef("");
+  const accRef = React.useRef(new LiveStatsAcc());
+  const [stats, setStats] = React.useState<LiveStats>(() => new LiveStatsAcc().stats());
   const [live, setLive] = React.useState(false);
 
   React.useEffect(() => {
@@ -160,7 +184,24 @@ function useRunEvents(runId: string) {
       if (!pending.length) return;
       const batch = pending;
       pending = [];
-      setEvents((prev) => [...prev, ...batch].slice(-3000));
+      const kept: Ev[] = [];
+      let text: string | null = null;
+      for (const e of batch) {
+        if (e.type === "agentic" && e.subtype === "partial" && typeof e.delta === "string") text = (text ?? partialRef.current) + e.delta;
+        else {
+          if (e.type === "assistant" || e.type === "user" || e.type === "result") text = "";
+          kept.push(e);
+        }
+      }
+      if (text !== null) {
+        partialRef.current = text.slice(-20_000);
+        setPartial(partialRef.current);
+      }
+      if (kept.length) {
+        for (const e of kept) accRef.current.add(e);
+        setStats(accRef.current.stats());
+        setEvents((prev) => [...prev, ...kept].slice(-3000));
+      }
     };
     const push = (e: Ev) => {
       pending.push(e);
@@ -218,13 +259,13 @@ function useRunEvents(runId: string) {
     };
   }, [runId]);
 
-  return { events, live };
+  return { events, live, partial, stats };
 }
 
 /** One turn of the conversation: the user's message (replies) and what Claude did. */
-function Segment({ run, index, latest, onEvents }: { run: Run; index: number; latest: boolean; onEvents: (id: string, events: Ev[], live: boolean) => void }) {
-  const { events, live } = useRunEvents(run.id);
-  React.useEffect(() => onEvents(run.id, events, live), [run.id, events, live, onEvents]);
+function Segment({ run, index, latest, onEvents }: { run: Run; index: number; latest: boolean; onEvents: (id: string, events: Ev[], live: boolean, partial: string, stats: LiveStats) => void }) {
+  const { events, live, partial, stats } = useRunEvents(run.id);
+  React.useEffect(() => onEvents(run.id, events, live, partial, stats), [run.id, events, live, partial, stats, onEvents]);
   // Replies reuse the session: hide the repeated command line, init and exit noise.
   const shown = index === 0 ? events : events.filter((e) => !(e.type === "agentic" && (e.subtype === "start" || e.subtype === "exit")) && !(e.type === "system" && e.subtype === "init"));
   // Pair each tool call with its result (they arrive as separate events) so a call renders as one card.
@@ -309,21 +350,21 @@ function Segment({ run, index, latest, onEvents }: { run: Run; index: number; la
 /** The whole conversation (first run + replies) in one place, like the chat. */
 function HeadlessLog({ thread }: { thread: Run[] }) {
   const run = thread[thread.length - 1];
-  const [byRun, setByRun] = React.useState<Record<string, { events: Ev[]; live: boolean }>>({});
+  const [byRun, setByRun] = React.useState<Record<string, { events: Ev[]; live: boolean; partial: string; stats: LiveStats }>>({});
   const onEvents = React.useCallback(
-    (id: string, events: Ev[], live: boolean) => setByRun((p) => (p[id]?.events === events && p[id]?.live === live ? p : { ...p, [id]: { events, live } })),
+    (id: string, events: Ev[], live: boolean, partial: string, stats: LiveStats) => setByRun((p) => (p[id]?.events === events && p[id]?.live === live && p[id]?.partial === partial && p[id]?.stats === stats ? p : { ...p, [id]: { events, live, partial, stats } })),
     [],
   );
   const scroller = React.useRef<HTMLDivElement>(null);
-  const [follow, setFollow] = React.useState(true);
+  const body = React.useRef<HTMLDivElement>(null);
+  // Always follows the end (orb and status included) until you scroll up; the button brings you back.
+  const { stuck, setStuck, scrollToEnd } = useStickToBottom(scroller, body);
   const live = thread.some((r) => byRun[r.id]?.live);
   const latestEvents = byRun[run.id]?.events;
-  const stats = React.useMemo(() => liveStats(latestEvents ?? []), [latestEvents]);
-
-  React.useEffect(() => {
-    // Scroll only the log container, never the whole window.
-    if (follow && scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
-  }, [byRun, thread.length, follow]);
+  const partial = byRun[run.id]?.partial ?? "";
+  const base = byRun[run.id]?.stats;
+  const stats = React.useMemo(() => (base ? { ...base, partial } : undefined), [base, partial]);
+  const activity = partial ? { state: "writing" as const, label: ORB_LABEL.writing } : stateFromEvents(latestEvents ?? []);
 
   return (
     <Card className="gap-0 py-0">
@@ -337,22 +378,33 @@ function HeadlessLog({ thread }: { thread: Run[] }) {
           )}
         </CardTitle>
         <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
-          <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} className="accent-primary" /> Seguir
+          <input type="checkbox" checked={stuck} onChange={(e) => setStuck(e.target.checked)} className="accent-primary" /> Seguir
         </label>
       </CardHeader>
-      <CardContent ref={scroller} className="max-h-[65vh] min-h-64 overflow-y-auto bg-inset p-4">
-        <div className="flex flex-col gap-3">
+      <CardContent ref={scroller} className="relative max-h-[65vh] min-h-64 overflow-y-auto bg-inset p-4" tabIndex={0} aria-label="Salida de Claude">
+        <div ref={body} className="flex flex-col gap-3">
           {thread.map((r, i) => (
             <Segment key={r.id} run={r} index={i} latest={i === thread.length - 1} onEvents={onEvents} />
           ))}
           {/* At the end of the output: what Claude is doing now (step, time, tokens) while it works, a calm orb when done. */}
           {run.status === "running" ? (
-            <Appear><LiveStatus activity={stateFromEvents(byRun[run.id]?.events ?? [])} stats={stats} startedAt={run.startedAt} /></Appear>
+            <Appear><LiveStatus activity={activity} stats={stats} startedAt={run.startedAt} /></Appear>
           ) : (
             <ActivityOrb activity={run.status === "failed" ? { state: "error", label: "Ha fallado" } : stateFromEvents(byRun[run.id]?.events ?? [])} size={44} className="mt-1" />
           )}
         </div>
       </CardContent>
+      {!stuck && (
+        <div className="pointer-events-none relative h-0">
+          <button
+            type="button"
+            onClick={scrollToEnd}
+            className="appear pointer-events-auto absolute right-4 bottom-3 flex items-center gap-1.5 rounded-full border bg-card/95 px-3 py-1.5 text-xs font-medium shadow-lg backdrop-blur hover:bg-card"
+          >
+            <ArrowDownIcon className="size-3.5" /> Ir al final
+          </button>
+        </div>
+      )}
       <ReplyBox run={run} />
     </Card>
   );
@@ -719,9 +771,9 @@ export default function RunPage() {
               <CardTitle>Métricas</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-3 text-sm">
-              <Metric k="Coste" v={cost != null ? `$${cost.toFixed(4)}` : "—"} />
-              <Metric k="Duración" v={duration != null ? `${(duration / 1000).toFixed(1)} s` : "—"} />
-              <Metric k="Turnos" v={turns != null ? String(turns) : "—"} />
+              <Metric k="Coste" v={cost != null ? <AnimatedNumber value={cost} format={(n) => `$${n.toFixed(4)}`} /> : "—"} />
+              <Metric k="Duración" v={duration != null ? <AnimatedNumber value={duration / 1000} format={(n) => `${n.toFixed(1)} s`} /> : "—"} />
+              <Metric k="Turnos" v={turns != null ? <AnimatedNumber value={turns} /> : "—"} />
               <Metric k="Código salida" v={run.exitCode != null ? String(run.exitCode) : "—"} />
             </CardContent>
           </Card>
@@ -737,7 +789,7 @@ export default function RunPage() {
   );
 }
 
-function Metric({ k, v }: { k: string; v: string }) {
+function Metric({ k, v }: { k: string; v: React.ReactNode }) {
   return (
     <div>
       <div className="text-xs text-muted-foreground">{k}</div>

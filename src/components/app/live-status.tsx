@@ -5,6 +5,7 @@ import type { Activity } from "@/lib/orb-state";
 import { compactTokens, formatElapsed, type LiveStats } from "@/lib/live-stats";
 import { describeTool } from "@/lib/tool-cards";
 import { cn } from "@/lib/utils";
+import { AnimatedNumber } from "./animated-number";
 import { LiquidOrb } from "./liquid-orb";
 import { Markdown } from "./markdown";
 
@@ -46,14 +47,27 @@ export function LiveStatus({ activity, stats, startedAt, size = 44 }: { activity
   const tool = stats?.tool ? describeTool(stats.tool.name, stats.tool.input) : null;
   const step = tool ? `${tool.group}${tool.title ? ` · ${tool.title}` : ""}` : activity.label;
   const elapsed = startedAt ? formatElapsed(now - Date.parse(startedAt)) : null;
-  const detail = [elapsed, stats && stats.outputTokens > 0 ? `${compactTokens(stats.outputTokens)} tokens` : null, stats && stats.contextTokens > 0 ? `contexto ${compactTokens(stats.contextTokens)}` : null].filter(Boolean).join(" · ");
+  const tokens = stats && stats.outputTokens > 0 ? stats.outputTokens : 0;
+  const context = stats && stats.contextTokens > 0 ? stats.contextTokens : 0;
   return (
     <div className="grid gap-3" role="status" aria-live="polite">
       <div className="flex items-center gap-2.5">
         <LiquidOrb state={activity.state} size={size} />
         <div className="min-w-0">
           <MorphText text={step} state={activity.state} />
-          {detail && <div className="text-xs text-muted-foreground tabular-nums">{detail}</div>}
+          <div className="flex gap-1.5 text-xs text-muted-foreground tabular-nums">
+            {elapsed && <span>{elapsed}</span>}
+            {tokens > 0 && (
+              <span>
+                · <AnimatedNumber value={tokens} format={(n) => compactTokens(Math.round(n))} /> tokens
+              </span>
+            )}
+            {context > 0 && (
+              <span>
+                · contexto <AnimatedNumber value={context} format={(n) => compactTokens(Math.round(n))} />
+              </span>
+            )}
+          </div>
         </div>
       </div>
       {stats?.partial && <div className="ml-1 max-w-3xl"><Markdown>{stats.partial}</Markdown></div>}

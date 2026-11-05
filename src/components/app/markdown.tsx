@@ -122,13 +122,14 @@ function useTyped(text: string, on: boolean): string {
   const [n, setN] = React.useState(() => (on && Date.now() - BOOT > 2500 && !typedSeen.has(text) ? 0 : text.length));
   React.useEffect(() => {
     if (n >= text.length) return;
-    const t = setTimeout(() => setN((v) => Math.min(text.length, v + Math.max(2, Math.ceil(text.length / 500)))), 16);
+    // Markdown is parsed again at every step: few, fuller steps keep long answers smooth.
+    const t = setTimeout(() => setN((v) => Math.min(text.length, v + Math.max(3, Math.ceil(text.length / 160)))), 33);
     return () => clearTimeout(t);
   }, [n, text]);
   return n >= text.length ? text : text.slice(0, n);
 }
 
-export function Markdown({ children, className, reveal, onTyped }: { children: string; className?: string; reveal?: boolean; onTyped?: () => void }) {
+function MarkdownImpl({ children, className, reveal, onTyped }: { children: string; className?: string; reveal?: boolean; onTyped?: () => void }) {
   const shown = useTyped(children, !!reveal);
   const typing = shown.length < children.length;
   const split = React.useMemo(() => splitMail(shown), [shown]);
@@ -165,3 +166,6 @@ export function Markdown({ children, className, reveal, onTyped }: { children: s
     </div>
   );
 }
+
+/** Re-parsing is the costly part of a long conversation: it only happens when the text itself changes. */
+export const Markdown = React.memo(MarkdownImpl);
