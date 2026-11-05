@@ -1,4 +1,5 @@
 import { ChangeWatcher } from "./run-changes";
+import { LiveStatsAcc, type LiveStats } from "../live-stats";
 import { saveUpload } from "./uploads";
 import { spawn, execFile, type ChildProcess } from "node:child_process";
 import { findUpload, uploadsDir } from "./uploads";
@@ -533,6 +534,25 @@ export class RunManager {
       for (const [type, l] of perRun) if (!out.has(type)) out.set(type, l);
     }
     return [...out.values()];
+  }
+
+  private live = new Map<string, { offset: number; acc: LiveStatsAcc }>();
+
+  /** Tokens, the step in flight and a glimpse of the reasoning for a run, read incrementally from its log. */
+  liveStats(id: string): LiveStats {
+    let s = this.live.get(id);
+    if (!s) {
+      s = { offset: 0, acc: new LiveStatsAcc() };
+      this.live.set(id, s);
+      if (this.live.size > 40) this.live.delete(this.live.keys().next().value as string);
+    }
+    for (;;) {
+      const c = this.readLog(id, s.offset, 1024 * 1024);
+      if (!c.events.length) break;
+      for (const e of c.events) s.acc.add(e);
+      s.offset = c.nextOffset;
+    }
+    return s.acc.stats();
   }
 
   /** What Claude is doing in a run right now. */

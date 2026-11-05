@@ -19,7 +19,7 @@ if (args[0] === "mcp") {
 }
 const sid = "11111111-2222-4333-8444-555555555555";
 out({ type: "system", subtype: "init", session_id: sid, cwd: process.cwd() });
-out({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: JSON.stringify({ args, cwd: process.cwd() }) }] } });
+out({ type: "assistant", message: { id: "msg_fake1", role: "assistant", usage: { input_tokens: 100, cache_read_input_tokens: 400, output_tokens: 42 }, content: [{ type: "text", text: JSON.stringify({ args, cwd: process.cwd() }) }] } });
 process.stderr.write("some stderr line\n");
 if (prompt.includes("EDIT")) {
   const fs = await import("node:fs");

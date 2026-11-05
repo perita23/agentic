@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Markdown } from "@/components/app/markdown";
-import { ActivityOrb, CyclingOrb, LiquidOrb } from "@/components/app/liquid-orb";
+import { CyclingOrb, LiquidOrb } from "@/components/app/liquid-orb";
+import { LiveStatus } from "@/components/app/live-status";
+import type { LiveStats } from "@/lib/live-stats";
 import { SlashList, useSlashCommands, useSlashMenu } from "@/components/app/slash-menu";
 import { MODE_LABEL, parseSlash, type PermMode } from "@/lib/slash";
 import { describeTool } from "@/lib/tool-cards";
@@ -24,6 +26,7 @@ interface ChatItem {
   pinned?: boolean;
   running: boolean;
   activity?: Activity | null;
+  live?: (LiveStats & { startedAt: string }) | null;
 }
 interface ChatMessage {
   role: "user" | "assistant";
@@ -162,15 +165,20 @@ export default function ChatPage() {
   const [model, setModel] = React.useState("");
   const [mode, setMode] = React.useState<PermMode>("default");
   const [sending, setSending] = React.useState(false);
-  const { data: chat } = useApi<ChatDetail>(selected ? `/api/chats/${selected}` : null, { refreshInterval: (d) => (d?.running ? 1500 : 0) });
+  // Shown the instant you send, before the server answers (the conversation feels immediate).
+  const [optimistic, setOptimistic] = React.useState<string | null>(null);
+  const { data: chat } = useApi<ChatDetail>(selected ? `/api/chats/${selected}` : null, { refreshInterval: (d) => (d?.running ? 700 : 0) });
   const bottom = React.useRef<HTMLDivElement>(null);
+  // The optimistic bubble only stands in until the server shows the same message.
+  const optimisticShown = optimistic && !chat?.pendingPrompt && !chat?.messages.some((m) => m.role === "user" && m.text.trim() === optimistic.trim()) ? optimistic : null;
 
   React.useEffect(() => {
     bottom.current?.scrollIntoView({ block: "end" });
-  }, [chat?.messages.length, chat?.pendingPrompt, chat?.running, selected]);
+  }, [chat?.messages.length, chat?.pendingPrompt, chat?.running, selected, optimisticShown]);
 
   async function newChat(prompt: string, o: SendOpts = {}) {
     setSending(true);
+    setOptimistic(prompt);
     try {
       const c = await api<ChatItem>("POST", "/api/chats", { prompt, model: o.model ?? model, permissionMode: o.mode ?? mode });
       setSelected(c.id);
@@ -178,6 +186,7 @@ export default function ChatPage() {
       return true;
     } catch (e) {
       toast.error("No se pudo enviar", { description: errorMessage(e) });
+      setOptimistic(null);
       return false;
     } finally {
       setSending(false);
@@ -187,12 +196,14 @@ export default function ChatPage() {
   async function reply(prompt: string, o: SendOpts = {}) {
     if (!selected) return newChat(prompt, o);
     setSending(true);
+    setOptimistic(prompt);
     try {
       await api("POST", `/api/chats/${selected}/messages`, { prompt, model: o.model ?? model, permissionMode: o.mode ?? mode });
       refresh(`/api/chats/${selected}`, "/api/chats");
       return true;
     } catch (e) {
       toast.error("No se pudo enviar", { description: errorMessage(e) });
+      setOptimistic(null);
       return false;
     } finally {
       setSending(false);
@@ -300,10 +311,10 @@ export default function ChatPage() {
                   {chat?.messages.map((m, i) => (
                     <Bubble key={i} m={m} />
                   ))}
-                  {chat?.pendingPrompt && <Bubble m={{ role: "user", text: chat.pendingPrompt }} />}
-                  {/* The orb closes the conversation: live activity while Claude works, calm when it is done. */}
-                  {chat?.running ? (
-                    <ActivityOrb activity={chat.activity ?? { state: "thinking", label: "Pensando…" }} size={44} />
+                  {(chat?.pendingPrompt ?? optimisticShown) && <Bubble m={{ role: "user", text: (chat?.pendingPrompt ?? optimisticShown)! }} />}
+                  {/* The orb closes the conversation: step, time and tokens while Claude works (with the answer's skeleton), calm when done. */}
+                  {chat?.running || optimisticShown ? (
+                    <LiveStatus activity={chat?.activity ?? { state: "thinking", label: "Pensando…" }} stats={chat?.live} startedAt={chat?.live?.startedAt} />
                   ) : chat && chat.messages.length > 0 ? (
                     <LiquidOrb state={chat.error ? "error" : "done"} size={32} />
                   ) : null}

@@ -3,6 +3,15 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.40.0] - 2026-11-05
+
+### Añadido
+- **El chat te cuenta qué está haciendo mientras trabaja.** Junto a la bolita ahora sale el paso en curso en palabras (p. ej. «Docker · Leyendo logs · api» o «Editar archivo · page.tsx»), cuánto lleva el turno, **cuántos tokens ha escrito** y el tamaño del contexto. Si el modelo envía su razonamiento, se ve un fragmento mientras piensa, y queda en el chat como un bloque plegable «Razonamiento». Vale para el chat de Headless y para el Chat general.
+- **Esqueleto de la respuesta con los colores de la bolita.** Mientras Claude piensa o escribe, aparecen líneas que brillan en morado, coral y azul donde llegará la respuesta, en vez de un hueco vacío. Respeta «reducir movimiento».
+
+### Cambiado
+- **El Chat general se siente más rápido:** tu mensaje aparece al instante (sin esperar a la respuesta del servidor) con su estado en vivo, y mientras Claude responde se actualiza cada 0,7 s en vez de cada 1,5 s.
+
 ## [0.39.0] - 2026-11-05
 
 ### Añadido

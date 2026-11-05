@@ -352,7 +352,7 @@ try {
 
   // Rich tool cards + attachments: pasted images and long text, taller box.
   const box = page.getByLabel("Responder a Claude");
-  await page.waitForFunction(() => !document.querySelector("textarea[aria-label='Responder a Claude']")?.disabled, null, { timeout: 15000 });
+  await page.getByRole("button", { name: "Enviar", exact: true }).waitFor({ timeout: 15000 }); // idle again (while Claude works the button says "Añadir a la cola")
   check(((await box.boundingBox())?.height ?? 0) >= 110, "the reply box is tall");
   const png = path.join(tmp, "shot.png");
   fs.writeFileSync(png, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
@@ -375,7 +375,7 @@ try {
   check(true, "docker logs render as a tool card with its output, not a bare Bash");
 
   // "@" autocompletes project files while typing.
-  await page.waitForFunction(() => !document.querySelector("textarea[aria-label='Responder a Claude']")?.disabled, null, { timeout: 15000 });
+  await page.getByRole("button", { name: "Enviar", exact: true }).waitFor({ timeout: 15000 }); // idle again (while Claude works the button says "Añadir a la cola")
   await page.getByLabel("Responder a Claude").fill("mira @trac");
   await page.getByRole("option", { name: /tracked\.txt/ }).waitFor({ timeout: 10000 });
   await page.getByLabel("Responder a Claude").press("Tab");
@@ -394,7 +394,7 @@ try {
   check((await execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: project, encoding: "utf8" })).trim() === "main", "the chat can switch back to another branch");
 
   // A reply whose tool result is a big screenshot must not stall the chat: the picture shows, and Claude's next message arrives.
-  await page.waitForFunction(() => !document.querySelector("textarea[aria-label='Responder a Claude']")?.disabled, null, { timeout: 15000 });
+  await page.getByRole("button", { name: "Enviar", exact: true }).waitFor({ timeout: 15000 }); // idle again (while Claude works the button says "Añadir a la cola")
   await page.getByLabel("Responder a Claude").fill("BIGIMG mira la captura");
   await page.getByRole("button", { name: "Enviar", exact: true }).click();
   await page.getByText("he visto la imagen").waitFor({ timeout: 15000 });
@@ -402,7 +402,7 @@ try {
   check(true, "a big screenshot in a tool result does not stall the chat: the picture shows and the conversation continues");
 
   // A change made through the terminal (not an Edit tool call) appears under that command, with its diff.
-  await page.waitForFunction(() => !document.querySelector("textarea[aria-label='Responder a Claude']")?.disabled, null, { timeout: 15000 });
+  await page.getByRole("button", { name: "Enviar", exact: true }).waitFor({ timeout: 15000 }); // idle again (while Claude works the button says "Añadir a la cola")
   await page.getByLabel("Responder a Claude").fill("BASHCHANGE hazlo por terminal");
   await page.getByRole("button", { name: "Enviar", exact: true }).click();
   const terminalCard = page.locator("main").getByRole("button", { name: /Creó archivo\s*hecho-por-terminal\.txt/ });
@@ -412,7 +412,7 @@ try {
   fs.rmSync(path.join(project, "hecho-por-terminal.txt"), { force: true });
 
   // A plan renders as Markdown with three ways to answer it.
-  await page.waitForFunction(() => !document.querySelector("textarea[aria-label='Responder a Claude']")?.disabled, null, { timeout: 15000 });
+  await page.getByRole("button", { name: "Enviar", exact: true }).waitFor({ timeout: 15000 }); // idle again (while Claude works the button says "Añadir a la cola")
   await page.getByLabel("Responder a Claude").fill("/plan PLAN dame un plan");
   await page.getByRole("button", { name: "Enviar", exact: true }).click();
   await page.getByRole("heading", { name: "Plan de prueba" }).waitFor({ timeout: 15000 });
@@ -435,6 +435,9 @@ try {
   await page.getByText("en vivo").waitFor({ timeout: 10000 });
   await page.locator("main").getByText("some stderr line").waitFor({ timeout: 10000 });
   check((await fetch(base + `/api/runs/${longRun.id}`, { headers: { authorization: `Bearer ${token}` } }).then((r) => r.json())).status === "running", "live log streams over SSE while the run is still running");
+  // Live feedback while Claude works: the step, how long it has taken, the tokens written, and the answer's skeleton.
+  await page.locator("main").getByText(/42 tokens/).waitFor({ timeout: 10000 });
+  check(/\d+ s/.test(await page.locator("main [role=status]").first().innerText()) && (await page.locator("main .orb-skeleton").count()) >= 3, "while Claude works the chat shows elapsed time, tokens and a skeleton of the coming answer");
   check((await page.locator("aside").getByText("Claude trabajando").count()) === 0, "sidebar hides the live card on the run page (it already shows its own orb)");
   await page.goto(`${base}/tasks`);
   await page.locator("aside").getByText("Claude trabajando").waitFor({ timeout: 20000 });

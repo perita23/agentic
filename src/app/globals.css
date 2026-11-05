@@ -134,6 +134,13 @@ html[data-desktop="mac"]:not([data-fullscreen]) .traffic-light-gap {
   scrollbar-width: thin;
 }
 
+/* ---- Response skeleton: shimmering bars in the orb's colours, shown while Claude is still writing ---- */
+@keyframes orb-shimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+.orb-skeleton { height: 11px; border-radius: 6px; background-color: rgb(255 255 255 / 0.05);
+  background-image: linear-gradient(100deg, transparent 28%, rgb(139 108 245 / 0.42) 40%, rgb(255 138 91 / 0.4) 50%, rgb(90 169 255 / 0.36) 60%, transparent 72%);
+  background-size: 250% 100%; background-repeat: no-repeat; animation: orb-shimmer 2.4s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .orb-skeleton { animation: none; background-image: none; } }
+
 /* ---- Liquid orb: Claude's live status ----
    Eight blobs share one clock (--t, advanced from JS at a per-state speed that eases). A state decides
    HOW MANY blobs are alive (--k), how big (--bs), their orbit (--ax/--ay) and spacing (--gap), so each
