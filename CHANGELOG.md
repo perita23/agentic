@@ -3,6 +3,16 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.46.2] - 2026-11-05
+
+### Mejorado
+- **La isla se ensancha según lo que tenga que decir.** Cerrada, a un lado de la muesca va la bolita con el proyecto y al otro el paso en el que va y el reloj; la píldora crece (hasta 520 px) para que quepan, con una animación suave y en tramos de 8 px para que el reloj no la haga temblar. Abierta, se ajusta al título y al proyecto del aviso. La ventana de la isla es algo más ancha para dar ese margen. El negro sigue siendo `#000000` exacto.
+- **La isla tiene animaciones.** Aparece y desaparece plegándose y desplegándose con un resorte, con el contenido apareciendo un instante después y yéndose antes; al pasar el ratón por encima se hincha un poco, y al pulsarla se aprieta. Mientras Claude trabaja, un clic en la píldora abre esa ejecución en la app.
+
+### Corregido
+- **La isla ya no sale como una ventanita al deslizar tres dedos hacia arriba (Mission Control / Exposé).** Su ventana se marca como oculta en Mission Control y fuera del menú Ventana y del ciclo ⌘`.
+
+
 ## [0.46.1] - 2026-11-05
 
 ### Cambiado

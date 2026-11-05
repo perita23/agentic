@@ -5,7 +5,7 @@
 const path = require("node:path");
 const { execFile } = require("node:child_process");
 
-const WIDTH = 460;
+const WIDTH = 560; // room for the widest the pill can get (520) plus its shoulders
 const HEIGHT = 150;
 // Electron does not report the notch. Notch Macs have a menu bar of ~37pt (others ~24pt), so a tall one means a notch.
 const NOTCH_BAR_MIN = 32;
@@ -121,6 +121,10 @@ function createIsland({ BrowserWindow, screen, ipcMain, getOrigin, openMain }) {
     // Also above full-screen apps and in every Space (without turning the app into an accessory: no Dock changes).
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
     win.setIgnoreMouseEvents(true, { forward: true });
+    // Swiping up with three fingers (Mission Control, App Exposé) must not show the island as a little window,
+    // and it is not a window of the app for the Window menu or the ⌘` cycle either.
+    if (typeof win.setHiddenInMissionControl === "function") win.setHiddenInMissionControl(true);
+    win.excludedFromShownWindowsMenu = true;
     place();
     const origin = getOrigin();
     win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));

@@ -299,7 +299,7 @@ try {
   // The island (macOS app): rendered here in a plain page with a stand-in for the native bridge.
   const islCtx = await browser.newContext({ storageState: await page.context().storageState(), deviceScaleFactor: 3 });
   const isl = await islCtx.newPage();
-  await isl.setViewportSize({ width: 460, height: 150 });
+  await isl.setViewportSize({ width: 560, height: 150 });
   await isl.addInitScript(() => {
     window.__island = [];
     window.__vis = true;
@@ -328,11 +328,44 @@ try {
   await isl.waitForTimeout(700);
   await shot0(isl, "06a-island-work");
   check(await isl.evaluate(() => window.__island.includes("show")), "the island opens while Claude works");
-  await isl.getByText("Claude ha terminado").waitFor({ timeout: 20000 });
+  await isl.getByText("Claude ha terminado").locator("visible=true").waitFor({ timeout: 20000 });
   await isl.waitForTimeout(900);
   await shot0(isl, "06b-island-alert");
+  const pillW = await isl.evaluate(() => Math.round(document.querySelector('div[style*="clip-path"]').getBoundingClientRect().width));
+  check(pillW >= 340 && pillW <= 520, `the island's width follows its content (${pillW}px)`);
   await isl.getByRole("button", { name: "Abrir" }).click();
   check(await isl.evaluate(() => window.__island.some((c) => /^open:\/runs\/[0-9a-f-]+$/.test(c))), "the island's Abrir button opens the run in the main window");
+  // Compact state with fixed data: the pill grows with the texts it has to show.
+  const widths = [];
+  for (const [project, label, state] of [["app", "Leyendo…", "reading"], ["inox-backend-services", "Ejecutando un comando…", "running"]]) {
+    const p2 = await islCtx.newPage();
+    await p2.setViewportSize({ width: 560, height: 150 });
+    await p2.addInitScript(() => {
+      window.__island = [];
+      window.agenticIsland = { metrics: async () => ({ notch: true, notchWidth: 200, barHeight: 32 }), show() {}, hide() {}, interactive() {}, open() {}, mainVisible: async () => false, onMainVisible: () => () => {} };
+    });
+    await p2.route("**/api/island", (r) =>
+      r.fulfill({ json: { running: [{ id: "x", title: "Revisar la PR", project, state, label, startedAt: new Date(Date.now() - 83_000).toISOString(), endedAt: null, href: "/runs/x" }], recent: [] } }),
+    );
+    await p2.goto(`${base}/island`);
+    await p2.getByText(/\d+ s|min/).locator("visible=true").first().waitFor({ timeout: 10000 });
+    await p2.addStyleTag({ content: "html{background:#2c2c2e !important}" });
+    await p2.waitForTimeout(900);
+    const pillWidth = () => p2.evaluate(() => Math.round(document.querySelector('div[style*="clip-path"]').getBoundingClientRect().width));
+    widths.push(await pillWidth());
+    if (widths.length === 1) {
+      await p2.mouse.move(280, 14); // over the pill
+      await p2.waitForTimeout(700);
+      const swollen = await pillWidth();
+      check(swollen > widths[0] + 8, `the island swells when hovered (${widths[0]}px → ${swollen}px)`);
+      await p2.mouse.move(5, 140);
+      await p2.waitForTimeout(700);
+      widths[0] = await pillWidth(); // back to rest
+    }
+    await shot0(p2, `06c-island-compact-${widths.length}`);
+    await p2.close();
+  }
+  check(widths[0] >= 328 && widths[1] > widths[0] && widths[1] <= 520, `the compact island grows with its texts (${widths.join("px → ")}px)`);
   await islCtx.close();
   await page.setViewportSize({ width: 820, height: 900 });
   await page.waitForTimeout(400);

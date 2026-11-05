@@ -6,6 +6,7 @@ import { useApi } from "@/lib/api";
 import type { IslandRun, IslandSnapshot } from "@/lib/server/island";
 import type { OrbState } from "@/lib/orb-state";
 import { formatElapsed } from "@/lib/live-stats";
+import { cn } from "@/lib/utils";
 import { LiquidOrb } from "./liquid-orb";
 
 interface Metrics {
@@ -54,6 +55,24 @@ export function notchPath(w: number, h: number, tr: number, br: number): string 
 
 const ALERT_MS: Record<string, number> = { done: 7000, error: 10000, waiting: 14000 };
 const SHORT: Partial<Record<OrbState, string>> = { thinking: "Pensando", writing: "Escribiendo", reading: "Leyendo", editing: "Editando", running: "Ejecutando", searching: "Buscando", waiting: "Te espera" };
+
+/** The natural width of an element, kept up to date as its text changes (a ResizeObserver callback, not an effect body). */
+function useWidth<T extends HTMLElement>() {
+  const ref = React.useRef<T>(null);
+  const [w, setW] = React.useState(0);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setW(Math.ceil(el.getBoundingClientRect().width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, w] as const;
+}
+
+/** Rounded up to a multiple of 8 px, so a ticking clock does not make the pill tremble. */
+const q8 = (n: number) => Math.ceil(n / 8) * 8;
+const MAX_W = 520;
 
 /**
  * The island: a black pill glued to the top centre of the screen (around the notch). While Claude works it shows
@@ -122,16 +141,43 @@ export function IslandView() {
   }, [mode, bridge]);
 
   const bar = Math.max(metrics.barHeight, 28);
-  const sideW = 64; // each side of the notch: orb on the left, short label on the right
-  const compactW = metrics.notch ? metrics.notchWidth + sideW * 2 : 232;
   const open = mode === "alert";
   const hidden = mode === "hidden";
+  // After the last thing ends, its content stays while the pill folds away.
+  const live = alert ?? main;
+  const [last, setLast] = React.useState<IslandRun | undefined>(live);
+  if (live && live !== last) setLast(live);
+  const shown = live ?? last;
+  const elapsed = main ? formatElapsed(now - Date.parse(main.startedAt)) : "";
+  const label = shown ? SHORT[shown.state] ?? "Trabajando" : "";
+  const count = running.length > 1 ? ` ·${running.length}` : "";
+  // Around a notch the orb and the project go on its left and the step and clock on its right; without a notch, one row.
+  const leftText = metrics.notch ? (shown && shown.project.length > 18 ? `${shown.project.slice(0, 17)}…` : (shown?.project ?? "")) : label;
+  const rightText = metrics.notch ? `${label} · ${elapsed}${count}` : `${elapsed}${count}`;
+  const alertTitle = alert?.state === "waiting" ? "Claude te espera" : alert?.state === "error" ? "Ha fallado" : "Claude ha terminado";
+  const alertSub = alert ? `${alert.project ? `${alert.project} · ` : ""}${alert.title}` : "";
+  const [lRef, lW] = useWidth<HTMLSpanElement>();
+  const [rRef, rW] = useWidth<HTMLSpanElement>();
+  const [tRef, tW] = useWidth<HTMLSpanElement>();
+  const [sRef, sW] = useWidth<HTMLSpanElement>();
+  const orbW = Math.min(22, bar - 8);
+  const padClosed = 7 + 12; // shoulder + breathing room
+  const leftNat = orbW + (leftText ? 8 + lW : 0);
+  // The pill grows with what it has to say (never narrower than the notch plus a little on each side).
+  const workW = metrics.notch
+    ? Math.min(MAX_W, Math.max(metrics.notchWidth + 2 * 64, q8(metrics.notchWidth + 2 * (padClosed + Math.max(leftNat, rW)))))
+    : Math.min(MAX_W, Math.max(170, q8(2 * padClosed + leftNat + 16 + rW)));
+  const alertW = Math.min(MAX_W, Math.max(340, q8(Math.max(tW, sW, 170) + 2 * (14 + 12 + 4))));
   // Closed it is the notch (small shoulders, bottom radius ~12); open it is the island card (bigger radii).
+  // Hovering it makes the pill swell a little (as the notch apps do); pressing it squeezes it back.
+  const [hover, setHover] = React.useState(false);
+  const [press, setPress] = React.useState(false);
+  const swell = hover && !hidden ? (press ? -4 : 1) : 0;
   const target = hidden
-    ? { w: Math.round(compactW * 0.55), h: Math.round(bar * 0.55), tr: 4, br: 8, o: 0 }
+    ? { w: Math.round(workW * 0.55), h: Math.round(bar * 0.55), tr: 4, br: 8, o: 0 }
     : open
-      ? { w: Math.max(compactW, 420), h: bar + 88, tr: 14, br: 26, o: 1 }
-      : { w: compactW, h: bar, tr: 7, br: 12, o: 1 };
+      ? { w: alertW + swell * 8, h: bar + 88 + swell * 2, tr: 14, br: 26, o: 1 }
+      : { w: workW + swell * 16, h: bar + swell * 5, tr: 7 + swell, br: 12 + swell * 3, o: 1 };
   const w = useMotionValue(target.w);
   const h = useMotionValue(target.h);
   const tr = useMotionValue(target.tr);
@@ -143,16 +189,17 @@ export function IslandView() {
     return () => runs.forEach((r) => r.stop());
   }, [target.w, target.h, target.tr, target.br, target.o, w, h, tr, br, opacity]);
   const clip = useTransform([w, h, tr, br], ([cw, ch, ctr, cbr]: number[]) => `path('${notchPath(cw, ch, ctr, cbr)}')`);
-  // After the last thing ends, its content stays while the pill folds away.
-  const live = alert ?? main;
-  const [last, setLast] = React.useState<IslandRun | undefined>(live);
-  if (live && live !== last) setLast(live);
-  const shown = live ?? last;
-  const elapsed = main ? formatElapsed(now - Date.parse(main.startedAt)) : "";
   const inset = target.tr + 12; // content sits inside the shoulders
 
   return (
     <div className="pointer-events-none flex h-screen w-screen items-start justify-center overflow-hidden select-none">
+      {/* Invisible copies of the texts: their width is what the pill grows to. */}
+      <div aria-hidden className="invisible fixed top-0 left-0 -z-10 whitespace-nowrap">
+        <span ref={lRef} className="inline-block text-[11px] font-medium">{leftText}</span>
+        <span ref={rRef} className="inline-block text-[11px] font-medium tabular-nums">{rightText}</span>
+        <span ref={tRef} className="inline-block text-[13px] font-semibold">{alertTitle}</span>
+        <span ref={sRef} className="inline-block text-xs">{alertSub}</span>
+      </div>
       {/* Closed, the pill must melt into the physical notch (pure black, no halo); only the open card casts a shadow. */}
       <div style={{ filter: open ? "drop-shadow(0 8px 14px rgba(0,0,0,0.5))" : "none", transition: "filter 0.3s ease" }}>
         {shown && (
@@ -160,17 +207,33 @@ export function IslandView() {
             className="pointer-events-auto relative overflow-hidden text-white"
             // Exactly #000000, like the notch itself: any other black would show as a seam against it.
             style={{ width: w, height: h, clipPath: clip, opacity, backgroundColor: "#000000" }}
-            onMouseEnter={() => bridge?.interactive(true)}
-            onMouseLeave={() => bridge?.interactive(false)}
+            onMouseEnter={() => {
+              bridge?.interactive(true);
+              setHover(true);
+            }}
+            onMouseLeave={() => {
+              bridge?.interactive(false);
+              setHover(false);
+              setPress(false);
+            }}
+            onMouseDown={() => setPress(true)}
+            onMouseUp={() => setPress(false)}
+            // While Claude works, a click on the pill opens that run in the app.
+            onClick={() => mode === "work" && shown && bridge?.open(shown.href)}
           >
-            <div className="flex items-center justify-between" style={{ height: bar, paddingInline: inset }}>
-              <LiquidOrb state={shown.state} size={Math.min(22, bar - 8)} />
-              {!metrics.notch && <span className="mx-2 min-w-0 flex-1 truncate text-center text-[11px] font-medium text-white/85">{mode === "alert" ? "" : SHORT[shown.state] ?? "Trabajando"}</span>}
-              <span className="min-w-0 text-[11px] font-medium tabular-nums text-white/70">
-                {mode === "work" ? (metrics.notch ? SHORT[shown.state] ?? "Trabajando" : elapsed) : ""}
-                {mode === "work" && running.length > 1 ? ` ·${running.length}` : ""}
+            <motion.div
+              className={cn("flex items-center justify-between gap-4", mode === "work" && "cursor-pointer")}
+              style={{ height: bar, paddingInline: inset }}
+              initial={false}
+              animate={{ opacity: hidden ? 0 : 1, y: hidden ? -3 : 0 }}
+              transition={{ duration: hidden ? 0.15 : 0.28, delay: hidden ? 0 : 0.1 }}
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <LiquidOrb state={shown.state} size={orbW} />
+                {mode === "work" && leftText && <span className="truncate text-[11px] font-medium whitespace-nowrap text-white/85">{leftText}</span>}
               </span>
-            </div>
+              {mode === "work" && <span className="text-[11px] font-medium whitespace-nowrap tabular-nums text-white/70">{rightText}</span>}
+            </motion.div>
             <AnimatePresence>
               {mode === "alert" && alert && (
                 <motion.div
@@ -180,13 +243,8 @@ export function IslandView() {
                   animate={{ opacity: 1, y: 0, transition: { delay: 0.12 } }}
                   exit={{ opacity: 0, transition: { duration: 0.12 } }}
                 >
-                  <div className="truncate text-[13px] font-semibold">
-                    {alert.state === "waiting" ? "Claude te espera" : alert.state === "error" ? "Ha fallado" : "Claude ha terminado"}
-                  </div>
-                  <div className="mt-0.5 truncate text-xs text-white/60">
-                    {alert.project ? `${alert.project} · ` : ""}
-                    {alert.title}
-                  </div>
+                  <div className="truncate text-[13px] font-semibold">{alertTitle}</div>
+                  <div className="mt-0.5 truncate text-xs text-white/60">{alertSub}</div>
                   <div className="mt-2.5 flex gap-2">
                     <button type="button" onClick={() => { bridge?.open(alert.href); setAlert(null); }} className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-black hover:bg-white/90">
                       Abrir
