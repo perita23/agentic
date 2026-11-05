@@ -6,7 +6,7 @@
 
 - **Descargar y usar la aplicación gratis** para fines no comerciales, según la [licencia](LICENSE) (PolyForm Noncommercial 1.0.0).
 - **Avisar de un fallo o proponer una idea** abriendo un *issue*. Se leen, pero no se garantiza respuesta ni plazo.
-- **Informar de un problema de seguridad** de forma privada, como se explica en [docs/SECURITY.md](docs/SECURITY.md).
+- **Informar de un problema de seguridad** contactando con el autor de forma privada, sin publicar los detalles en un issue abierto.
 
 ## Por qué
 
