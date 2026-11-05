@@ -52,6 +52,12 @@ export function findUpload(dataDir: string, id: string): { path: string; mime: s
   return null;
 }
 
+/** Remove one stored image (a profile photo that was replaced or removed). */
+export function deleteUpload(dataDir: string, id: string) {
+  const f = findUpload(dataDir, id);
+  if (f) fs.rmSync(f.path, { force: true });
+}
+
 function pruneUploads(dir: string, now = Date.now()) {
   try {
     for (const n of fs.readdirSync(dir)) {

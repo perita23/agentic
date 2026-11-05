@@ -238,8 +238,8 @@ try {
   const shot0 = async (pg, name) => shots && pg.screenshot({ path: path.join(shots, `${name}.png`) });
 
   await page.goto(`${base}/auth?token=${token}`);
-  await page.getByRole("heading", { name: "Dashboard" }).waitFor();
-  // After an update the release notes show up once.
+  // After an update the release notes show up once. They are waited for first: while that dialog is open the rest of
+  // the page is aria-hidden, and the dashboard streams in just after the loading skeleton, so it can open before it.
   await page.getByText(/Novedades de la v/).waitFor();
   await shot("00-whats-new");
   await page.getByRole("button", { name: "Entendido" }).click();
@@ -305,6 +305,51 @@ try {
   check((await notes.innerText()).includes("Decisiones") && /^obsidian:\/\/open\?path=/.test(noteHref ?? ""), "the run page lists the notes Claude wrote in Obsidian, each with an «Abrir en Obsidian» link");
   await shot("03j-obsidian");
   await fetch(base + "/api/obsidian", { method: "PUT", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ enabled: false }) });
+
+  // Mi cuenta: name, a predefined avatar, an uploaded photo (cropped in the browser) and removing it.
+  await page.goto(`${base}/account`);
+  await page.getByRole("heading", { name: "Mi cuenta" }).waitFor();
+  await page.getByLabel("Tu nombre").fill("Hugo");
+  await page.getByLabel("Tu nombre").press("Enter");
+  await page.getByLabel("Guardado").waitFor({ timeout: 10000 });
+  await page.getByRole("button", { name: "Cambiar imagen" }).click();
+  await page.getByRole("radio", { name: "Aurora" }).click();
+  await page.waitForTimeout(500);
+  const apiProfile = () => fetch(base + "/api/profile", { headers: { authorization: `Bearer ${token}` } }).then((r) => r.json());
+  let pr = await apiProfile();
+  check(pr.name === "Hugo" && pr.avatar?.kind === "preset" && pr.avatar.id === "aurora", "Mi cuenta saves the name and a predefined avatar");
+  await page.getByRole("tab", { name: /Tu foto/ }).click();
+  const avatarPng = path.join(tmp, "avatar.png");
+  fs.writeFileSync(avatarPng, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"));
+  await page.locator('input[type="file"]').setInputFiles(avatarPng);
+  await page.getByRole("button", { name: "Usar esta foto" }).click();
+  await page.locator('header img[src^="/api/uploads/"]').waitFor({ timeout: 10000 });
+  pr = await apiProfile();
+  check(pr.avatar?.kind === "photo", "a photo is cropped, uploaded and shown in the top bar");
+  const photoUrl = await page.locator('header img[src^="/api/uploads/"]').getAttribute("src");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Cambiar imagen" }).click();
+  await page.getByRole("tab", { name: /Tu foto/ }).click();
+  await page.getByRole("button", { name: "Quitar" }).click();
+  await page.waitForTimeout(600);
+  pr = await apiProfile();
+  check(pr.avatar === null && (await fetch(base + photoUrl, { headers: { authorization: `Bearer ${token}` } })).status === 404, "removing the photo also deletes the file");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Cambiar imagen" }).click();
+  await page.getByRole("radio", { name: "Brasa" }).click();
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(400);
+  await shot("07-account");
+  // Placeholders sweep with light (the animation lives in globals.css).
+  const sweep = await page.evaluate(() => {
+    const d = document.createElement("div");
+    d.setAttribute("data-slot", "skeleton");
+    document.body.appendChild(d);
+    const n = getComputedStyle(d).animationName;
+    d.remove();
+    return n;
+  });
+  check(sweep === "skeleton-sweep", "skeleton loaders have the light sweep");
 
   // A turn that has ended while the process lingers (background tasks): calm status, no clock, no dollars.
   const lingerRun = await (

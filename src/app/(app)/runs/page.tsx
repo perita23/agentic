@@ -3,7 +3,8 @@
 import * as React from "react";
 import { RocketIcon, TerminalSquareIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonRows } from "@/components/app/skeletons";
+import { Stagger, StaggerItem } from "@/components/app/reveal";
 import { EmptyState, PageHeader } from "@/components/app/common";
 import { useLauncher } from "@/components/app/launcher";
 import { RunRow } from "@/components/app/run-row";
@@ -53,12 +54,15 @@ export default function RunsPage() {
       </div>
       <div className="overflow-hidden rounded-lg border bg-card">
         {!data ? (
-          <div className="space-y-2 p-4">
-            <Skeleton className="h-11" />
-            <Skeleton className="h-11" />
-          </div>
+          <SkeletonRows n={6} />
         ) : runs.length ? (
-          <div className="divide-y">{runs.map((r) => <RunRow key={r.id} r={r} />)}</div>
+          <Stagger gap={0.035} className="divide-y">
+            {runs.map((r) => (
+              <StaggerItem key={r.id}>
+                <RunRow r={r} />
+              </StaggerItem>
+            ))}
+          </Stagger>
         ) : (
           <div className="p-6">
             <EmptyState

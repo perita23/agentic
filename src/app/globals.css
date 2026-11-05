@@ -167,6 +167,26 @@ html[data-desktop="mac"]:not([data-fullscreen]) .traffic-light-gap {
   animation: orb-flow 3.2s linear infinite; box-shadow: 0 0 26px -8px rgb(139 108 245 / 0.6); }
 @media (prefers-reduced-motion: reduce) { .orb-border { animation: none; } }
 
+/* ---- Skeletons: a soft band of light sweeps over the placeholder ---- */
+@keyframes skeleton-sweep { from { background-position: 180% 0; } to { background-position: -80% 0; } }
+[data-slot="skeleton"] {
+  background-color: var(--secondary);
+  background-image: linear-gradient(100deg, transparent 32%, color-mix(in srgb, var(--foreground) 7%, transparent) 50%, transparent 68%);
+  background-size: 220% 100%; background-repeat: no-repeat; animation: skeleton-sweep 1.7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@media (prefers-reduced-motion: reduce) { [data-slot="skeleton"] { animation: none; background-image: none; } }
+
+/* ---- Small touches of motion shared by the whole app ---- */
+.lift { transition: transform 0.25s cubic-bezier(0.22, 0.8, 0.3, 1), border-color 0.2s, box-shadow 0.25s; }
+.lift:hover { transform: translateY(-2px); box-shadow: 0 10px 28px -14px rgb(0 0 0 / 0.7); }
+.press { transition: transform 0.15s cubic-bezier(0.22, 0.8, 0.3, 1); }
+.press:active { transform: scale(0.97); }
+@keyframes pop-in { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: none; } }
+.pop-in { animation: pop-in 0.28s cubic-bezier(0.22, 0.8, 0.3, 1) both; }
+@keyframes fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.fade-up { animation: fade-up 0.4s cubic-bezier(0.22, 0.8, 0.3, 1) both; }
+@media (prefers-reduced-motion: reduce) { .lift, .press { transition: none; } .lift:hover { transform: none; } .press:active { transform: none; } .pop-in, .fade-up { animation: none; } }
+
 /* ---- Liquid orb: Claude's live status ----
    Eight blobs share one clock (--t, advanced from JS at a per-state speed that eases). A state decides
    HOW MANY blobs are alive (--k), how big (--bs), their orbit (--ax/--ay) and spacing (--gap), so each
