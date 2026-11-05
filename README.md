@@ -116,3 +116,9 @@ Ambos se ejecutan en GitHub Actions en cada PR y en cada push a `main` (`.github
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — fases del proyecto
 - [`docs/KANBAN.md`](docs/KANBAN.md) — estado de las tareas
 - [`docs/SECURITY.md`](docs/SECURITY.md) — modelo de amenazas y medidas de hardening
+
+## Licencia
+
+Agentic se distribuye bajo la [PolyForm Noncommercial License 1.0.0](LICENSE): **cualquiera puede descargarlo, usarlo, estudiarlo y modificarlo gratis para fines no comerciales** (uso personal, aprendizaje, investigación, organizaciones sin ánimo de lucro, educativas o públicas), **pero no se puede vender ni usar con fines comerciales** (por ejemplo, revenderlo, ofrecerlo como servicio de pago o incluirlo en un producto comercial) sin permiso del autor. Si lo redistribuyes o lo modificas, debes conservar el aviso de copyright y el texto de la licencia.
+
+Es una licencia de código disponible, no «open source» en el sentido estricto de la OSI, porque esa definición no admite restringir el uso comercial. Las versiones publicadas hasta la 0.44 se distribuyeron bajo licencia MIT y quien las obtuvo así conserva esos derechos sobre esas copias. Para otro tipo de uso (por ejemplo, comercial), contacta con el autor.
