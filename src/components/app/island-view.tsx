@@ -141,12 +141,13 @@ export function IslandView() {
 
   return (
     <div className="pointer-events-none flex h-screen w-screen items-start justify-center overflow-hidden select-none">
-      {/* The drop shadow goes outside the clipped shape. */}
-      <div style={{ filter: "drop-shadow(0 8px 14px rgba(0,0,0,0.5))" }}>
+      {/* Closed, the pill must melt into the physical notch (pure black, no halo); only the open card casts a shadow. */}
+      <div style={{ filter: open ? "drop-shadow(0 8px 14px rgba(0,0,0,0.5))" : "none", transition: "filter 0.3s ease" }}>
         {shown && (
           <motion.div
-            className="pointer-events-auto relative overflow-hidden bg-black text-white"
-            style={{ width: w, height: h, clipPath: clip, opacity }}
+            className="pointer-events-auto relative overflow-hidden text-white"
+            // Exactly #000000, like the notch itself: any other black would show as a seam against it.
+            style={{ width: w, height: h, clipPath: clip, opacity, backgroundColor: "#000000" }}
             onMouseEnter={() => bridge?.interactive(true)}
             onMouseLeave={() => bridge?.interactive(false)}
           >
