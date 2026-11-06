@@ -3,6 +3,14 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.50.2] - 2026-11-06
+
+### Cambiado
+- **Dictado: el texto se escribe en la bandeja mientras hablas.** Ya no hay que esperar a soltar: las palabras aparecen en la caja de escritura según las dices y se van reescribiendo con la frase completa (lo que ya tenías escrito se respeta, y **Esc** lo deja exactamente como estaba). La línea de estado de debajo sólo dice «Te escucho…». Si no hay caja donde escribir, sigue saliendo la píldora con las palabras.
+
+### Corregido
+- **Arrancaba tarde aunque ya ponía «te escucho».** Antes se mostraba «escuchando» en cuanto se lanzaba el ayudante, y el micrófono tardaba aún en abrirse (y lo primero que decías se perdía). Ahora pone «Activando el micrófono…» hasta que el micrófono está abierto de verdad. Además, **en la app de Mac se mantiene un ayudante ya cargado y esperando** (se prepara al abrir la app, mientras mantienes Espacio y tras cada dictado), así que empezar es casi inmediato; en el navegador se empieza a escuchar antes de preparar el medidor de volumen. Mantener Espacio responde un poco antes (300 ms).
+
 ## [0.50.1] - 2026-11-06
 
 ### Corregido

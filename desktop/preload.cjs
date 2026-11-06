@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld("agenticDesktop", {
   voice: {
     available: () => ipcRenderer.invoke("voice:available"),
     start: (lang) => ipcRenderer.invoke("voice:start", String(lang)),
+    warm: () => ipcRenderer.send("voice:warm"),
     stop: () => ipcRenderer.send("voice:stop"),
     cancel: () => ipcRenderer.send("voice:cancel"),
     onEvent: (cb) => {

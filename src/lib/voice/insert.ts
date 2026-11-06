@@ -54,3 +54,56 @@ export function sendButtonFor(el: TextField): HTMLButtonElement | null {
   }
   return null;
 }
+
+/**
+ * Dictating live: the words appear in the field as they are heard and are replaced by the next version of the
+ * sentence (never appended twice). What was in the field before, around the caret, is kept as it was.
+ */
+export class LiveInsert {
+  private before: string;
+  private after: string;
+  private sep: string;
+  private focused = false;
+  private written: string | null = null;
+  /** The person typed or deleted in the field meanwhile: from then on it is theirs, not dictation's. */
+  private edited = false;
+  constructor(readonly el: TextField) {
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? start;
+    this.before = el.value.slice(0, start);
+    this.after = el.value.slice(end);
+    this.sep = this.before && !/\s$/.test(this.before) ? " " : "";
+  }
+
+  private write(value: string, caret: number) {
+    const el = this.el;
+    if (this.edited || (this.written !== null && el.value !== this.written)) {
+      this.edited = true;
+      return;
+    }
+    if (el.value === value) return;
+    this.written = value;
+    const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, "value")!.set!.call(el, value);
+    if (!this.focused) {
+      el.focus();
+      this.focused = true;
+    }
+    el.setSelectionRange(caret, caret);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    if (el instanceof HTMLTextAreaElement) el.scrollTop = el.scrollHeight; // keep the newest words in view
+  }
+
+  /** The whole sentence heard so far. */
+  update(text: string) {
+    if (!this.el.isConnected) return;
+    if (!text) return this.restore();
+    this.write(`${this.before}${this.sep}${text}${this.after}`, this.before.length + this.sep.length + text.length);
+  }
+
+  /** As it was before dictating. */
+  restore() {
+    if (!this.el.isConnected) return;
+    this.write(this.before + this.after, this.before.length);
+  }
+}

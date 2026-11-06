@@ -22,12 +22,16 @@ export interface VoiceSession {
 
 export interface VoiceEngine {
   id: "native" | "web";
+  /** Resolves once the microphone is really being listened to (not before). */
   start(lang: string, h: VoiceHandlers): Promise<VoiceSession>;
+  /** Get ready ahead of time (the key is down, the sentence has not started yet). */
+  warm?(): void;
 }
 
 export interface NativeVoiceBridge {
   available(): Promise<boolean>;
   start(lang: string): Promise<{ ok: boolean; error?: string }>;
+  warm?(): void;
   stop(): void;
   cancel(): void;
   onEvent(cb: (o: { type: string; v?: number; text?: string; final?: boolean; message?: string }) => void): () => void;
@@ -58,17 +62,25 @@ export function resolveLang(pref: string, system = typeof navigator !== "undefin
 const nativeBridge = (): NativeVoiceBridge | null => (typeof window === "undefined" ? null : ((window as unknown as { agenticDesktop?: { voice?: NativeVoiceBridge } }).agenticDesktop?.voice ?? null));
 const inApp = () => typeof window !== "undefined" && !!(window as unknown as { agenticDesktop?: unknown }).agenticDesktop;
 
+/** The helper says "ready" once the microphone is open; never wait for it forever. */
+const READY_TIMEOUT_MS = 6000;
+
 function nativeEngine(bridge: NativeVoiceBridge): VoiceEngine {
   return {
     id: "native",
+    warm: () => bridge.warm?.(),
     async start(lang, h) {
       let off = () => {};
+      let ready = () => {};
+      const isReady = new Promise<void>((r) => (ready = r));
       off = bridge.onEvent((o) => {
-        if (o.type === "level" && typeof o.v === "number") h.onLevel(o.v);
+        if (o.type === "ready") ready();
+        else if (o.type === "level" && typeof o.v === "number") h.onLevel(o.v);
         else if (o.type === "text" && typeof o.text === "string") h.onText(o.text, !!o.final);
         else if (o.type === "error") h.onError(o.message ?? "Error de dictado");
         else if (o.type === "end") {
           off();
+          ready();
           h.onEnd();
         }
       });
@@ -77,6 +89,7 @@ function nativeEngine(bridge: NativeVoiceBridge): VoiceEngine {
         off();
         throw new Error(r.error || "No se pudo iniciar el dictado");
       }
+      await Promise.race([isReady, new Promise<void>((res) => setTimeout(res, READY_TIMEOUT_MS))]);
       return { stop: () => bridge.stop(), cancel: () => bridge.cancel() };
     },
   };

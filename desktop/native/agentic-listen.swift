@@ -1,6 +1,8 @@
 // agentic-listen: what the microphone hears, as text, one JSON object per line on stdout.
-// It is started by the Agentic app (never by hand) when you dictate. Apple's Speech framework does the recognition,
-// on the device whenever the language is installed for it. Commands arrive on stdin: "stop" (finish what was heard) or "cancel".
+// It is started by the Agentic app (never by hand), which keeps one waiting so that dictating begins at once.
+// Apple's Speech framework does the recognition, on the device whenever the language is installed for it.
+// Commands arrive on stdin: "start <lang>", then "stop" (finish what was heard) or "cancel".
+// It prints {"type":"warm"} when it is waiting and {"type":"ready"} once the microphone is really open.
 import AVFoundation
 import Foundation
 import Speech
@@ -12,16 +14,13 @@ func emit(_ o: [String: Any]) {
     print(s)
 }
 
-let lang = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "es-ES"
-guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: lang)) else {
-    emit(["type": "error", "message": "No hay reconocimiento de voz para el idioma \(lang)."])
-    exit(2)
-}
+/// Shared, so that it can be set up while waiting (once the microphone is already allowed).
+let sharedEngine = AVAudioEngine()
 
 final class Listener {
     let recognizer: SFSpeechRecognizer
     init(_ recognizer: SFSpeechRecognizer) { self.recognizer = recognizer }
-    let engine = AVAudioEngine()
+    let engine = sharedEngine
     var request: SFSpeechAudioBufferRecognitionRequest?
     var task: SFSpeechRecognitionTask?
     var lastLevel = Date.distantPast
@@ -83,26 +82,49 @@ final class Listener {
     }
 }
 
-let listener = Listener(recognizer)
+var listener: Listener?
 
-SFSpeechRecognizer.requestAuthorization { status in
-    guard status == .authorized else {
-        emit(["type": "error", "code": "speech-denied", "message": "Falta el permiso de reconocimiento de voz: Ajustes del Sistema → Privacidad y seguridad → Reconocimiento de voz → Agentic."])
-        exit(4)
+func startListening(_ lang: String) {
+    guard listener == nil else { return }
+    guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: lang)) else {
+        emit(["type": "error", "message": "No hay reconocimiento de voz para el idioma \(lang)."])
+        exit(2)
     }
-    AVCaptureDevice.requestAccess(for: .audio) { granted in
-        guard granted else {
-            emit(["type": "error", "code": "mic-denied", "message": "Falta el permiso del micrófono: Ajustes del Sistema → Privacidad y seguridad → Micrófono → Agentic."])
-            exit(5)
+    let l = Listener(recognizer)
+    listener = l
+    SFSpeechRecognizer.requestAuthorization { status in
+        guard status == .authorized else {
+            emit(["type": "error", "code": "speech-denied", "message": "Falta el permiso de reconocimiento de voz: Ajustes del Sistema → Privacidad y seguridad → Reconocimiento de voz → Agentic."])
+            exit(4)
         }
-        DispatchQueue.main.async { listener.begin() }
+        AVCaptureDevice.requestAccess(for: .audio) { granted in
+            guard granted else {
+                emit(["type": "error", "code": "mic-denied", "message": "Falta el permiso del micrófono: Ajustes del Sistema → Privacidad y seguridad → Micrófono → Agentic."])
+                exit(5)
+            }
+            DispatchQueue.main.async { l.begin() }
+        }
     }
 }
 
+// Waiting: load what loading costs now, without asking for any permission (that happens when dictating starts).
+if AVCaptureDevice.authorizationStatus(for: .audio) == .authorized {
+    _ = sharedEngine.inputNode.outputFormat(forBus: 0)
+    sharedEngine.prepare()
+}
+_ = SFSpeechRecognizer.authorizationStatus()
+emit(["type": "warm"])
+
 DispatchQueue.global().async {
-    while let line = readLine() {
-        switch line.trimmingCharacters(in: .whitespacesAndNewlines) {
-        case "stop": DispatchQueue.main.async { listener.stop() }
+    while let raw = readLine() {
+        let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if line.hasPrefix("start ") {
+            let lang = String(line.dropFirst(6))
+            DispatchQueue.main.async { startListening(lang) }
+            continue
+        }
+        switch line {
+        case "stop": DispatchQueue.main.async { listener?.stop() }
         case "cancel":
             emit(["type": "end"])
             exit(0)
