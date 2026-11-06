@@ -69,14 +69,15 @@ const ollama = http.createServer((req, res) => {
       const last = m[m.length - 1].content;
       const prop = body.format?.required?.[0];
       let out;
-      if (prop === "palabra") {
+      if (prop === "existe") {
         const w = last.replace(/^[\s\S]*<palabra>/, "").replace(/<\/palabra>$/, "");
-        out = { herrores: "errores", codigo: "código", escribiendo: "escribiendo" }[w] ?? w;
+        const fixed = { herrores: "errores", escribiendo: "escribiendo" }[w] ?? w;
+        out = { existe: fixed === w, palabra: fixed };
       } else {
         const text = last.replace(/^<texto>\n/, "").replace(/\n<\/texto>$/, "");
         out = m[0].content.includes("CORRECTOR") ? text.replace("herrores", "errores").replace("q tal", "qué tal") : `## Objetivo\n${text}`;
       }
-      return setTimeout(() => res.end(JSON.stringify({ message: { role: "assistant", content: prop ? JSON.stringify({ [prop]: out }) : out } })), 120);
+      return setTimeout(() => res.end(JSON.stringify({ message: { role: "assistant", content: prop === "existe" ? JSON.stringify(out) : prop ? JSON.stringify({ [prop]: out }) : out } })), 120);
     }
     res.statusCode = 404;
     res.end("{}");
@@ -986,8 +987,8 @@ try {
   await shot("08d-word-morph");
   await page.waitForFunction((q) => document.querySelector(q).value === "dime que tengo errores ", OBOX, { timeout: 8000 });
   check(true, "word by word: shorthand and typos are fixed as you type, without a pause");
-  await page.locator(OBOX).pressSequentially("en el codigo y escribiendo ", { delay: 45 });
-  await page.waitForFunction((q) => document.querySelector(q).value === "dime que tengo errores en el código y escribiendo ", OBOX, { timeout: 8000 });
+  await page.locator(OBOX).pressSequentially("en el codigo y corrije escribiendo ", { delay: 45 });
+  await page.waitForFunction((q) => document.querySelector(q).value === "dime que tengo errores en el código y corrige escribiendo ", OBOX, { timeout: 8000 });
   check(await page.locator(OBOX).evaluate((e) => e.selectionStart === e.value.length), "the caret stays where you were typing");
   await page.locator(OBOX).fill("");
   await page.goto(`${base}/settings`);

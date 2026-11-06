@@ -3,6 +3,15 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.54.1] - 2026-11-06
+
+### Corregido
+- **La corrección con la IA local fallaba en palabras sencillas** (por ejemplo, «corrije» se quedaba como estaba) y a veces estropeaba palabras correctas. Ahora:
+  - **Faltas frecuentes sin depender del modelo.** Un diccionario local arregla al instante unos 130 errores típicos del español («corrije», «exelente», «nesesito», «probrema», «escrivir», «aora», «tambien», «codigo», «funcion», «informacion»…), igual que las abreviaturas de chat. Siempre funcionan, también con un modelo flojo.
+  - **El modelo primero decide si la palabra está bien** (existe: sí/no) y sólo en caso de falta clara propone la forma correcta. Ante la duda, no la toca: es peor estropear una palabra buena que dejar pasar una errata.
+  - **Mucho mejor instruido:** 16 ejemplos de palabras (b/v, g/j, h, tildes, letras cambiadas, nombres propios, comandos…) y más ejemplos al corregir frases, con las reglas de ortografía explícitas.
+  - Ajustes recomienda un modelo de 7-8B para español (`qwen2.5:7b`, `llama3.1:8b`): los de 3B son más rápidos pero fallan más.
+
 ## [0.54.0] - 2026-11-06
 
 ### Añadido

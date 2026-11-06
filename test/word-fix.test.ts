@@ -39,3 +39,20 @@ describe("chat shorthand", () => {
     expect(checked("dime q hiciste ")).toEqual(["q", "hiciste"]);
   });
 });
+
+describe("frequent misspellings", () => {
+  it("are fixed on the spot, keeping the capital", () => {
+    expect(shorthandFix("corrije")).toBe("corrige");
+    expect(shorthandFix("Corrije")).toBe("Corrige");
+    expect(shorthandFix("tambien")).toBe("también");
+    expect(shorthandFix("nesesito")).toBe("necesito");
+    expect(shorthandFix("codigo")).toBe("código");
+    expect(shorthandFix("corrige")).toBeNull();
+    expect(shorthandFix("version")).toBeNull(); // a word in English too
+    expect(shorthandFix("hola")).toBeNull();
+  });
+  it("are checked (the word was not typed in code)", () => {
+    expect(checked("por favor corrije esto ")).toEqual(["favor", "corrije"]);
+    expect(checked("abre src/codigo.ts ya ")).toEqual(["abre"]);
+  });
+});
