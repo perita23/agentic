@@ -41,6 +41,12 @@ exports.default = async function afterPack(context) {
     [FuseV1Options.GrantFileProtocolExtraPrivileges]: false,
   });
 
+  // The dictation helper keeps its own identity (it carries the microphone and speech descriptions).
+  const helper = path.join(app, "Contents", "Resources", "agentic-listen");
+  if (fs.existsSync(helper) && !process.env.CSC_LINK) {
+    execFileSync("/usr/bin/codesign", ["--force", "--sign", "-", "--timestamp=none", "--identifier", "dev.agentic.console.listen", helper], { stdio: "inherit" });
+  }
+
   if (process.env.CSC_LINK) return; // electron-builder signs with the Developer ID next
   execFileSync("/usr/bin/codesign", ["--force", "--deep", "--sign", "-", "--timestamp=none", app], { stdio: "inherit" });
   // Re-sign only the outer app (helpers keep their own identifiers and signatures).

@@ -237,6 +237,31 @@ try {
   const shot = async (name) => shots && page.screenshot({ path: path.join(shots, `${name}.png`) });
   const shot0 = async (pg, name) => shots && pg.screenshot({ path: path.join(shots, `${name}.png`) });
 
+  await page.addInitScript(() => {
+    const result = (t, final) => Object.assign([{ transcript: t }], { isFinal: final });
+    window.SpeechRecognition = class {
+      start() {
+        this.a = setTimeout(() => this.onresult?.({ results: [result("hola claude", false)] }), 200);
+        this.b = setTimeout(() => this.onresult?.({ results: [result("hola claude, resume la tarea", false)] }), 450);
+      }
+      stop() {
+        setTimeout(() => this.onend?.(), 80);
+      }
+      abort() {
+        clearTimeout(this.a);
+        clearTimeout(this.b);
+        this.onend?.();
+      }
+    };
+    navigator.mediaDevices.getUserMedia = async () => {
+      const c = new AudioContext();
+      const o = c.createOscillator();
+      const d = c.createMediaStreamDestination();
+      o.connect(d);
+      o.start();
+      return d.stream;
+    };
+  });
   await page.goto(`${base}/auth?token=${token}`);
   // After an update the release notes show up once. They are waited for first: while that dialog is open the rest of
   // the page is aria-hidden, and the dashboard streams in just after the loading skeleton, so it can open before it.
@@ -350,6 +375,70 @@ try {
     return n;
   });
   check(sweep === "skeleton-sweep", "skeleton loaders have the light sweep");
+
+  // Dictation: hold Space (or press the microphone) and what is said lands in the message box.
+  await page.goto(`${base}/chat`);
+  const chatBox = page.getByLabel("Mensaje para Claude");
+  await chatBox.waitFor();
+  await chatBox.click();
+  await page.waitForTimeout(500);
+  await page.keyboard.down("Space");
+  await page.getByTestId("voice-text").getByText("hola claude, resume la tarea").waitFor({ timeout: 5000 });
+  check((await chatBox.locator("xpath=ancestor::*[@data-composer]").getByTestId("voice-text").count()) === 1, "while it listens, the transcript shows inside the message box itself (no floating bar)");
+  await shot("08-voice-listening");
+  await page.keyboard.up("Space");
+  await page.waitForFunction(() => document.querySelector("textarea[aria-label='Mensaje para Claude']").value === "hola claude, resume la tarea");
+  check(true, "holding Space dictates into the message box (and types no spaces)");
+  await chatBox.fill("");
+  await page.getByRole("button", { name: "Dictar" }).first().click();
+  await page.getByTestId("voice-text").getByText("hola claude, resume la tarea").waitFor({ timeout: 5000 });
+  await page.getByRole("button", { name: "Dictar" }).first().click(); // pressing the microphone again finishes
+  await page.waitForFunction(() => document.querySelector("textarea[aria-label='Mensaje para Claude']").value === "hola claude, resume la tarea");
+  check(true, "the microphone button dictates too");
+  await chatBox.fill("");
+  await page.getByRole("button", { name: "Dictar" }).first().click();
+  await page.getByTestId("voice-text").waitFor();
+  await page.keyboard.press("Escape");
+  await page.getByTestId("voice-text").waitFor({ state: "detached", timeout: 5000 });
+  await page.waitForTimeout(500);
+  check((await chatBox.inputValue()) === "", "Esc cancels the dictation and writes nothing");
+  await page.goto(`${base}/tasks`);
+  await page.getByRole("heading", { name: "Tareas" }).first().waitFor();
+  await page.waitForTimeout(700); // the page is interactive (its keyboard shortcuts are attached) a moment after it shows
+  await page.keyboard.down("Space");
+  await page.getByTestId("voice-text").getByText("hola claude, resume la tarea").waitFor({ timeout: 5000 });
+  await shot("08b-voice-floating");
+  await page.keyboard.up("Space");
+  await page.waitForFunction(() => document.querySelector("textarea[aria-label='Mensaje para Claude']")?.value === "hola claude, resume la tarea", null, { timeout: 10000 });
+  check(page.url().endsWith("/chat"), "dictating with no field in focus opens a new chat with the text");
+  // The Mac app's own engine (a native helper) reaches the same overlay through the preload bridge: here a stand-in.
+  const natCtx = await browser.newContext({ storageState: await page.context().storageState() });
+  const nat = await natCtx.newPage();
+  await nat.addInitScript(() => {
+    let cb = () => {};
+    window.agenticDesktop = {
+      isDesktop: true,
+      voice: {
+        available: async () => true,
+        start: async () => {
+          setTimeout(() => cb({ type: "level", v: 0.7 }), 40);
+          setTimeout(() => cb({ type: "text", text: "dictado nativo", final: false }), 120);
+          return { ok: true };
+        },
+        stop: () => setTimeout(() => (cb({ type: "text", text: "dictado nativo", final: true }), cb({ type: "end" })), 60),
+        cancel: () => cb({ type: "end" }),
+        onEvent: (f) => ((cb = f), () => {}),
+      },
+    };
+  });
+  await nat.goto(`${base}/chat`);
+  await nat.getByLabel("Mensaje para Claude").click();
+  await nat.keyboard.down("Space");
+  await nat.getByTestId("voice-text").getByText("dictado nativo").waitFor({ timeout: 5000 });
+  await nat.keyboard.up("Space");
+  await nat.waitForFunction(() => document.querySelector("textarea[aria-label='Mensaje para Claude']").value === "dictado nativo");
+  check(true, "the Mac app's native engine dictates through the same overlay");
+  await natCtx.close();
 
   // A turn that has ended while the process lingers (background tasks): calm status, no clock, no dollars.
   const lingerRun = await (

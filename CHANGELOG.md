@@ -3,6 +3,17 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.49.0] - 2026-11-06
+
+### Añadido
+- **Dictado por voz.** Habla en vez de escribir: lo que dices aparece en el campo en el que estés (el chat, la respuesta a una ejecución…), como si lo hubieras tecleado.
+  - **Mantén Espacio** (con el campo vacío, o fuera de cualquier campo): escucha mientras lo tengas pulsado y, al soltar, inserta el texto. Un toque corto sigue siendo el Espacio de siempre.
+  - **O pulsa el micrófono** (en la barra superior, en el chat y en la respuesta de una ejecución): escucha hasta que lo pulses de nuevo, o por sí solo tras unos segundos de silencio. **Esc cancela.**
+  - **Al escuchar, todo ocurre dentro de la propia caja de escritura**, sin barras flotantes: una línea discreta con unas barritas que siguen tu voz y lo que vas diciendo en tiempo real, y un filo fino de color (el violeta, el coral y el azul de la bolita) que recorre el borde de la caja. Si no hay ninguna caja donde ponerlo (en el dashboard, por ejemplo), aparece una píldora pequeña y tranquila abajo. Son componentes nuevos: la bolita no se ha tocado.
+  - Si no hay ningún campo en foco, abre un chat nuevo con el texto.
+  - **Ajustes → Dictado por voz:** activarlo, mantener Espacio, enviar al terminar (apagado por defecto), e idioma (automático o español, català, English, français, Deutsch, italiano, português).
+  - **En la app de Mac** usa el reconocimiento de voz de Apple, en el dispositivo cuando el idioma está instalado, mediante un pequeño ayudante nativo (Swift) que se compila al construir la app. macOS pedirá permiso para el micrófono y el reconocimiento de voz la primera vez. **En el navegador** usa el reconocimiento de voz del propio navegador (Chrome, Edge, Safari), que puede enviar el audio a su proveedor; Electron no trae uno utilizable, por eso la app lleva el suyo.
+
 ## [0.48.0] - 2026-11-06
 
 ### Añadido

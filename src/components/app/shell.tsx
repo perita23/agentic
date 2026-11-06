@@ -1,6 +1,7 @@
 "use client";
 
 import { AccountMenu } from "./account-menu";
+import { VoiceButton, VoiceProvider } from "./voice";
 import { Avatar, useProfile } from "./avatar";
 import { RouteProgress } from "./route-progress";
 import * as React from "react";
@@ -287,6 +288,7 @@ function Topbar({ onSearch }: { onSearch: () => void }) {
         <Button onClick={() => launcher.open()} size="sm">
           <RocketIcon /> <span className="hidden sm:inline">Nueva sesión</span>
         </Button>
+        <VoiceButton />
         <AccountMenu />
       </div>
     </header>
@@ -336,7 +338,9 @@ function ShellInner({ children }: { children: React.ReactNode }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <LauncherProvider>
-      <ShellInner>{children}</ShellInner>
+      <VoiceProvider>
+        <ShellInner>{children}</ShellInner>
+      </VoiceProvider>
     </LauncherProvider>
   );
 }
