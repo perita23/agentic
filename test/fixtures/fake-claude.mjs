@@ -44,6 +44,24 @@ if (prompt.includes("STREAMTEXT")) {
   }
   out({ type: "assistant", message: { id: "m1", role: "assistant", content: [{ type: "text", text: "Hola, esto se va escribiendo" }] } });
 }
+if ((prompt.includes("closures") || prompt.includes("modo voz")) && process.env.CLAUDE_HOME) {
+  // A chat answer with markup, to be read aloud (headings, emphasis, a link, code). A chat is read back from the transcript.
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const dir = path.join(process.env.CLAUDE_HOME, "projects", "-chat");
+  fs.mkdirSync(dir, { recursive: true });
+  const now = Date.now();
+  const text = "## Closures\n\nUna **closure** recuerda las variables de donde nació. Mira [la guía](https://example.com/guia).\n\n```js\nconst a = 1;\n```\n\n- primero\n- segundo";
+  fs.appendFileSync(
+    path.join(dir, `${sid}.jsonl`),
+    [
+      { type: "user", cwd: process.cwd(), timestamp: new Date(now).toISOString(), message: { role: "user", content: prompt } },
+      { type: "assistant", timestamp: new Date(now + 1).toISOString(), message: { role: "assistant", model: "claude", content: [{ type: "text", text }] } },
+    ]
+      .map((l) => JSON.stringify(l))
+      .join("\n") + "\n",
+  );
+}
 if (prompt.includes("CURLLONG")) {
   // A long curl (a token with no spaces, a long URL) as a command, its output, and written in the answer.
   const tok = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9".repeat(6);

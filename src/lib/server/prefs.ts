@@ -22,6 +22,10 @@ export const voiceSchema = z.object({
   lang: z.string().regex(/^(auto|[a-z]{2,3}-[A-Za-z0-9]{2,8})$/, "Idioma no válido").default("auto"),
   /** Send the message when dictation ends. */
   autoSend: z.boolean().default(false),
+  /** The voice that reads answers aloud ("" = the best one of the language). Only voices of the device itself. */
+  voiceURI: z.string().max(300).default(""),
+  /** Reading speed. */
+  rate: z.number().min(0.6).max(1.6).default(1),
 });
 
 export const prefsSchema = z.object({
@@ -30,11 +34,11 @@ export const prefsSchema = z.object({
     .max(40)
     .default([]),
   island: islandSchema.default({ enabled: true, working: true, alerts: true }),
-  voice: voiceSchema.default({ enabled: true, holdSpace: true, lang: "auto", autoSend: false }),
+  voice: voiceSchema.default({ enabled: true, holdSpace: true, lang: "auto", autoSend: false, voiceURI: "", rate: 1 }),
 });
 export type Prefs = z.infer<typeof prefsSchema>;
 
-const DEFAULTS: Prefs = { hiddenNav: [], island: { enabled: true, working: true, alerts: true }, voice: { enabled: true, holdSpace: true, lang: "auto", autoSend: false } };
+const DEFAULTS: Prefs = { hiddenNav: [], island: { enabled: true, working: true, alerts: true }, voice: { enabled: true, holdSpace: true, lang: "auto", autoSend: false, voiceURI: "", rate: 1 } };
 
 /** Personal UI preferences (stored with the app's data, so they survive updates and are the same in app and browser). */
 export class PrefsService {

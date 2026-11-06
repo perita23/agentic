@@ -10,6 +10,7 @@ import { useApi } from "@/lib/api";
 import { pickEngine, resolveLang, type VoiceEngine, type VoiceSession } from "@/lib/voice/engine";
 import { LiveInsert, dictationTarget, insertAtCaret, isTextField, sendButtonFor, trackFocus, type TextField } from "@/lib/voice/insert";
 import { voiceColor } from "@/lib/voice/palette";
+import { speaker } from "@/lib/voice/speak";
 import { cn } from "@/lib/utils";
 
 export interface VoicePrefs {
@@ -17,8 +18,10 @@ export interface VoicePrefs {
   holdSpace: boolean;
   lang: string;
   autoSend: boolean;
+  voiceURI: string;
+  rate: number;
 }
-export const DEFAULT_VOICE: VoicePrefs = { enabled: true, holdSpace: true, lang: "auto", autoSend: false };
+export const DEFAULT_VOICE: VoicePrefs = { enabled: true, holdSpace: true, lang: "auto", autoSend: false, voiceURI: "", rate: 1 };
 
 type Phase = "idle" | "starting" | "listening" | "finishing";
 interface VoiceCtx {
@@ -114,7 +117,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     const put = (f: TextField) => {
       if (live && live.el === f) live.update(t); // already there word by word: this is the final version
       else insertAtCaret(f, t);
-      if (prefsRef.current.autoSend) setTimeout(() => sendButtonFor(f)?.click(), 150);
+      if (prefsRef.current.autoSend || speaker.state.voiceMode) setTimeout(() => sendButtonFor(f)?.click(), 150);
     };
     if (field) return put(field);
     router.push("/chat");
@@ -169,6 +172,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
   const start = async (m: "hold" | "click") => {
     if (phaseRef.current !== "idle" || !prefsRef.current.enabled) return;
+    speaker.stop(); // you talk: it falls silent
     let engine = engineRef.current;
     if (!engine) {
       const picked = await pickEngine();
@@ -223,6 +227,11 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     let holding: "page" | "empty-field" | null = null;
     let started = false;
     const onDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && phaseRef.current === "idle" && speaker.state.speaking) {
+        e.preventDefault();
+        speaker.stop();
+        return;
+      }
       if (e.key === "Escape" && phaseRef.current !== "idle") {
         e.preventDefault();
         cancel();
@@ -357,11 +366,13 @@ function LiveText({ v, className }: { v: VoiceCtx; className?: string }) {
 export function VoiceInline() {
   const id = React.useId();
   const v = useVoice();
+  const speaking = React.useSyncExternalStore(speaker.subscribe, () => speaker.getSnapshot().speaking, () => false);
   const mine = v.phase !== "idle" && v.slot === id;
+  const reading = speaking && v.phase === "idle";
   return (
     <div data-voice-slot={id} className="min-w-0 max-w-full">
       <AnimatePresence initial={false}>
-        {mine && (
+        {(mine || reading) && (
           <motion.div
             key="live"
             data-voice-live
@@ -374,9 +385,15 @@ export function VoiceInline() {
             className="overflow-hidden"
           >
             <div className="flex items-center gap-2.5 px-4 py-1.5 text-sm">
-              <VoiceBars level={v.level} />
-              <LiveText v={v} className="flex-1" />
-              <span className="shrink-0 text-[11px] text-muted-foreground">{hint(v.mode)}</span>
+              <VoiceBars level={reading ? (speaker.level as unknown as MotionValue<number>) : v.level} />
+              {reading ? (
+                <span data-testid="speak-status" className="min-w-0 flex-1 truncate text-muted-foreground">
+                  Leyendo en voz alta…
+                </span>
+              ) : (
+                <LiveText v={v} className="flex-1" />
+              )}
+              <span className="shrink-0 text-[11px] text-muted-foreground">{reading ? "Esc" : hint(v.mode)}</span>
             </div>
           </motion.div>
         )}

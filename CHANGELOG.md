@@ -3,6 +3,14 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.51.0] - 2026-11-06
+
+### Añadido
+- **Claude te responde por voz, en local.** Debajo de cada respuesta del chat hay un botón de altavoz («Leer en voz alta»); **Esc** (o pulsar de nuevo) lo calla. Usa **sólo las voces de tu propio equipo** (las de macOS en la app): no hay claves, ni coste, ni sale tu texto a internet; si una voz fuera remota, se descarta. Antes de leer, se limpia lo que suena mal: se omiten los bloques de código (si sólo hay código, dice «te dejo el código en pantalla»), las tablas y los enlaces (queda el texto, o «un enlace»), las rutas largas y el formato Markdown; y se lee frase a frase.
+- **Modo voz** (botón de las ondas junto al micrófono del chat): cuando Claude termina de responder, **te lee la respuesta y, al acabar, te escucha** y envía lo que digas, así que puedes conversar sin tocar nada. Nunca escucha mientras habla (no se oye a sí mismo, aunque uses altavoces); si empiezas a hablar tú (Espacio o el micrófono) o pulsas Esc, se calla. Se acuerda de si lo tenías activado. Mientras lee, la caja de escritura muestra las barritas de colores y «Leyendo en voz alta…».
+- **Ajustes → Dictado por voz → Leer en voz alta:** elige la voz (entre las locales; «Automática» escoge la mejor del idioma, prefiriendo las «Mejoradas»/«Premium»), la velocidad y pruébala. Con una pista de cómo descargar voces más naturales en macOS.
+- La bola de Agentic no se ha tocado.
+
 ## [0.50.2] - 2026-11-06
 
 ### Cambiado

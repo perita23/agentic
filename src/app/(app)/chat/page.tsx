@@ -10,6 +10,7 @@ import { Markdown } from "@/components/app/markdown";
 import { CyclingOrb, LiquidOrb } from "@/components/app/liquid-orb";
 import { LiveStatus } from "@/components/app/live-status";
 import { Appear } from "@/components/app/appear";
+import { ReadAloudButton, VoiceLoop, VoiceModeButton } from "@/components/app/speak";
 import { VoiceButton, VoiceInline } from "@/components/app/voice";
 import { useStickToBottom } from "@/lib/use-stick-bottom";
 import type { LiveStats } from "@/lib/live-stats";
@@ -89,6 +90,7 @@ function BubbleImpl({ m, reveal }: { m: ChatMessage; reveal?: boolean }) {
         </div>
       )}
       {m.text.trim() && <Markdown reveal={reveal}>{m.text}</Markdown>}
+      {m.text.trim() && <ReadAloudButton text={m.text} className="-ml-1.5 mt-1 opacity-50 hover:opacity-100 focus-visible:opacity-100" />}
     </div>
   );
 }
@@ -183,10 +185,11 @@ function Composer({ onSend, busy, autoFocus, model, setModel, mode, setMode }: {
           </select>
         </div>
         <div className="flex items-center gap-1">
-        <VoiceButton />
-        <Button size="icon-sm" className="rounded-full" onClick={send} disabled={busy || !text.trim()} aria-label="Enviar">
-          {busy ? <Loader2Icon className="animate-spin" /> : <ArrowUpIcon />}
-        </Button>
+          <VoiceModeButton />
+          <VoiceButton />
+          <Button size="icon-sm" className="rounded-full" onClick={send} disabled={busy || !text.trim()} aria-label="Enviar">
+            {busy ? <Loader2Icon className="animate-spin" /> : <ArrowUpIcon />}
+          </Button>
         </div>
       </div>
     </div>
@@ -335,6 +338,7 @@ export default function ChatPage() {
                 <span className="truncate text-sm font-semibold">{chat?.title ?? "…"}</span>
                 {chat?.model && <span className="rounded border px-1.5 font-mono text-[11px] text-muted-foreground">{chat.model}</span>}
               </div>
+              <VoiceLoop running={!!chat?.running} last={[...(chat?.messages ?? [])].reverse().find((m) => m.role === "assistant")?.text ?? ""} />
               <ChatScroll key={selected ?? "new"}>
                   {!chat && <Skeleton className="h-40" />}
                   {chat?.messages.map((m, i) => (
