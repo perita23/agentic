@@ -3,6 +3,14 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.55.1] - 2026-11-06
+
+### Corregido
+- **«promt» en una frase en español se convertía en otra palabra.** Con el idioma en automático, la errata de una palabra inglesa o técnica dentro de una frase en español se corregía a la palabra española que estuviera más cerca («promt» → «aromo»). Ahora el corrector compara también los candidatos del otro idioma y gana el más parecido, sea del idioma que sea: «promt» → «prompt», «comit» → «commit», «deploi» → «deploy», «brach» → «branch». Además hay una lista de palabras propias del trabajo con Claude Code (prompt, commit, deploy, branch, merge, token, endpoint, docker…) que ganan los empates, y a igualdad manda el idioma en el que escribes.
+
+### Añadido
+- **Palabras que no se corrigen** (Ajustes → Corrector ortográfico): tu lista de nombres, jerga o marcas. No se tocan nunca y, además, sus erratas se corrigen a ellas (si añades «Morphy», «Morphi» pasa a «Morphy»).
+
 ## [0.55.0] - 2026-11-06
 
 ### Añadido
