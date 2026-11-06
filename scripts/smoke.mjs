@@ -69,7 +69,11 @@ const ollama = http.createServer((req, res) => {
       const last = m[m.length - 1].content;
       const prop = body.format?.required?.[0];
       let out;
-      if (prop === "existe") {
+      if (prop === "elegida") {
+        const word = last.replace(/^[\s\S]*<palabra>/, "").replace(/<\/palabra>[\s\S]*$/, "");
+        const options = [...last.matchAll(/^\d+\. (.+)$/gm)].map((x) => x[1]);
+        out = { elegida: options.find((o) => o === "errores") ?? word };
+      } else if (prop === "existe") {
         const w = last.replace(/^[\s\S]*<palabra>/, "").replace(/<\/palabra>$/, "");
         const fixed = { herrores: "errores", escribiendo: "escribiendo" }[w] ?? w;
         out = { existe: fixed === w, palabra: fixed };
@@ -77,7 +81,7 @@ const ollama = http.createServer((req, res) => {
         const text = last.replace(/^<texto>\n/, "").replace(/\n<\/texto>$/, "");
         out = m[0].content.includes("CORRECTOR") ? text.replace("herrores", "errores").replace("q tal", "qué tal") : `## Objetivo\n${text}`;
       }
-      return setTimeout(() => res.end(JSON.stringify({ message: { role: "assistant", content: prop === "existe" ? JSON.stringify(out) : prop ? JSON.stringify({ [prop]: out }) : out } })), m[0].content.includes("REESCRITOR") ? 1600 : 120);
+      return setTimeout(() => res.end(JSON.stringify({ message: { role: "assistant", content: prop === "existe" || prop === "elegida" ? JSON.stringify(out) : prop ? JSON.stringify({ [prop]: out }) : out } })), m[0].content.includes("REESCRITOR") ? 1600 : 120);
     }
     res.statusCode = 404;
     res.end("{}");
@@ -980,7 +984,7 @@ try {
   await page.waitForFunction((q) => document.querySelector(q).value === "## Objetivo\narregla el login que falla", OBOX, { timeout: 8000 });
   check(true, "«Mejorar prompt» rewrites and organises the prompt with the local model");
   // Word by word: each finished word is checked, and a wrong one is fixed on the spot, morphing.
-  await fetch(base + "/api/ollama", { method: "PUT", headers: auth, body: JSON.stringify({ autocorrect: "words" }) });
+  await fetch(base + "/api/spell", { method: "PUT", headers: auth, body: JSON.stringify({ mode: "words", lang: "auto" }) });
   await page.goto(`${base}/chat`);
   await page.locator(OBOX).waitFor();
   await page.waitForTimeout(600);
@@ -994,6 +998,11 @@ try {
   await page.locator(OBOX).pressSequentially("en el codigo y corrije escribiendo ", { delay: 45 });
   await page.waitForFunction((q) => document.querySelector(q).value === "dime que tengo errores en el código y corrige escribiendo ", OBOX, { timeout: 8000 });
   check(await page.locator(OBOX).evaluate((e) => e.selectionStart === e.value.length), "the caret stays where you were typing");
+  await page.locator(OBOX).fill("");
+  // English too: the language is worked out from the words around (or chosen in Ajustes).
+  await page.locator(OBOX).pressSequentially("I will recieve the report ", { delay: 40 });
+  await page.waitForFunction((q) => document.querySelector(q).value.endsWith("I will receive the report "), OBOX, { timeout: 8000 });
+  check(true, "the corrector works in English too (language detected from the words around)");
   await page.locator(OBOX).fill("");
   // Not only the message boxes: any field for prose (a task's title and description) is corrected too, and searches are left alone.
   await page.goto(`${base}/tasks`);

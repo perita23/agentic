@@ -3,6 +3,16 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.55.0] - 2026-11-06
+
+### Añadido
+- **Corrector ortográfico con diccionarios (Hunspell), en español e inglés.** Es el mismo tipo de corrector que usan LibreOffice, Firefox y macOS: un diccionario dice con exactitud qué palabras están mal y propone los candidatos. Es instantáneo, siempre da el mismo resultado, funciona sin internet y **no necesita ningún modelo** (antes dependía de Ollama para encontrar las faltas, y un modelo pequeño fallaba en palabras sencillas). Nueva tarjeta **Ajustes → Corrector ortográfico**.
+  - **Idioma a elegir:** Automático (mira las palabras de alrededor para saber si escribes en español o en inglés), Español o English. Las palabras correctas en cualquiera de los dos (commit, deploy…), los nombres propios en mitad de frase, el código y las palabras sin candidatos parecidos se dejan como están.
+  - **Cómo decide:** arregla al instante lo seguro («tambien» → «también», «exelente» → «excelente», «recieve» → «receive»). Cuando el diccionario propone varias opciones («corrije» → corrige, corrijo, corrija), **la IA local sólo elige la que encaja en la frase** (nunca escribe palabras por su cuenta, y si dice algo que no es una opción se ignora). Sin Ollama, esas palabras dudosas se dejan como las escribiste. Se puede desactivar el uso del modelo.
+  - Funciona en todos los campos de texto, con el mismo efecto de transformación y el mismo «deshacer».
+- **IA local → «Corregir la frase al pausar»** pasa a ser sólo sugerir o aplicar la frase entera; la corrección palabra a palabra vive en el corrector. Quien tenía «Palabra a palabra» activado la conserva.
+- Diccionarios incluidos en la app (≈1,4 MB): español (GPL/LGPL/MPL, de LibreOffice) e inglés (MIT/BSD); sus licencias van junto a los ficheros.
+
 ## [0.54.3] - 2026-11-06
 
 ### Añadido

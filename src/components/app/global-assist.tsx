@@ -6,14 +6,13 @@ import { proseField, wordAssist, type Morph } from "@/lib/word-assist";
 import { MorphPill } from "./prompt-assist";
 
 /**
- * Word-by-word correction with the local model in every field where you write prose (task titles and descriptions,
+ * Word-by-word correction (dictionaries, and the local model for the doubtful ones) in every field where you write prose (task titles and descriptions,
  * notes, comments…), not only in the message boxes. Fields that are searches, addresses, paths, keys… are left alone
  * (see `proseField`), and any field can opt out with `data-no-assist`.
  */
 export function GlobalWordAssist() {
-  const { data } = useApi<{ settings: { enabled: boolean; model: string; autocorrect: string } }>("/api/ollama?probe=0", { revalidateOnFocus: false });
-  const s = data?.settings;
-  const on = !!s?.enabled && !!s.model && s.autocorrect === "words";
+  const { data } = useApi<{ settings: { mode: string } }>("/api/spell", { revalidateOnFocus: false });
+  const on = data?.settings.mode === "words";
   const [morphs, setMorphs] = React.useState<Morph[]>([]);
   React.useEffect(() => {
     if (!on) return;
