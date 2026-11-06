@@ -22,6 +22,7 @@ import { PrefsService } from "./prefs";
 import { AgenticMcp } from "./agentic-mcp";
 import { ObsidianService } from "./obsidian";
 import { OllamaService } from "./ollama";
+import { SpellService } from "./spell";
 import { ProfileService } from "./profile";
 import { SessionTrash } from "./trash";
 import pkg from "../../../package.json";
@@ -61,6 +62,7 @@ export interface Context {
   prefs: PrefsService;
   obsidian: ObsidianService;
   ollama: OllamaService;
+  spell: SpellService;
   agenticMcp: AgenticMcp;
   profile: ProfileService;
   trash: SessionTrash;
@@ -79,6 +81,7 @@ export function createContext(config: Config): Context {
   const integrations = new IntegrationService(store, tasks);
   const obsidian = new ObsidianService(store);
   const ollama = new OllamaService(store);
+  const spell = new SpellService(store, ollama);
   const agenticMcp = new AgenticMcp(store, config.dataDir);
   const runs = new RunManager(store, {
     dataDir: config.dataDir,
@@ -132,6 +135,7 @@ export function createContext(config: Config): Context {
     prefs: new PrefsService(store),
     obsidian,
     ollama,
+    spell,
     agenticMcp,
     profile: new ProfileService(store, config.dataDir),
     trash: new SessionTrash(config.dataDir, config.claudeHome, sessions),

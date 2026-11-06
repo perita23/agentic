@@ -21,8 +21,8 @@ const MAX_CHARS = 3000;
 const DELAY_MS = 140;
 
 /**
- * Word by word, for any text field: every word you finish is checked (frequent misspellings at once, the rest by the
- * local model); a wrong one is fixed on the spot, keeping the caret and the undo history, and reported as a Morph.
+ * Word by word, for any text field: every word you finish is checked (frequent misspellings at once, the rest against
+ * the dictionaries of the server, with the local model only choosing between candidates); a wrong one is fixed on the spot, keeping the caret and the undo history, and reported as a Morph.
  * One shared instance: what the model said about a word in one field is known in all.
  */
 export class WordAssist {
@@ -71,7 +71,7 @@ export class WordAssist {
         const { field, tok } = item;
         const key = `${tok.before.split(" ").pop() ?? ""}|${tok.word}`;
         try {
-          const r = await api<{ word: string; changed: boolean }>("POST", "/api/ollama/word", { word: tok.word, before: tok.before.slice(-120) });
+          const r = await api<{ word: string; changed: boolean }>("POST", "/api/spell/word", { word: tok.word, before: tok.before.slice(-200) });
           if (this.cache.size > 3000) this.cache.clear();
           this.cache.set(key, r.word);
           if (r.changed) this.fix(field, tok, r.word);

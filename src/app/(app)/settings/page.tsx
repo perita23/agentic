@@ -11,6 +11,7 @@ import { DesktopCard } from "@/components/app/desktop-card";
 import { IslandCard } from "@/components/app/island-card";
 import { ObsidianCard } from "@/components/app/obsidian";
 import { OllamaCard } from "@/components/app/ollama-card";
+import { SpellCard } from "@/components/app/spell-card";
 import { VoiceCard } from "@/components/app/voice-card";
 import { InstallTool } from "@/components/app/install-tool";
 import { AuditCard, SessionsCard, TouchIdCard } from "@/components/app/security-settings";
@@ -78,6 +79,7 @@ export default function SettingsPage() {
           <NotificationsCard />
           <ObsidianCard />
           <VoiceCard />
+          <SpellCard />
           <OllamaCard />
         </div>
         <Card>

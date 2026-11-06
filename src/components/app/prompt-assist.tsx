@@ -30,6 +30,8 @@ const MAX_CHARS = 3000;
  */
 export function usePromptAssist(text: string, getField: () => Field | null) {
   const { data } = useApi<{ settings: Settings }>("/api/ollama?probe=0", { revalidateOnFocus: false });
+  const { data: spell } = useApi<{ settings: { mode: string } }>("/api/spell", { revalidateOnFocus: false });
+  const wordsOn = spell?.settings.mode === "words"; // dictionaries: needs no model
   const s = data?.settings;
   const ready = !!s?.enabled && !!s.model;
   const mode = ready ? s.autocorrect : "off";
@@ -83,10 +85,10 @@ export function usePromptAssist(text: string, getField: () => Field | null) {
     if (f) f.dataset.assist = "own";
   });
   React.useEffect(() => {
-    if (mode !== "words") return;
+    if (!wordsOn) return;
     const f = getRef.current();
     if (f && f.value === text) wordAssist.schedule(f);
-  }, [text, mode]);
+  }, [text, wordsOn]);
 
   const shown = chip && chip.kind === "suggest" ? (text === chip.forText ? chip : null) : chip && text === chip.forText ? chip : null;
 

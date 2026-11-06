@@ -78,14 +78,13 @@ export function OllamaCard() {
         </label>
         <label className="flex items-center justify-between gap-4">
           <span>
-            Corregir mientras escribo
-            <span className="block text-xs text-muted-foreground">«Palabra a palabra» revisa cada palabra en cuanto la terminas y la arregla al instante (Ctrl/⌘+Z lo deshace). «Al pausar» revisa la frase entera cuando dejas de escribir.</span>
+            Corregir la frase al pausar
+            <span className="block text-xs text-muted-foreground">Cuando dejas de escribir, el modelo revisa la frase entera y la corrige. La corrección palabra a palabra está en el «Corrector ortográfico» (más rápido, con diccionarios).</span>
           </span>
-          <select aria-label="Corrección al escribir" value={s.autocorrect} disabled={!s.enabled} onChange={(e) => void save({ autocorrect: e.target.value as View["settings"]["autocorrect"] })} className="h-8 rounded-md border bg-transparent px-2 text-sm">
+          <select aria-label="Corrección al escribir" value={s.autocorrect === "words" ? "off" : s.autocorrect} disabled={!s.enabled} onChange={(e) => void save({ autocorrect: e.target.value as View["settings"]["autocorrect"] })} className="h-8 rounded-md border bg-transparent px-2 text-sm">
             <option value="off">Desactivada</option>
-            <option value="words">Palabra a palabra</option>
-            <option value="suggest">Al pausar: sugerir</option>
-            <option value="auto">Al pausar: aplicar sola</option>
+            <option value="suggest">Sugerir</option>
+            <option value="auto">Aplicar sola</option>
           </select>
         </label>
         <details className="rounded-lg border px-3 py-2">
