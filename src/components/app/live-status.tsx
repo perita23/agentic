@@ -10,7 +10,7 @@ import { LiquidOrb } from "./liquid-orb";
 import { Markdown } from "./markdown";
 
 /** Text that morphs when it changes: the old words blur out while the new ones blur in. */
-function MorphText({ text, state, glow }: { text: string; state: string; glow: boolean }) {
+export function MorphText({ text, state, glow, className, wrap }: { text: string; state: string; glow: boolean; className?: string; wrap?: boolean }) {
   const [st, setSt] = React.useState<{ shown: string; leaving: string | null; rev: number }>({ shown: text, leaving: null, rev: 0 });
   // Derived during render (the React way to react to a prop change): the old words stay for the exit animation.
   if (text !== st.shown) setSt({ shown: text, leaving: st.shown, rev: st.rev + 1 });
@@ -21,13 +21,13 @@ function MorphText({ text, state, glow }: { text: string; state: string; glow: b
   }, [st.rev]);
   const { shown, leaving, rev } = st;
   return (
-    <div className="grid overflow-hidden text-sm font-medium">
+    <div className={cn("grid overflow-hidden", className ?? "text-sm font-medium")}>
       {leaving !== null && (
-        <span key={`o${rev}`} data-state={state} className={cn("morph-out truncate whitespace-nowrap", glow ? "orb-text" : "text-foreground")} style={{ gridArea: "1 / 1" }} aria-hidden>
+        <span key={`o${rev}`} data-state={state} className={cn("morph-out", wrap ? "break-words" : "truncate whitespace-nowrap", glow ? "orb-text" : "text-foreground")} style={{ gridArea: "1 / 1" }} aria-hidden>
           {leaving}
         </span>
       )}
-      <span key={`n${rev}`} data-state={state} className={cn("truncate whitespace-nowrap", glow ? "orb-text" : "text-foreground", rev > 0 && "morph-in")} style={{ gridArea: "1 / 1" }}>
+      <span key={`n${rev}`} data-state={state} className={cn(wrap ? "break-words" : "truncate whitespace-nowrap", glow ? "orb-text" : "text-foreground", rev > 0 && "morph-in")} style={{ gridArea: "1 / 1" }}>
         {shown}
       </span>
     </div>

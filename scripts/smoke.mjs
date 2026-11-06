@@ -64,10 +64,19 @@ const ollama = http.createServer((req, res) => {
     res.setHeader("content-type", "application/json");
     if (req.url === "/api/tags") return res.end(JSON.stringify({ models: [{ name: "fake:1b", size: 1.2e9 }] }));
     if (req.url === "/api/chat") {
-      const m = JSON.parse(raw).messages;
-      const text = m[1].content.replace(/^<texto>\n/, "").replace(/\n<\/texto>$/, "");
-      const out = m[0].content.includes("corrector") ? text.replace("herrores", "errores").replace("q tal", "qué tal") : `## Objetivo\n${text}`;
-      return setTimeout(() => res.end(JSON.stringify({ message: { role: "assistant", content: out } })), 120);
+      const body = JSON.parse(raw);
+      const m = body.messages;
+      const last = m[m.length - 1].content;
+      const prop = body.format?.required?.[0];
+      let out;
+      if (prop === "palabra") {
+        const w = last.replace(/^[\s\S]*<palabra>/, "").replace(/<\/palabra>$/, "");
+        out = { herrores: "errores", codigo: "código", escribiendo: "escribiendo" }[w] ?? w;
+      } else {
+        const text = last.replace(/^<texto>\n/, "").replace(/\n<\/texto>$/, "");
+        out = m[0].content.includes("CORRECTOR") ? text.replace("herrores", "errores").replace("q tal", "qué tal") : `## Objetivo\n${text}`;
+      }
+      return setTimeout(() => res.end(JSON.stringify({ message: { role: "assistant", content: prop ? JSON.stringify({ [prop]: out }) : out } })), 120);
     }
     res.statusCode = 404;
     res.end("{}");
@@ -917,15 +926,15 @@ try {
   await page.getByRole("button", { name: "Modo voz" }).click();
   await page.getByTestId("voice-stage").waitFor();
   check(true, "talk mode takes over the screen: no message box, only the voice");
-  await page.getByTestId("voice-stage-status").getByText("Te escucho…").waitFor({ timeout: 8000 });
-  await page.getByTestId("voice-stage-caption").getByText("pregunta en modo voz").waitFor({ timeout: 5000 });
+  await page.getByTestId("voice-stage-status").getByText("Te escucho…").first().waitFor({ timeout: 8000 });
+  await page.getByTestId("voice-stage-caption").getByText("pregunta en modo voz").first().waitFor({ timeout: 5000 });
   check(true, "it listens by itself and shows the words as you speak");
   await shot("08c-voice-stage");
   await page.getByRole("button", { name: "Terminar de hablar" }).click();
   await page.waitForFunction(() => window.__spoken.length > 0, null, { timeout: 30000 });
   check(true, "in talk mode the answer is read aloud on its own");
   await page.getByTestId("voice-stage-caption").waitFor();
-  await page.getByTestId("voice-stage-status").getByText("Te escucho…").waitFor({ timeout: 15000 });
+  await page.getByTestId("voice-stage-status").getByText("Te escucho…").first().waitFor({ timeout: 15000 });
   check(true, "and then it listens again");
   await page.evaluate(() => (window.__srPhrase = undefined));
   await page.getByRole("button", { name: "Salir del modo voz" }).click();
@@ -965,6 +974,22 @@ try {
   await page.getByRole("button", { name: "Mejorar prompt" }).click();
   await page.waitForFunction((q) => document.querySelector(q).value === "## Objetivo\narregla el login que falla", OBOX, { timeout: 8000 });
   check(true, "«Mejorar prompt» rewrites and organises the prompt with the local model");
+  // Word by word: each finished word is checked, and a wrong one is fixed on the spot, morphing.
+  await fetch(base + "/api/ollama", { method: "PUT", headers: auth, body: JSON.stringify({ autocorrect: "words" }) });
+  await page.goto(`${base}/chat`);
+  await page.locator(OBOX).waitFor();
+  await page.waitForTimeout(600);
+  await page.locator(OBOX).click();
+  await page.locator(OBOX).pressSequentially("dime q tengo herrores ", { delay: 45 });
+  await page.getByTestId("word-morph").first().waitFor({ timeout: 8000 });
+  check(true, "a corrected word morphs in place");
+  await shot("08d-word-morph");
+  await page.waitForFunction((q) => document.querySelector(q).value === "dime que tengo errores ", OBOX, { timeout: 8000 });
+  check(true, "word by word: shorthand and typos are fixed as you type, without a pause");
+  await page.locator(OBOX).pressSequentially("en el codigo y escribiendo ", { delay: 45 });
+  await page.waitForFunction((q) => document.querySelector(q).value === "dime que tengo errores en el código y escribiendo ", OBOX, { timeout: 8000 });
+  check(await page.locator(OBOX).evaluate((e) => e.selectionStart === e.value.length), "the caret stays where you were typing");
+  await page.locator(OBOX).fill("");
   await page.goto(`${base}/settings`);
   await page.getByText("IA local (Ollama)").first().waitFor();
   await page.getByText("conectado", { exact: true }).waitFor({ timeout: 8000 });

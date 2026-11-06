@@ -31,7 +31,12 @@ const sendSchema = z.object({
   model: z.string().regex(MODEL_RE).optional().or(z.literal("").transform(() => undefined)),
   /** Never bypassPermissions in a chat. */
   permissionMode: z.enum(["default", "plan", "acceptEdits", "auto"]).default("default"),
+  /** Talk mode: the answer will be heard, not read. */
+  voice: z.boolean().optional(),
 });
+
+/** What Claude is told in talk mode: short, spoken answers that can start being read at once. */
+export const VOICE_HINT = "Esta conversación es por voz: tu respuesta se va a escuchar, no a leer. Responde de forma breve, natural y directa, con frases cortas y completas, como si hablaras con la persona (empieza por lo importante). Sin Markdown, listas, tablas ni emojis. No leas código, rutas ni URL: di qué hace o resume. Si hace falta mucho detalle, da lo esencial y ofrece ampliarlo.";
 const patchSchema = z.object({ title: text(120).trim().min(1).optional(), pinned: z.boolean().optional() }).strict();
 
 export function chatDir(dataDir: string) {
@@ -99,7 +104,7 @@ export class ChatService {
   }
 
   async create(body: unknown) {
-    const { prompt, model, permissionMode } = parse(sendSchema, body);
+    const { prompt, model, permissionMode, voice } = parse(sendSchema, body);
     const now = nowIso();
     const chat: Chat = {
       id: crypto.randomUUID(),
@@ -114,12 +119,12 @@ export class ChatService {
       chats.unshift(chat);
       chats.splice(MAX_CHATS);
     });
-    await this.send(chat.id, { prompt, model, permissionMode });
+    await this.send(chat.id, { prompt, model, permissionMode, voice });
     return this.find(chat.id);
   }
 
   async send(id: string, body: unknown) {
-    const { prompt, model, permissionMode } = parse(sendSchema, body);
+    const { prompt, model, permissionMode, voice } = parse(sendSchema, body);
     const chat = this.sync(this.find(id));
     const last = chat.lastRunId ? this.runs.list().find((r) => r.id === chat.lastRunId) : undefined;
     if (last?.status === "running") throw new HttpError(409, "Claude todavía está respondiendo");
@@ -133,6 +138,7 @@ export class ChatService {
       model: model ?? chat.model ?? undefined,
       resumeSessionId: chat.sessionId ?? undefined,
       permissionMode,
+      appendPrompt: voice ? VOICE_HINT : undefined,
     });
     this.save((chats) => {
       const c = chats.find((x) => x.id === id);

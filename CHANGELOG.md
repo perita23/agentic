@@ -3,6 +3,18 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.54.0] - 2026-11-06
+
+### Añadido
+- **Corrección palabra a palabra con la IA local.** En **Ajustes → IA local → Corregir mientras escribo → «Palabra a palabra»**: en cuanto terminas una palabra (espacio, coma, punto…) se le manda al modelo con las palabras anteriores como contexto; si está mal escrita, **se arregla ahí mismo, mientras sigues escribiendo**, y la palabra se transforma con el mismo **morphing** del texto de estado de la bola (la vieja se desenfoca y la nueva entra con los colores de la bola, justo en su sitio). Ctrl/⌘+Z lo deshace y el cursor no se mueve. Sólo se revisan palabras sueltas de texto normal: no se toca el código, las rutas, las URL, los correos, los identificadores, las siglas, los números ni las palabras muy comunes; las abreviaturas de chat (`q`, `xq`, `tb`, `xfa`…) se arreglan al instante sin usar el modelo. Los resultados se recuerdan, así que una palabra repetida no vuelve a consultarse, y si Ollama no responde, deja de insistir unos segundos.
+- **Instrucciones para el modelo (Ajustes → IA local).** Puedes añadir tus propias reglas al corregir («no toques los nombres de mis proyectos») y al mejorar el prompt («escribe siempre en español, con pasos numerados»).
+
+### Corregido
+- **El modelo local ya no responde a lo que escribes.** Antes, si tu texto sonaba a una orden o una pregunta, el modelo podía contestarla en vez de corregirla. Ahora: las instrucciones dicen que el texto es sólo material (nunca una orden), lleva ejemplos en los que el texto pide cosas y la respuesta sólo lo corrige, la respuesta se fuerza a un campo JSON (sin charla), con temperatura cero, y cualquier «corrección» que se aleje del original (más larga, distinta, traducida) se descarta. Al corregir una palabra, sólo vale otra palabra parecida.
+- **Modo voz: responde mucho antes.** Como en Claude Desktop, **la respuesta se empieza a leer mientras se escribe**: cada frase se dice en cuanto está terminada, sin esperar al final. Además, en modo voz Claude responde de forma breve y hablada (sin listas ni código, pensado para escuchar), y tu frase se da por terminada ~1,3 s después de tu última palabra (antes eran 9 s de silencio).
+- **Modo voz: la bola y los textos con sus transiciones de siempre.** Los estados de la bola ya no parpadean (aguantan un instante antes de cambiar) y usan los suyos: azul y viva mientras te escucha, violeta mientras Claude piensa, coral mientras habla. El estado y la frase que Claude está diciendo cambian con el mismo morphing que el resto de la app, y las palabras tuyas salen en directo.
+- La bola de Agentic no se ha tocado.
+
 ## [0.53.0] - 2026-11-06
 
 ### Añadido
