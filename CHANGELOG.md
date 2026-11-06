@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.54.2] - 2026-11-06
+
+### Añadido
+- **Animación al mejorar el prompt.** Mientras el modelo local reescribe tu prompt, la caja se ilumina: el borde fluye con los colores de la bola, una luz recorre la caja, el texto se desenfoca ligeramente y el botón muestra una mini bola trabajando con «Mejorando…» brillando. Al terminar, el texto nuevo entra desenfocado y se aclara. Respeta «reducir movimiento».
+
 ## [0.54.1] - 2026-11-06
 
 ### Corregido
