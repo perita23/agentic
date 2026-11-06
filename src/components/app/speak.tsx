@@ -1,12 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { AudioLinesIcon, SquareIcon, Volume2Icon } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AudioLinesIcon, MicIcon, MicOffIcon, SquareIcon, Volume2Icon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useApi } from "@/lib/api";
 import { resolveLang } from "@/lib/voice/engine";
 import { speaker, type SpeakOptions } from "@/lib/voice/speak";
+import type { Activity, OrbState } from "@/lib/orb-state";
 import { cn } from "@/lib/utils";
+import { LiquidOrb } from "./liquid-orb";
 import { DEFAULT_VOICE, useVoice, type VoicePrefs } from "./voice";
 
 export const useSpeaker = () => {
@@ -16,7 +19,9 @@ export const useSpeaker = () => {
     () => speaker.available(),
     () => false,
   );
-  React.useEffect(() => speaker.loadMode(), []);
+  React.useEffect(() => {
+    void speaker.loadNative();
+  }, []);
   return { ...st, available };
 };
 
@@ -71,10 +76,7 @@ export function VoiceModeButton({ className }: { className?: string }) {
   );
 }
 
-/**
- * The loop of talk mode. When Claude finishes answering it reads the answer; when it has finished reading, it listens
- * (it never listens while it talks, so it does not hear itself). Nothing happens when talk mode is off.
- */
+/** When Claude finishes answering in talk mode, it reads the answer aloud (the stage then listens again). */
 export function VoiceLoop({ running, last }: { running: boolean; last: string }) {
   const v = useVoice();
   const opts = useSpeakOptions();
@@ -94,12 +96,145 @@ export function VoiceLoop({ running, last }: { running: boolean; last: string })
     speaker.speak(lastRef.current, {
       ...optsRef.current,
       id: "reply",
-      onEnd: () => {
-        if (speaker.state.voiceMode && vRef.current.phase === "idle") vRef.current.toggle();
-      },
     });
   }, [running]);
-  // Leaving the page silences it.
-  React.useEffect(() => () => speaker.stop(), []);
+  // Leaving the page silences it and ends talk mode (the microphone is never left open behind your back).
+  React.useEffect(
+    () => () => {
+      speaker.setVoiceMode(false);
+      vRef.current.cancel();
+    },
+    [],
+  );
   return null;
 }
+
+/**
+ * Talk mode, on its own: the message box goes away and only the voice stays. The orb (as it is, untouched) swells with
+ * your voice while you speak and with Claude's while it answers; under it, the words being said. It listens again by
+ * itself after each answer.
+ */
+export function VoiceStage({ activity, busy }: { activity: Activity | null | undefined; busy: boolean }) {
+  const v = useVoice();
+  const sp = useSpeaker();
+  const reduce = useReducedMotion();
+  const [paused, setPaused] = React.useState(false);
+  const vRef = React.useRef(v);
+  const spRef = React.useRef(sp);
+  React.useEffect(() => {
+    vRef.current = v;
+    spRef.current = sp;
+  });
+
+  // Listens (again) whenever nothing else is going on: it is not waiting for an answer, not talking, not paused.
+  React.useEffect(() => {
+    if (paused || v.phase !== "idle" || sp.speaking || busy || v.available !== true) return;
+    const t = setTimeout(() => vRef.current.toggle(), 700);
+    return () => clearTimeout(t);
+  }, [paused, v.phase, v.available, sp.speaking, busy]);
+
+  const exit = React.useCallback(() => {
+    speaker.setVoiceMode(false);
+    vRef.current.cancel();
+  }, []);
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && vRef.current.phase === "idle" && !spRef.current.speaking) exit();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [exit]);
+
+  // The orb swells with the voice (a wrapper around it: the orb itself is not touched).
+  const wrap = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (reduce) return;
+    let raf = 0;
+    let cur = 0;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const cv = vRef.current;
+      const target = spRef.current.speaking ? speaker.level.get() : cv.phase === "listening" ? cv.level.get() : 0;
+      cur += (target - cur) * 0.22;
+      if (wrap.current) wrap.current.style.transform = `scale(${1 + Math.min(1, cur) * 0.3})`;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [reduce]);
+
+  const orb: OrbState = sp.speaking ? "writing" : busy ? (activity?.state ?? "thinking") : paused ? "idle" : v.phase !== "idle" ? "waiting" : "idle";
+  const status = paused
+    ? "En pausa"
+    : sp.speaking
+      ? "Hablando…"
+      : busy
+        ? (activity?.label ?? "Pensando…")
+        : v.available === false
+          ? (v.reason ?? "El dictado no está disponible aquí")
+          : v.phase === "starting"
+            ? "Activando el micrófono…"
+            : v.phase === "listening"
+              ? "Te escucho…"
+              : v.phase === "finishing"
+                ? "Un momento…"
+                : "Preparando…";
+  const caption = sp.speaking ? sp.caption : v.phase !== "idle" ? v.text : "";
+
+  return (
+    <motion.div
+      data-testid="voice-stage"
+      role="dialog"
+      aria-label="Modo voz"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25, ease: [0.22, 0.8, 0.3, 1] }}
+      className="fixed inset-0 z-[80] flex flex-col items-center justify-center gap-7 bg-background/95 px-6 backdrop-blur-xl"
+    >
+      <Button type="button" variant="ghost" size="icon" className="absolute top-4 right-4 rounded-full" aria-label="Salir del modo voz" title="Salir del modo voz (Esc)" onClick={exit}>
+        <XIcon />
+      </Button>
+      <button
+        type="button"
+        aria-label="Terminar de hablar"
+        title={v.phase === "listening" ? "Toca para enviar lo que has dicho" : undefined}
+        disabled={v.phase !== "listening"}
+        onClick={() => vRef.current.finish()}
+        className="cursor-pointer rounded-full outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default"
+      >
+        <div ref={wrap} className="will-change-transform" style={{ transition: reduce ? undefined : "none" }}>
+          <LiquidOrb state={orb} size={200} />
+        </div>
+      </button>
+      <p data-testid="voice-stage-status" role="status" aria-live="polite" className="text-sm text-muted-foreground">
+        {status}
+      </p>
+      <p data-testid="voice-stage-caption" className="line-clamp-4 min-h-[5.5rem] max-w-xl text-center text-xl leading-snug text-foreground/85">
+        {caption}
+      </p>
+      <div className="flex items-center gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          className={cn("rounded-full", paused && "bg-accent")}
+          aria-label={paused ? "Reanudar el micrófono" : "Pausar el micrófono"}
+          aria-pressed={paused}
+          onClick={() => {
+            if (!paused) vRef.current.cancel();
+            setPaused(!paused);
+          }}
+        >
+          {paused ? <MicOffIcon /> : <MicIcon />} {paused ? "Reanudar" : "Pausar"}
+        </Button>
+        {sp.speaking && (
+          <Button type="button" variant="outline" size="lg" className="rounded-full" aria-label="Callar a Claude" onClick={() => speaker.stop()}>
+            <SquareIcon /> Callar
+          </Button>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+export { AnimatePresence };

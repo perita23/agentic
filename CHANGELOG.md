@@ -3,6 +3,13 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.53.0] - 2026-11-06
+
+### Añadido
+- **Voces mucho más naturales en la app de Mac.** La lectura en voz alta usa ahora todas las voces de macOS (a través de `say`), incluidas las **Premium** y **Mejoradas**, que el navegador integrado de la app no enseñaba. «Automática» elige siempre la más natural del idioma (Premium › Mejorada › compacta). En **Ajustes → Dictado por voz → Leer en voz alta** aparecen ordenadas y marcadas como «muy natural» / «natural», con la pista de cómo descargarlas (Ajustes del Sistema → Accesibilidad → Contenido leído → Voz del sistema → Gestionar voces; por ejemplo Mónica, Jorge, Paulina o Marisol en español). Se omiten las voces de efectos y las robóticas. Todo sigue siendo local.
+- **El modo voz ahora es sólo voz.** Al activarlo, la pantalla pasa a un modo inmersivo: **se oculta la caja de mensaje** y queda la bola de Agentic (tal cual, sin tocarla) que **crece con tu voz** mientras hablas y **con la de Claude** mientras responde, el estado debajo («Te escucho…», «Pensando…», «Hablando…») y las palabras que se dicen en grande (las tuyas en directo, o la frase que Claude está leyendo). Escucha sola, envía al terminar, lee la respuesta y vuelve a escuchar. **Toca la bola para enviar ya** lo que has dicho sin esperar al silencio; **Pausar** cierra el micrófono; **Callar** corta a Claude; **Esc** o la ✕ salen. Al salir de la página, el micrófono se cierra y el modo se desactiva (ya no se queda recordado entre visitas).
+- La bola de Agentic no se ha tocado.
+
 ## [0.52.0] - 2026-11-06
 
 ### Añadido

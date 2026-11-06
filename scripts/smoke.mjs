@@ -272,9 +272,10 @@ try {
     const result = (t, final) => Object.assign([{ transcript: t }], { isFinal: final });
     window.SpeechRecognition = class {
       start() {
+        const phrase = window.__srPhrase || "hola claude, resume la tarea";
         setTimeout(() => this.onaudiostart?.(), 40);
-        this.a = setTimeout(() => this.onresult?.({ results: [result("hola claude", false)] }), 200);
-        this.b = setTimeout(() => this.onresult?.({ results: [result("hola claude, resume la tarea", false)] }), 450);
+        this.a = setTimeout(() => this.onresult?.({ results: [result(phrase.split(/[, ]+/).slice(0, 2).join(" "), false)] }), 200);
+        this.b = setTimeout(() => this.onresult?.({ results: [result(phrase, false)] }), 450);
       }
       stop() {
         setTimeout(() => this.onend?.(), 80);
@@ -911,25 +912,31 @@ try {
   await page.keyboard.press("Escape");
   await page.getByTestId("speak-status").waitFor({ state: "detached", timeout: 5000 });
   check(true, "Esc silences the reading");
-  await page.getByRole("button", { name: "Modo voz" }).click();
-  check((await page.getByRole("button", { name: "Modo voz" }).getAttribute("aria-pressed")) === "true", "talk mode switches on");
+  await page.evaluate(() => (window.__srPhrase = "pregunta en modo voz"));
   await page.evaluate(() => (window.__spoken.length = 0));
-  await page.getByLabel("Mensaje para Claude").fill("segunda pregunta en modo voz");
-  await page.keyboard.press("Enter");
-  await page.waitForFunction(() => window.__spoken.length > 0, null, { timeout: 25000 });
+  await page.getByRole("button", { name: "Modo voz" }).click();
+  await page.getByTestId("voice-stage").waitFor();
+  check(true, "talk mode takes over the screen: no message box, only the voice");
+  await page.getByTestId("voice-stage-status").getByText("Te escucho…").waitFor({ timeout: 8000 });
+  await page.getByTestId("voice-stage-caption").getByText("pregunta en modo voz").waitFor({ timeout: 5000 });
+  check(true, "it listens by itself and shows the words as you speak");
+  await shot("08c-voice-stage");
+  await page.getByRole("button", { name: "Terminar de hablar" }).click();
+  await page.waitForFunction(() => window.__spoken.length > 0, null, { timeout: 30000 });
   check(true, "in talk mode the answer is read aloud on its own");
-  await page.getByTestId("voice-status").waitFor({ timeout: 8000 });
+  await page.getByTestId("voice-stage-caption").waitFor();
+  await page.getByTestId("voice-stage-status").getByText("Te escucho…").waitFor({ timeout: 15000 });
   check(true, "and then it listens again");
-  await page.keyboard.press("Escape");
-  await page.getByTestId("voice-status").waitFor({ state: "detached", timeout: 5000 });
-  await page.getByRole("button", { name: "Modo voz" }).dispatchEvent("click"); // a toast about the finished run may cover it
-  check((await page.getByRole("button", { name: "Modo voz" }).getAttribute("aria-pressed")) === "false", "talk mode switches off");
+  await page.evaluate(() => (window.__srPhrase = undefined));
+  await page.getByRole("button", { name: "Salir del modo voz" }).click();
+  await page.getByTestId("voice-stage").waitFor({ state: "detached", timeout: 5000 });
+  check((await page.getByRole("button", { name: "Modo voz" }).getAttribute("aria-pressed")) === "false", "leaving talk mode brings the message box back");
   // Chat: edit a sent message, ↑ recalls the last one, stop a long answer, and a message waits its turn.
   await page.getByRole("button", { name: "Editar y reenviar" }).first().dispatchEvent("click");
   check((await page.getByLabel("Mensaje para Claude").inputValue()) === "Hola Claude, ¿me explicas los closures?", "«Editar y reenviar» puts a sent message back in the box");
   await page.getByLabel("Mensaje para Claude").fill("");
   await page.keyboard.press("ArrowUp");
-  check((await page.getByLabel("Mensaje para Claude").inputValue()).includes("segunda pregunta"), "↑ in an empty box recalls the last message");
+  check((await page.getByLabel("Mensaje para Claude").inputValue()).includes("pregunta en modo voz"), "↑ in an empty box recalls the last message");
   await page.getByLabel("Mensaje para Claude").fill("SLEEP respuesta larga");
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Detener" }).waitFor({ timeout: 10000 });
