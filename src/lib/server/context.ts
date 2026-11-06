@@ -19,6 +19,7 @@ import { BackupService } from "./backup";
 import { CommandService } from "./commands";
 import { LibraryService } from "./library";
 import { PrefsService } from "./prefs";
+import { AgenticMcp } from "./agentic-mcp";
 import { ObsidianService } from "./obsidian";
 import { ProfileService } from "./profile";
 import { SessionTrash } from "./trash";
@@ -58,6 +59,7 @@ export interface Context {
   library: LibraryService;
   prefs: PrefsService;
   obsidian: ObsidianService;
+  agenticMcp: AgenticMcp;
   profile: ProfileService;
   trash: SessionTrash;
   oauth: OAuthService;
@@ -74,9 +76,11 @@ export function createContext(config: Config): Context {
   const tasks = new TaskService(store);
   const integrations = new IntegrationService(store, tasks);
   const obsidian = new ObsidianService(store);
+  const agenticMcp = new AgenticMcp(store, config.dataDir);
   const runs = new RunManager(store, {
     dataDir: config.dataDir,
     obsidian: (cwd) => obsidian.forRun(cwd),
+    mcp: () => agenticMcp.forRun(),
     claudeBin: config.claudeBin,
     maxConcurrent: config.maxConcurrentRuns,
     maxLogBytes: config.maxLogBytes,
@@ -124,6 +128,7 @@ export function createContext(config: Config): Context {
     library: new LibraryService(sessions),
     prefs: new PrefsService(store),
     obsidian,
+    agenticMcp,
     profile: new ProfileService(store, config.dataDir),
     trash: new SessionTrash(config.dataDir, config.claudeHome, sessions),
     oauth: new OAuthService(store, integrations),

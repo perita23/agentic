@@ -53,6 +53,7 @@ export function route(handler: Handler, opts: { public?: boolean; maxBody?: numb
       assertRequestAllowed(req, opts.public ? null : { token: c.token, dataDir: c.config.dataDir });
       const params = (await context?.params) ?? {};
       const url = new URL(req.url);
+      if (url.port) (globalThis as { __agenticPort?: string }).__agenticPort = url.port; // for the MCP address handed to Claude
       const result = await handler({ req, params, c, url, body: () => readJson(req, opts.maxBody ?? DEFAULT_MAX_BODY) });
       // Audit every successful state change (method + path only: never bodies or secrets).
       if (req.method !== "GET" && !url.pathname.startsWith("/api/auth/") && !url.pathname.endsWith("/search")) audit(c.config.dataDir, "api", { method: req.method, path: url.pathname.slice(0, 300) });

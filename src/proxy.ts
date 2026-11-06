@@ -2,8 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getConfig } from "@/lib/server/config";
 import { buildCsp, isAllowedHost, isAuthorized, loadOrCreateToken, SECURITY_HEADERS } from "@/lib/server/security";
 
-/** Reachable without a session: the login page, the passkey login ceremony and the OAuth redirect (authorised by its single-use state). */
-const PUBLIC = new Set(["/auth", "/login", "/api/auth/status", "/api/auth/passkey/login/options", "/api/auth/passkey/login/verify", "/api/integrations/oauth/callback"]);
+/** Reachable without a session: the login page, the passkey login ceremony, the OAuth redirect (authorised by its single-use state) and Agentic's own MCP endpoint (it checks its own token). */
+const PUBLIC = new Set(["/auth", "/login", "/api/auth/status", "/api/auth/passkey/login/options", "/api/auth/passkey/login/verify", "/api/integrations/oauth/callback", "/api/agentic-mcp"]);
 
 /**
  * First line of defence for every request:
