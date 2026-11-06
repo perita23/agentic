@@ -396,6 +396,16 @@ try {
   await page.keyboard.down("Space");
   await page.getByTestId("voice-text").getByText("hola claude, resume la tarea").waitFor({ timeout: 5000 });
   check((await chatBox.locator("xpath=ancestor::*[@data-composer]").getByTestId("voice-text").count()) === 1, "while it listens, the transcript shows inside the message box itself (no floating bar)");
+  const longOv = await page.evaluate(() => {
+    const t = document.querySelector("[data-testid=voice-text]");
+    const box = t.closest("[data-composer]");
+    const inner = t.firstElementChild;
+    inner.textContent = "una frase muy larga que sigue y sigue sin parar ".repeat(20);
+    const r = box.getBoundingClientRect();
+    const tr = t.getBoundingClientRect();
+    return { page: document.documentElement.scrollWidth - document.documentElement.clientWidth, box: box.scrollWidth - box.clientWidth, inside: tr.left >= r.left - 1 && tr.right <= r.right + 1 };
+  });
+  check(longOv.page <= 1 && longOv.box <= 1 && longOv.inside, `a long dictation stays inside the message box ${JSON.stringify(longOv)}`);
   await shot("08-voice-listening");
   await page.keyboard.up("Space");
   await page.waitForFunction(() => document.querySelector("textarea[aria-label='Mensaje para Claude']").value === "hola claude, resume la tarea");

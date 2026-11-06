@@ -324,12 +324,25 @@ const hint = (mode: "hold" | "click") => (mode === "hold" ? "Suelta Espacio" : "
  * Listening, inside the message box itself: a quiet line with the bars and what is being said, and the box's border
  * lets a thin line of colour run along it (globals.css, `[data-composer]`). Put one in every message box.
  */
+/** What is being heard, on one line that always shows the END (the newest words) and fades out on the left. */
+function LiveText({ v, className }: { v: VoiceCtx; className?: string }) {
+  const empty = !v.text;
+  return (
+    <span
+      data-testid="voice-text"
+      className={cn("flex min-w-0 justify-end overflow-hidden", !empty && "[mask-image:linear-gradient(to_right,transparent,#000_2rem)]", empty ? "justify-start text-muted-foreground" : "text-foreground/80", className)}
+    >
+      <span className="shrink-0 whitespace-nowrap">{v.text || (v.phase === "starting" ? "Activando el micrófono…" : "Te escucho…")}</span>
+    </span>
+  );
+}
+
 export function VoiceInline() {
   const id = React.useId();
   const v = useVoice();
   const mine = v.phase !== "idle" && v.slot === id;
   return (
-    <div data-voice-slot={id}>
+    <div data-voice-slot={id} className="min-w-0 max-w-full">
       <AnimatePresence initial={false}>
         {mine && (
           <motion.div
@@ -345,9 +358,7 @@ export function VoiceInline() {
           >
             <div className="flex items-center gap-2.5 px-4 py-1.5 text-sm">
               <VoiceBars level={v.level} />
-              <span className={cn("min-w-0 flex-1 truncate", v.text ? "text-foreground/80" : "text-muted-foreground")} data-testid="voice-text">
-                {v.text || (v.phase === "starting" ? "Activando el micrófono…" : "Te escucho…")}
-              </span>
+              <LiveText v={v} className="flex-1" />
               <span className="shrink-0 text-[11px] text-muted-foreground">{hint(v.mode)}</span>
             </div>
           </motion.div>
@@ -376,9 +387,7 @@ function VoiceFloating({ v }: { v: VoiceCtx }) {
         >
           <div className="flex max-w-md items-center gap-2.5 rounded-full border bg-popover/95 px-3.5 py-1.5 text-sm shadow-lg backdrop-blur">
             <VoiceBars level={v.level} />
-            <span className={cn("min-w-0 truncate", v.text ? "text-foreground/80" : "text-muted-foreground")} data-testid="voice-text">
-              {v.text || (v.phase === "starting" ? "Activando el micrófono…" : "Te escucho…")}
-            </span>
+            <LiveText v={v} className="max-w-[18rem]" />
             <span className="shrink-0 text-[11px] text-muted-foreground">{hint(v.mode)}</span>
           </div>
         </motion.div>
