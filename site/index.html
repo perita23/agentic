@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Agentic — la consola local para Claude Code</title>
+    <title>Agentic — Morphy y tus tareas del día</title>
     <meta
       name="description"
-      content="Mira lo que hace Claude Code en tiempo real: sesiones, tareas, pull requests, voz y una IA local. Una app para macOS que se ejecuta en tu Mac."
+      content="Agentic es una herramienta para organizar tus tareas diarias con Morphy, la bola que ves trabajar. Con tu plan de Claude (suscripción o cualquier plan) o en local con Ollama. App para macOS."
     />
     <meta name="theme-color" content="#0a0a0a" />
     <meta
@@ -15,10 +15,10 @@
     />
     <meta name="referrer" content="no-referrer" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Agentic — la consola local para Claude Code" />
+    <meta property="og:title" content="Agentic — Morphy y tus tareas del día" />
     <meta
       property="og:description"
-      content="Esa bola es Claude trabajando. Sesiones, tareas, PRs, voz y una IA local, todo en tu Mac."
+      content="Organiza tus tareas diarias con Morphy: con tu plan de Claude, o en local con Ollama. Todo en tu Mac."
     />
     <meta property="og:image" content="assets/og.png" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -34,6 +34,7 @@
         <span>Agentic</span>
       </a>
       <nav aria-label="Principal">
+        <a href="#motor">Con qué funciona</a>
         <a href="#funciones">Funciones</a>
         <a href="#voz">Voz e IA local</a>
         <a href="#seguridad">Seguridad</a>
@@ -44,14 +45,14 @@
     <main id="top">
       <!-- La bola, haciendo lo suyo -->
       <section class="hero" aria-labelledby="hero-title">
-        <div class="hero-orb" id="hero-orb" role="img" aria-label="La bola de Agentic: cambia de forma y de color según lo que hace Claude"></div>
+        <div class="hero-orb" id="hero-orb" role="img" aria-label="Morphy, la bola de Agentic: cambia de forma y de color según lo que está haciendo"></div>
         <div class="status" id="hero-status" role="status" aria-live="off">
           <span class="orb-text" data-state="thinking">Pensando…</span>
         </div>
-        <h1 id="hero-title">Esa bola es <span class="grad">Claude trabajando</span></h1>
+        <h1 id="hero-title">Conoce a <span class="grad">Morphy</span></h1>
         <p class="lead">
-          Agentic es la consola local para Claude Code: ves en directo lo que piensa, lee, edita
-          y ejecuta, lanzas tareas, revisas pull requests y hablas con él. Todo en tu Mac.
+          Agentic es una herramienta para <strong>organizar tus tareas diarias</strong> con Morphy, la bola que ves trabajar.
+          Úsala con tu plan de Claude, sea una suscripción o cualquier otro, o en local con Ollama. Todo en tu Mac.
         </p>
         <div class="cta">
           <a id="dl-primary" class="btn primary" href="https://github.com/perita23/agentic-releases/releases/latest/download/Agentic-arm64.dmg">
@@ -62,7 +63,7 @@
         </div>
         <p class="meta" id="release-meta">macOS 13 o superior · Apple Silicon e Intel · se actualiza sola</p>
 
-        <div class="chips" role="group" aria-label="Cambia el estado de la bola">
+        <div class="chips" role="group" aria-label="Cambia el estado de Morphy">
           <button type="button" class="chip" data-state="thinking" aria-pressed="true">Pensando</button>
           <button type="button" class="chip" data-state="reading" aria-pressed="false">Leyendo</button>
           <button type="button" class="chip" data-state="searching" aria-pressed="false">Buscando</button>
@@ -71,20 +72,52 @@
           <button type="button" class="chip" data-state="writing" aria-pressed="false">Escribiendo</button>
           <button type="button" class="chip" data-state="waiting" aria-pressed="false">Esperándote</button>
         </div>
-        <p class="hint">Es la bola de la app. Toca un estado, o espera: cambia sola.</p>
+        <p class="hint">Así se mueve Morphy según lo que hace. Toca un estado, o espera: cambia sola.</p>
+      </section>
+
+      <!-- Con qué funciona -->
+      <section id="motor" class="engine" aria-labelledby="engine-title">
+        <div class="engine-head" data-reveal>
+          <p class="kicker">Qué es Agentic</p>
+          <h2 id="engine-title">Una herramienta para organizar tu día con Morphy</h2>
+          <p class="sub">
+            Apuntas lo que tienes que hacer, Morphy lo pone en marcha y tú ves cómo avanza. Tú eliges con qué trabaja.
+          </p>
+        </div>
+        <div class="engine-grid" data-reveal>
+          <article class="engine-card">
+            <h3>Con tu plan de Claude</h3>
+            <p>
+              Funciona con tu <a href="https://code.claude.com">Claude Code</a>, con la suscripción que ya tengas
+              (Pro, Max, Team…) o con cualquier otro plan, también el de pago por uso con clave de API.
+              Agentic no te cobra por el modelo ni lo sustituye: organiza el trabajo que le das a Claude.
+            </p>
+          </article>
+          <article class="engine-card">
+            <h3>En local, con Ollama</h3>
+            <p>
+              Conecta un modelo de <a href="https://ollama.com">Ollama</a> y se queda en tu Mac: corrige cada palabra
+              mientras escribes y mejora y ordena tus peticiones antes de enviarlas. Sin cuentas, sin internet para eso
+              y sin que tu texto salga de tu equipo.
+            </p>
+          </article>
+        </div>
+        <p class="engine-note" data-reveal>
+          Hoy las tareas largas (tocar código, ejecutar comandos) las hace Claude Code; Ollama se ocupa de escribir y pulir.
+        </p>
       </section>
 
       <!-- Cada gesto de Claude -->
       <section id="funciones" class="story" aria-labelledby="story-title">
         <div class="story-head" data-reveal>
           <p class="kicker">Qué hace</p>
-          <h2 id="story-title">Cada gesto de Claude, a la vista</h2>
-          <p class="sub">Según lo que haces en Agentic, la bola cambia de forma. Baja y míralo.</p>
+          <h2 id="story-title">Cada gesto de Morphy, a la vista</h2>
+          <p class="sub">Según lo que haces en Agentic, Morphy cambia de forma. Baja y míralo.</p>
         </div>
         <div class="story-grid">
           <div class="story-orb">
             <div class="sticky">
-              <div class="story-orb-ball" id="story-orb" role="img" aria-label="La bola, con el estado de la función que estás leyendo"></div>
+              <div class="story-orb-ball" id="story-orb" role="img" aria-label="Morphy, con el estado de la función que estás leyendo"></div>
               <div class="status small" id="story-status" role="status" aria-live="off">
                 <span class="orb-text" data-state="reading">Leyendo ficheros…</span>
               </div>
@@ -94,7 +127,7 @@
             <article class="step" data-state="reading" data-label="Leyendo ficheros…" data-reveal>
               <h3>Sesiones en vivo</h3>
               <p>
-                Todas tus conversaciones de <code>~/.claude</code> con su estado en tiempo real,
+                Todas tus conversaciones de Claude Code (<code>~/.claude</code>) con su estado en tiempo real,
                 transcripciones, tokens consumidos y búsqueda de texto completo.
               </p>
             </article>
@@ -106,10 +139,10 @@
               </p>
             </article>
             <article class="step" data-state="thinking" data-label="Pensando…" data-reveal>
-              <h3>Tareas autónomas</h3>
+              <h3>Tus tareas del día</h3>
               <p>
-                Un Kanban con plantillas y una cola que ejecuta tus tareas una a una, con límites,
-                presupuesto y parada ante fallos. Tú decides cuánta libertad tiene.
+                Apunta lo que tienes que hacer en un Kanban, con plantillas, y Morphy las ejecuta una a una con
+                límites, presupuesto y parada ante fallos. Tú decides cuánta libertad tiene.
               </p>
               <figure class="shot">
                 <img loading="lazy" src="assets/tasks.webp" alt="Tablero Kanban de tareas de Agentic" width="1600" height="1000" />
@@ -155,14 +188,14 @@
       <section id="voz" class="voice" aria-labelledby="voice-title">
         <div class="voice-copy" data-reveal>
           <p class="kicker">Voz e IA local</p>
-          <h2 id="voice-title">Háblale. Te responde.</h2>
+          <h2 id="voice-title">Háblale a Morphy. Te responde.</h2>
           <ul class="ticks">
             <li>
               <strong>Dictado.</strong> Mantén Espacio y habla: tus palabras aparecen en la caja según las
               dices, con el reconocimiento de voz de Apple, en el dispositivo.
             </li>
             <li>
-              <strong>Modo voz.</strong> La pantalla queda solo con la bola, que crece con tu voz y con la de
+              <strong>Modo voz.</strong> La pantalla queda solo con Morphy, que crece con tu voz y con la de
               Claude. Empieza a leerte la respuesta mientras la escribe, con las voces naturales de macOS.
             </li>
             <li>
@@ -174,7 +207,7 @@
         </div>
         <div class="voice-shots" data-reveal>
           <figure class="shot orb-shot">
-            <img loading="lazy" src="assets/voice-stage.webp" alt="El modo voz de Agentic: solo la bola, el estado «Te escucho…» y las palabras que dices" width="1200" height="927" />
+            <img loading="lazy" src="assets/voice-stage.webp" alt="El modo voz de Agentic: solo Morphy, el estado «Te escucho…» y las palabras que dices" width="1200" height="927" />
           </figure>
           <figure class="shot slim">
             <img loading="lazy" src="assets/word-morph.webp" alt="Una palabra mal escrita se corrige en el sitio con un efecto de transformación" width="1200" height="207" />
@@ -207,9 +240,9 @@
       <!-- Descarga -->
       <section id="descargar" class="download" aria-labelledby="dl-title">
         <div class="download-card" data-reveal>
-          <div class="download-orb" id="download-orb" role="img" aria-label="La bola, tranquila: terminado"></div>
-          <h2 id="dl-title">Ponla a trabajar</h2>
-          <p class="sub">Gratis para usar y descargar. Para Mac, con Apple Silicon o Intel.</p>
+          <div class="download-orb" id="download-orb" role="img" aria-label="Morphy, tranquilo: terminado"></div>
+          <h2 id="dl-title">Pon a Morphy a trabajar</h2>
+          <p class="sub">Gratis para usar y descargar. Para Mac, con Apple Silicon o Intel. Necesitas tu plan de Claude Code, o Ollama para la parte local.</p>
           <div class="cta">
             <a id="dl-arm" class="btn primary big" href="https://github.com/perita23/agentic-releases/releases/latest/download/Agentic-arm64.dmg">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.71-3.18-1.73-1.35-.14-2.64.8-3.33.8-.69 0-1.74-.78-2.86-.76-1.47.02-2.83.86-3.59 2.17-1.53 2.66-.39 6.6 1.1 8.76.73 1.05 1.6 2.24 2.73 2.2 1.1-.05 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.07 2.65-2.13.84-1.22 1.18-2.4 1.2-2.46-.03-.01-2.3-.88-2.3-3.52ZM14.2 6.13c.6-.74 1.01-1.75.9-2.77-.87.04-1.93.58-2.55 1.31-.56.65-1.05 1.69-.92 2.69.97.07 1.96-.49 2.57-1.23Z" /></svg>
@@ -226,7 +259,7 @@
               La primera vez, <strong>clic derecho → Abrir</strong> (la app aún no está notarizada por Apple). O en Terminal:
               <code>xattr -dr com.apple.quarantine /Applications/Agentic.app</code>
             </li>
-            <li>Necesitas <a href="https://code.claude.com">Claude Code</a> instalado (<code>claude</code> en tu terminal).</li>
+            <li>Para que Morphy ejecute tareas, necesitas <a href="https://code.claude.com">Claude Code</a> instalado (<code>claude</code> en tu terminal), con cualquier plan. Para corregir y mejorar lo que escribes en local, <a href="https://ollama.com">Ollama</a> (opcional).</li>
             <li>Las siguientes versiones se instalan solas desde la propia app.</li>
           </ol>
           <p class="meta"><a href="https://github.com/perita23/agentic-releases/releases">Todas las versiones y novedades</a></p>
