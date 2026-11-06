@@ -50,6 +50,30 @@ describe("what to do with the dictionary's candidates", () => {
   });
 });
 
+describe("technical words in a sentence of another language", () => {
+  it("a typo of «prompt» in Spanish is «prompt», not a Spanish word that happens to be near", async () => {
+    const c = ctx();
+    expect(await word(c, "promt", "mejora este")).toEqual({ word: "prompt", changed: true, source: "dictionary" });
+    expect(await word(c, "Promt", "")).toMatchObject({ word: "Prompt", changed: true });
+    expect(await word(c, "comit", "haz un")).toMatchObject({ word: "commit", changed: true });
+    expect(await word(c, "deploi", "el")).toMatchObject({ word: "deploy", changed: true });
+    expect(await word(c, "brach", "la")).toMatchObject({ word: "branch", changed: true });
+  });
+  it("the nearest candidate wins whatever its language; on a tie the language being written does", () => {
+    expect(decide("promt", ["arome", "aromo", "promo", "prom", "prompt"], new Set(["arome", "aromo"]))).toEqual({ kind: "fix", to: "prompt" });
+    const es = new Set(["casa"]);
+    expect(decide("casx", ["casa", "cask"], es)).toEqual({ kind: "fix", to: "casa" });
+  });
+  it("the person's own words are left alone and become the target of their typos", async () => {
+    const c = ctx();
+    expect(await word(c, "Morphi", "habla con")).toMatchObject({ changed: false }); // a capital in a sentence: a name
+    c.spell.set({ ignore: ["quuxiel"] });
+    expect(await word(c, "quuxiel", "abre")).toMatchObject({ word: "quuxiel", changed: false });
+    expect(await word(c, "quuxeil", "abre")).toMatchObject({ word: "quuxiel", changed: true });
+    expect(() => c.spell.set({ ignore: ["dos palabras"] })).toThrow();
+  });
+});
+
 describe("spelling with the dictionaries", () => {
   it("fixes clear mistakes in Spanish and in English, without any model", async () => {
     const c = ctx();
@@ -102,7 +126,7 @@ describe("spelling with the dictionaries", () => {
 describe("the settings", () => {
   it("start off, carry over the old 'word by word' of the local model, and validate", () => {
     const a = ctx();
-    expect(a.spell.get()).toEqual({ mode: "off", lang: "auto", useModel: true });
+    expect(a.spell.get()).toEqual({ mode: "off", lang: "auto", useModel: true, ignore: [] });
     const b = ctx();
     b.ollama.set({ autocorrect: "words" });
     expect(b.spell.get().mode).toBe("words"); // not set yet in this store: it follows what was there
@@ -110,6 +134,6 @@ describe("the settings", () => {
     expect(b.spell.get().mode).toBe("off");
     expect(() => b.spell.set({ lang: "fr" })).toThrow();
     expect(() => b.spell.set({ mode: "siempre" })).toThrow();
-    expect(b.spell.set({ lang: "en", mode: "words" })).toEqual({ mode: "words", lang: "en", useModel: true });
+    expect(b.spell.set({ lang: "en", mode: "words" })).toEqual({ mode: "words", lang: "en", useModel: true, ignore: [] });
   });
 });

@@ -10,7 +10,7 @@ import { api, refresh, useApi } from "@/lib/api";
 import { errorMessage } from "./common";
 
 interface View {
-  settings: { mode: "off" | "words"; lang: "auto" | "es" | "en"; useModel: boolean };
+  settings: { mode: "off" | "words"; lang: "auto" | "es" | "en"; useModel: boolean; ignore: string[] };
   dictionaries: { es: boolean; en: boolean };
 }
 interface OllamaView {
@@ -64,6 +64,25 @@ export function SpellCard() {
             <span className="block text-xs text-muted-foreground">{model ? "Cuando el diccionario propone varias opciones («corrije» → corrige, corrijo, corrija), el modelo elige la que encaja en la frase. Nunca escribe palabras por su cuenta." : "Conecta un modelo de Ollama (más abajo) para que elija entre las opciones cuando hay varias. Sin él, esas palabras se dejan como las escribiste."}</span>
           </span>
           <Switch aria-label="Usar la IA local para los casos dudosos" checked={s.useModel} disabled={s.mode !== "words" || !model} onCheckedChange={(on) => void save({ useModel: on })} />
+        </label>
+        <label className="grid gap-1.5">
+          <span>
+            Palabras que no se corrigen
+            <span className="block text-xs text-muted-foreground">Nombres, jerga o marcas, separados por espacios o comas. Tampoco se tocan, y las erratas de ellas se corrigen a ellas.</span>
+          </span>
+          <textarea
+            data-no-assist
+            aria-label="Palabras que no se corrigen"
+            rows={2}
+            defaultValue={s.ignore.join(" ")}
+            disabled={s.mode !== "words"}
+            placeholder="Morphy Agentic Obsidian…"
+            onBlur={(e) => {
+              const words = [...new Set(e.target.value.split(/[\s,;]+/).filter(Boolean))].slice(0, 500);
+              if (words.join(" ") !== s.ignore.join(" ")) void save({ ignore: words });
+            }}
+            className="min-h-14 w-full resize-y rounded-md border bg-transparent p-2 text-sm"
+          />
         </label>
         {missing && <p className="text-xs text-destructive">Faltan diccionarios en esta instalación ({[!data.dictionaries.es && "español", !data.dictionaries.en && "inglés"].filter(Boolean).join(", ")}).</p>}
         <p className="text-xs text-muted-foreground">Diccionarios Hunspell (los de LibreOffice y Firefox): español (GPL/LGPL/MPL) e inglés (MIT/BSD). Las faltas más típicas del español («tambien», «exelente»…) también se arreglan al instante, sin consultar nada.</p>

@@ -20,6 +20,8 @@ export const spellSettingsSchema = z.object({
   lang: z.enum(["auto", "es", "en"]).default("auto"),
   /** Let the local model choose between candidates when the context decides. */
   useModel: z.boolean().default(true),
+  /** Words that are never corrected (names, jargon): they also become valid targets for the fixes. */
+  ignore: z.array(z.string().min(1).max(60).regex(/^\S+$/)).max(500).default([]),
 });
 export type SpellSettings = z.infer<typeof spellSettingsSchema>;
 
@@ -32,6 +34,19 @@ export const spellWordSchema = z.object({
 export function defaultDictDir() {
   return path.join(process.cwd(), "public", "dict");
 }
+
+/**
+ * Words of the work Agentic is for. In a Spanish sentence a typo of «prompt» or «commit» is meant as that, not as one
+ * of the Spanish words that happen to be as close (promt → «aromo»).
+ */
+const TECH = new Set(
+  (
+    "prompt prompts commit commits deploy deploys branch branches merge rebase stash push pull checkout token tokens endpoint endpoints build builds release releases hotfix refactor debug debugging script scripts frontend backend fullstack " +
+    "dashboard framework workflow workflows pipeline pipelines repo repos issue issues feature bug bugs fix fixes patch plugin plugins timeout callback async await middleware webhook webhooks " +
+    "template templates agent agents session sessions chat chats worktree diff diffs lint linter test tests mock mocks cache config setup login logout username password email api apis cli json yaml markdown " +
+    "docker kubernetes server servers client clients database query queries schema migration migrations render hook hooks state props component components router route routes"
+  ).split(/\s+/),
+);
 
 const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
 
@@ -51,8 +66,11 @@ export function distance(a: string, b: string): number {
 
 export type Verdict = { kind: "fine" } | { kind: "fix"; to: string } | { kind: "choose"; options: string[] } | { kind: "unknown" };
 
-/** What to do with a misspelt word given the dictionary's candidates: one sure fix, a choice, or nothing. */
-export function decide(word: string, suggestions: string[]): Verdict {
+/**
+ * What to do with a misspelt word given the dictionaries' candidates: one sure fix, a choice, or nothing.
+ * `preferred` are the candidates of the language being written: they win ties against the other language's.
+ */
+export function decide(word: string, suggestions: string[], preferred?: ReadonlySet<string>): Verdict {
   const w = word.toLowerCase();
   const near = suggestions.filter((s) => distance(w, s.toLowerCase()) <= Math.max(2, Math.ceil(w.length * 0.4)));
   if (!near.length) return { kind: "unknown" };
@@ -60,12 +78,18 @@ export function decide(word: string, suggestions: string[]): Verdict {
   const accent = near.filter((s) => norm(s) === norm(w) && s.toLowerCase() !== w);
   if (accent.length) return { kind: "fix", to: accent[0]! };
   const ranked = near.map((s) => ({ s, d: distance(w, s.toLowerCase()) })).sort((x, y) => x.d - y.d);
-  const best = ranked.filter((r) => r.d === ranked[0]!.d);
+  let best = ranked.filter((r) => r.d === ranked[0]!.d);
+  const tech = best.filter((r) => TECH.has(r.s.toLowerCase()));
+  if (tech.length === 1 && ranked[0]!.d <= 2) return { kind: "fix", to: tech[0]!.s };
+  if (preferred) {
+    const mine = best.filter((r) => preferred.has(r.s));
+    if (mine.length && mine.length < best.length) best = mine;
+  }
   if (best.length === 1 && ranked[0]!.d <= 2) return { kind: "fix", to: best[0]!.s };
   // Two letters swapped («recieve») is by far the commonest slip: among equals, the only swap wins.
   const swaps = best.filter((r) => levenshtein(w, r.s.toLowerCase()) > r.d);
   if (swaps.length === 1 && ranked[0]!.d <= 2) return { kind: "fix", to: swaps[0]!.s };
-  return { kind: "choose", options: ranked.slice(0, 5).map((r) => r.s) };
+  return { kind: "choose", options: [...best, ...ranked.filter((r) => !best.includes(r))].slice(0, 5).map((r) => r.s) };
 }
 
 /** Same capital letters as the word that was typed. */
@@ -110,6 +134,17 @@ export class SpellService {
     return this.spellers.get(l) ?? null;
   }
 
+  private learned = new Set<string>();
+  /** The person's own words are known to both dictionaries (so they are also what typos of them are fixed to). */
+  private learn(words: string[]) {
+    for (const w of words) {
+      if (this.learned.has(w)) continue;
+      this.learned.add(w);
+      this.speller("es")?.add(w);
+      this.speller("en")?.add(w);
+    }
+  }
+
   /** Which language the words around are in: the one whose dictionary knows more of them. */
   detect(context: string): SpellLang {
     const es = this.speller("es");
@@ -128,6 +163,7 @@ export class SpellService {
 
   /** Is this word right in any of the languages? */
   private known(word: string) {
+    this.learn(this.get().ignore);
     return (["es", "en"] as const).some((l) => this.speller(l)?.correct(word) || this.speller(l)?.correct(word.toLowerCase()));
   }
 
@@ -139,10 +175,16 @@ export class SpellService {
     // A capital letter in the middle of a sentence is a name: not ours to correct.
     if (word[0] !== word[0]!.toLowerCase() && before.trim() && !/[.!?¿¡\n]\s*$/.test(before)) return same;
     const settings = this.get();
+    if (settings.ignore.some((w) => w.toLowerCase() === word.toLowerCase())) return same;
     const lang: SpellLang = settings.lang === "auto" ? this.detect(`${before} ${word}`) : settings.lang;
     const sp = this.speller(lang);
     if (!sp) return same;
-    const v = decide(word, sp.suggest(word.toLowerCase() === word ? word : word.toLowerCase()));
+    this.learn(settings.ignore);
+    const probe = word.toLowerCase();
+    const mine = sp.suggest(probe);
+    // Automatic: a word of the other language (a typo of «prompt» in a Spanish sentence) competes with the nearest ones.
+    const other = settings.lang === "auto" ? (this.speller(lang === "es" ? "en" : "es")?.suggest(probe) ?? []) : [];
+    const v = decide(word, [...new Set([...mine, ...other])], new Set(mine));
     if (v.kind === "fix") return { word: sameCase(word, v.to), changed: true, source: "dictionary" };
     if (v.kind === "choose" && settings.useModel) {
       const o = this.ollama.get();
