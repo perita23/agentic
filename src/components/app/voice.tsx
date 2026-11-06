@@ -1,0 +1,410 @@
+"use client";
+
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import { AnimatePresence, motion, useMotionValue, useReducedMotion, type MotionValue } from "motion/react";
+import { MicIcon } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { useApi } from "@/lib/api";
+import { pickEngine, resolveLang, type VoiceEngine, type VoiceSession } from "@/lib/voice/engine";
+import { dictationTarget, insertAtCaret, isTextField, sendButtonFor, trackFocus, type TextField } from "@/lib/voice/insert";
+import { voiceColor } from "@/lib/voice/palette";
+import { cn } from "@/lib/utils";
+
+export interface VoicePrefs {
+  enabled: boolean;
+  holdSpace: boolean;
+  lang: string;
+  autoSend: boolean;
+}
+export const DEFAULT_VOICE: VoicePrefs = { enabled: true, holdSpace: true, lang: "auto", autoSend: false };
+
+type Phase = "idle" | "starting" | "listening" | "finishing";
+interface VoiceCtx {
+  phase: Phase;
+  /** null while it is being found out. */
+  available: boolean | null;
+  reason?: string;
+  engine?: "native" | "web";
+  mode: "hold" | "click";
+  text: string;
+  level: MotionValue<number>;
+  /** The message box (its `VoiceInline`) that is listening, or null when the text has no box to go to. */
+  slot: string | null;
+  toggle(): void;
+  finish(): void;
+  cancel(): void;
+}
+const NOOP: VoiceCtx = { phase: "idle", available: false, mode: "click", text: "", level: { get: () => 0 } as unknown as MotionValue<number>, slot: null, toggle() {}, finish() {}, cancel() {} };
+const Ctx = React.createContext<VoiceCtx>(NOOP);
+export const useVoice = () => React.useContext(Ctx);
+
+const HOLD_MS = 350;
+const SILENCE_MS = 9000;
+
+/** The field a Space press would type into when it is empty: there, holding Space dictates instead. */
+function holdTarget(): "page" | "empty-field" | null {
+  const a = document.activeElement as HTMLElement | null;
+  if (!a || a === document.body) return "page";
+  if (isTextField(a)) return a.value.trim() === "" ? "empty-field" : null;
+  if (a.isContentEditable || a.closest("[role=dialog], [role=menu], [role=listbox]") || ["BUTTON", "A", "SELECT", "INPUT", "TEXTAREA", "SUMMARY"].includes(a.tagName)) return null;
+  return "page";
+}
+
+/** Dictation for the whole app: hold Space, or press the microphone; the text goes into the field you were in. */
+export function VoiceProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const { data } = useApi<{ voice?: Partial<VoicePrefs> }>("/api/prefs", { revalidateOnFocus: false });
+  const prefs = React.useMemo(() => ({ ...DEFAULT_VOICE, ...(data?.voice ?? {}) }), [data]);
+  const prefsRef = React.useRef(prefs);
+  const [phase, setPhaseState] = React.useState<Phase>("idle");
+  const phaseRef = React.useRef<Phase>("idle");
+  const [mode, setMode] = React.useState<"hold" | "click">("click");
+  const [text, setText] = React.useState("");
+  const [slot, setSlot] = React.useState<string | null>(null);
+  const textRef = React.useRef("");
+  const [info, setInfo] = React.useState<{ available: boolean | null; reason?: string; engine?: "native" | "web" }>({ available: null });
+  const level = useMotionValue(0);
+  const engineRef = React.useRef<VoiceEngine | null>(null);
+  const sessionRef = React.useRef<VoiceSession | null>(null);
+  const targetRef = React.useRef<TextField | null>(null);
+  const cancelledRef = React.useRef(false);
+  const wantFinish = React.useRef(false);
+  const silenceTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const finishTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const modeRef = React.useRef<"hold" | "click">("click");
+
+  React.useEffect(() => {
+    prefsRef.current = prefs;
+  }, [prefs]);
+
+  const setPhase = (p: Phase) => {
+    phaseRef.current = p;
+    setPhaseState(p);
+  };
+
+  // Which engine can dictate here (found out once).
+  React.useEffect(() => {
+    let live = true;
+    void pickEngine().then(({ engine, reason }) => {
+      if (!live) return;
+      engineRef.current = engine;
+      setInfo({ available: !!engine, reason, engine: engine?.id });
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  React.useEffect(() => trackFocus(), []);
+
+  const clearTimers = () => {
+    if (silenceTimer.current) clearTimeout(silenceTimer.current);
+    if (finishTimer.current) clearTimeout(finishTimer.current);
+    silenceTimer.current = finishTimer.current = null;
+  };
+
+  /** What was heard goes where it belongs: the field you were in, or a new chat when there is none. */
+  const deliver = (t: string) => {
+    const field = targetRef.current?.isConnected ? targetRef.current : dictationTarget();
+    const put = (f: TextField) => {
+      insertAtCaret(f, t);
+      if (prefsRef.current.autoSend) setTimeout(() => sendButtonFor(f)?.click(), 150);
+    };
+    if (field) return put(field);
+    router.push("/chat");
+    const t0 = Date.now();
+    const timer = setInterval(() => {
+      const f = document.querySelector<TextField>("textarea[aria-label='Mensaje para Claude']");
+      if (f) {
+        clearInterval(timer);
+        put(f);
+      } else if (Date.now() - t0 > 5000) clearInterval(timer);
+    }, 150);
+  };
+
+  const complete = () => {
+    clearTimers();
+    sessionRef.current = null;
+    const t = textRef.current.trim();
+    const cancelled = cancelledRef.current;
+    setPhase("idle");
+    level.set(0);
+    if (!cancelled && t) deliver(t);
+  };
+
+  const finish = () => {
+    if (phaseRef.current === "starting") {
+      wantFinish.current = true;
+      return;
+    }
+    if (phaseRef.current !== "listening") return;
+    setPhase("finishing");
+    sessionRef.current?.stop();
+    // A result normally follows within a moment; never wait more than a few seconds.
+    finishTimer.current = setTimeout(complete, 4000);
+  };
+
+  const cancel = () => {
+    if (phaseRef.current === "idle") return;
+    cancelledRef.current = true;
+    sessionRef.current?.cancel();
+    complete();
+  };
+
+  const armSilence = () => {
+    if (silenceTimer.current) clearTimeout(silenceTimer.current);
+    // Started with the microphone button, it stops by itself after a while of silence.
+    if (modeRef.current === "click") silenceTimer.current = setTimeout(finish, SILENCE_MS);
+  };
+
+  const start = async (m: "hold" | "click") => {
+    if (phaseRef.current !== "idle" || !prefsRef.current.enabled) return;
+    let engine = engineRef.current;
+    if (!engine) {
+      const picked = await pickEngine();
+      engine = engineRef.current = picked.engine;
+      if (!engine) return void toast.error(picked.reason ?? "El dictado no está disponible");
+    }
+    cancelledRef.current = false;
+    wantFinish.current = false;
+    textRef.current = "";
+    setText("");
+    modeRef.current = m;
+    setMode(m);
+    targetRef.current = dictationTarget();
+    setSlot(targetRef.current?.closest("[data-composer]")?.querySelector("[data-voice-slot]")?.getAttribute("data-voice-slot") ?? null);
+    setPhase("starting");
+    let smooth = 0;
+    try {
+      sessionRef.current = await engine.start(resolveLang(prefsRef.current.lang), {
+        onText: (t) => {
+          textRef.current = t;
+          setText(t);
+          armSilence();
+        },
+        onLevel: (v) => {
+          smooth = v > smooth ? v : smooth * 0.8 + v * 0.2;
+          level.set(smooth);
+          if (v > 0.15) armSilence();
+        },
+        onError: (msg) => toast.error(msg),
+        onEnd: complete,
+      });
+    } catch (e) {
+      setPhase("idle");
+      return void toast.error(e instanceof Error ? e.message : "No se pudo iniciar el dictado");
+    }
+    if (cancelledRef.current) {
+      sessionRef.current.cancel();
+      return;
+    }
+    setPhase("listening");
+    armSilence();
+    if (wantFinish.current) finish();
+  };
+
+  // Hold Space (when it would only type a space, or scroll): it listens while it is held.
+  React.useEffect(() => {
+    let holdTimer: ReturnType<typeof setTimeout> | null = null;
+    let holding: "page" | "empty-field" | null = null;
+    let started = false;
+    const onDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && phaseRef.current !== "idle") {
+        e.preventDefault();
+        cancel();
+        return;
+      }
+      if (e.code !== "Space" || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.isComposing) return;
+      const p = prefsRef.current;
+      if (!p.enabled || !p.holdSpace || engineRefAvailable() === false) return;
+      if (phaseRef.current !== "idle") {
+        // Already listening (started with the button): Space does not type meanwhile.
+        e.preventDefault();
+        return;
+      }
+      if (e.repeat) {
+        if (holding) e.preventDefault();
+        return;
+      }
+      const t = holdTarget();
+      if (!t) return;
+      holding = t;
+      started = false;
+      e.preventDefault();
+      holdTimer = setTimeout(() => {
+        started = true;
+        void start("hold");
+      }, HOLD_MS);
+    };
+    const onUp = (e: KeyboardEvent) => {
+      if (e.code !== "Space" || !holding) return;
+      if (holdTimer) clearTimeout(holdTimer);
+      const was = holding;
+      holding = null;
+      if (started) {
+        if (modeRef.current === "hold") finish();
+      } else if (was === "page") {
+        // A short tap on the page is still the usual Space: it scrolls.
+        window.scrollBy({ top: window.innerHeight * 0.85, behavior: "smooth" });
+      }
+    };
+    const onBlur = () => {
+      if (holdTimer) clearTimeout(holdTimer);
+      holding = null;
+      if (phaseRef.current !== "idle" && modeRef.current === "hold") cancel();
+    };
+    const engineRefAvailable = () => (engineRef.current ? true : info.available);
+    window.addEventListener("keydown", onDown, true);
+    window.addEventListener("keyup", onUp, true);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onDown, true);
+      window.removeEventListener("keyup", onUp, true);
+      window.removeEventListener("blur", onBlur);
+      if (holdTimer) clearTimeout(holdTimer);
+    };
+    // The handlers read everything through refs; they only need to know once the engine's availability is known.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [info.available]);
+
+  const toggle = () => {
+    if (phaseRef.current === "idle") void start("click");
+    else finish();
+  };
+
+  const ctx = React.useMemo<VoiceCtx>(
+    () => ({ phase, available: info.available, reason: info.reason, engine: info.engine, mode, text, level, slot, toggle, finish, cancel }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [phase, info, mode, text, slot],
+  );
+
+  return (
+    <Ctx.Provider value={ctx}>
+      {children}
+      <VoiceFloating v={ctx} />
+    </Ctx.Provider>
+  );
+}
+
+/** Tiny bars that follow your voice, in the orb's violet, coral and blue (their own colours: the orb is never touched). */
+function VoiceBars({ level, n = 16, height = 14, className }: { level: MotionValue<number>; n?: number; height?: number; className?: string }) {
+  const reduce = useReducedMotion();
+  const bars = React.useRef<(HTMLSpanElement | null)[]>([]);
+  React.useEffect(() => {
+    const hist = new Array<number>(n).fill(0);
+    let raf = 0;
+    let last = 0;
+    const tick = (now: number) => {
+      raf = requestAnimationFrame(tick);
+      if (now - last < 40) return;
+      last = now;
+      hist.push(reduce ? 0.2 : level.get());
+      hist.shift();
+      hist.forEach((h, i) => {
+        const el = bars.current[i];
+        if (el) el.style.transform = `scaleY(${0.16 + Math.min(1, h) * 0.84})`;
+      });
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [level, n, reduce]);
+  return (
+    <span aria-hidden className={cn("inline-flex shrink-0 items-center gap-[2px]", className)} style={{ height }}>
+      {Array.from({ length: n }, (_, i) => (
+        <span key={i} ref={(el) => void (bars.current[i] = el)} className="w-[2px] origin-center rounded-full" style={{ height, background: voiceColor(i / (n - 1)), transform: "scaleY(0.16)", transition: "transform 80ms linear" }} />
+      ))}
+    </span>
+  );
+}
+
+const hint = (mode: "hold" | "click") => (mode === "hold" ? "Suelta Espacio" : "Esc");
+
+/**
+ * Listening, inside the message box itself: a quiet line with the bars and what is being said, and the box's border
+ * lets a thin line of colour run along it (globals.css, `[data-composer]`). Put one in every message box.
+ */
+export function VoiceInline() {
+  const id = React.useId();
+  const v = useVoice();
+  const mine = v.phase !== "idle" && v.slot === id;
+  return (
+    <div data-voice-slot={id}>
+      <AnimatePresence initial={false}>
+        {mine && (
+          <motion.div
+            key="live"
+            data-voice-live
+            role="status"
+            aria-live="polite"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.22, ease: [0.22, 0.8, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="flex items-center gap-2.5 px-4 py-1.5 text-sm">
+              <VoiceBars level={v.level} />
+              <span className={cn("min-w-0 flex-1 truncate", v.text ? "text-foreground/80" : "text-muted-foreground")} data-testid="voice-text">
+                {v.text || (v.phase === "starting" ? "Activando el micrófono…" : "Te escucho…")}
+              </span>
+              <span className="shrink-0 text-[11px] text-muted-foreground">{hint(v.mode)}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/** With no message box to hold it (the page, a dialog…): one small quiet pill at the bottom. */
+function VoiceFloating({ v }: { v: VoiceCtx }) {
+  const open = v.phase !== "idle" && v.slot === null;
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="floating"
+          data-voice-live
+          role="status"
+          aria-live="polite"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 8 }}
+          transition={{ duration: 0.2, ease: [0.22, 0.8, 0.3, 1] }}
+          className="pointer-events-none fixed inset-x-0 bottom-5 z-[70] flex justify-center px-4"
+        >
+          <div className="flex max-w-md items-center gap-2.5 rounded-full border bg-popover/95 px-3.5 py-1.5 text-sm shadow-lg backdrop-blur">
+            <VoiceBars level={v.level} />
+            <span className={cn("min-w-0 truncate", v.text ? "text-foreground/80" : "text-muted-foreground")} data-testid="voice-text">
+              {v.text || (v.phase === "starting" ? "Activando el micrófono…" : "Te escucho…")}
+            </span>
+            <span className="shrink-0 text-[11px] text-muted-foreground">{hint(v.mode)}</span>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/** The microphone button: dictation without holding anything. Hidden where nothing can dictate. */
+export function VoiceButton({ className }: { className?: string }) {
+  const v = useVoice();
+  if (v.available === false) return null;
+  const on = v.phase !== "idle";
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      className={cn("rounded-full", on && "bg-accent text-foreground", className)}
+      aria-label="Dictar"
+      aria-pressed={on}
+      title="Dictar con la voz (o mantén Espacio)"
+      onMouseDown={(e) => e.preventDefault()} // keeps the caret in the text box
+      onClick={v.toggle}
+    >
+      <MicIcon />
+    </Button>
+  );
+}

@@ -10,6 +10,7 @@ import { CopyButton, PageHeader } from "@/components/app/common";
 import { DesktopCard } from "@/components/app/desktop-card";
 import { IslandCard } from "@/components/app/island-card";
 import { ObsidianCard } from "@/components/app/obsidian";
+import { VoiceCard } from "@/components/app/voice-card";
 import { InstallTool } from "@/components/app/install-tool";
 import { AuditCard, SessionsCard, TouchIdCard } from "@/components/app/security-settings";
 import { DataCard } from "@/components/app/data-card";
@@ -75,6 +76,7 @@ export default function SettingsPage() {
           <IslandCard />
           <NotificationsCard />
           <ObsidianCard />
+          <VoiceCard />
         </div>
         <Card>
           <CardHeader>

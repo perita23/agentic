@@ -12,6 +12,7 @@ const path = require("node:path");
 const fs = require("node:fs");
 const { createDesktopSession } = require("./lib/session.cjs");
 const { createIsland } = require("./lib/island.cjs");
+const { createVoice } = require("./lib/voice.cjs");
 const { loginShellPath, pickPort, waitForPort } = require("./lib/env.cjs");
 const updater = require("./lib/updater.cjs");
 const appLock = require("./lib/lock.cjs");
@@ -32,6 +33,7 @@ const UPDATE_PUBLIC_KEY = (() => {
 })();
 let win = null;
 let island = null;
+let voice = null;
 let origin = null;
 
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -480,6 +482,7 @@ app.whenReady().then(async () => {
       pageVisible = !!v;
       updateMainVisible();
     });
+    voice = createVoice({ app, ipcMain, fromApp });
     ipcMain.handle("agentic:version", (e) => (fromApp(e) ? app.getVersion() : null));
     ipcMain.handle("agentic:check-for-updates", (e) => (fromApp(e) ? checkForUpdates(true) : "denied"));
     // App lock settings (Ajustes): Touch ID is only enabled after a successful
@@ -568,5 +571,6 @@ app.on("window-all-closed", () => {
 });
 app.on("before-quit", () => {
   app.isQuitting = true;
+  voice?.stop();
   if (server) server.kill();
 });

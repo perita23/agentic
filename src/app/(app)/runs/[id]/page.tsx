@@ -30,6 +30,7 @@ import { FileList, useFileMenu } from "@/components/app/file-menu";
 import { LiveStatus } from "@/components/app/live-status";
 import { Appear } from "@/components/app/appear";
 import { ObsidianNotes } from "@/components/app/obsidian";
+import { VoiceButton, VoiceInline } from "@/components/app/voice";
 import { LiveStatsAcc, compactTokens, type LiveStats } from "@/lib/live-stats";
 import { useStickToBottom } from "@/lib/use-stick-bottom";
 import { AnimatedNumber } from "@/components/app/animated-number";
@@ -546,7 +547,7 @@ function ReplyBox({ run }: { run: Run }) {
         </div>
       )}
       <AttachmentBar att={att} disabled={off} />
-      <div className="relative">
+      <div data-composer className="relative rounded-md">
         {menu.open && <SlashList items={menu.items} active={menu.active} onPick={menu.pick} />}
         {files.open && <FileList items={files.items} active={files.active} onPick={files.pick} />}
         <textarea
@@ -569,9 +570,11 @@ function ReplyBox({ run }: { run: Run }) {
           placeholder={waiting ? "Claude está trabajando. Escribe y tu mensaje se enviará en cuanto termine (puedes dejar varios en cola)." : noSession ? "Esta ejecución no tiene sesión que continuar." : "Responde a Claude. Escribe / para comandos y @ para archivos, o pega o arrastra imágenes y textos largos."}
           className="min-h-32 w-full resize-y rounded-md border bg-inset p-3 text-sm disabled:opacity-60"
         />
+        <VoiceInline />
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <AttachButton att={att} disabled={off} />
+        <VoiceButton />
         <BranchSwitcher project={run.projectPath} disabled={waiting} disabledReason="Claude está trabajando: espera a que termine para cambiar de rama" />
         <select aria-label="Permisos" value={mode} onChange={(e) => setMode(e.target.value)} className="h-8 rounded-md border bg-inset px-2 text-xs" disabled={off}>
           <option value="default">Permisos: preguntar</option>

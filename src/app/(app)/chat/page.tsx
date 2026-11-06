@@ -10,6 +10,7 @@ import { Markdown } from "@/components/app/markdown";
 import { CyclingOrb, LiquidOrb } from "@/components/app/liquid-orb";
 import { LiveStatus } from "@/components/app/live-status";
 import { Appear } from "@/components/app/appear";
+import { VoiceButton, VoiceInline } from "@/components/app/voice";
 import { useStickToBottom } from "@/lib/use-stick-bottom";
 import type { LiveStats } from "@/lib/live-stats";
 import { SlashList, useSlashCommands, useSlashMenu } from "@/components/app/slash-menu";
@@ -145,7 +146,7 @@ function Composer({ onSend, busy, autoFocus, model, setModel, mode, setMode }: {
     if (await onSend(cmd.prompt, { model: cmd.model, mode: cmd.mode })) setText("");
   }
   return (
-    <div className="relative rounded-xl border bg-card transition-colors focus-within:border-border-strong">
+    <div data-composer className="relative rounded-xl border bg-card transition-colors focus-within:border-border-strong">
       {menu.open && <SlashList items={menu.items} active={menu.active} onPick={menu.pick} className="mx-2" />}
       <Textarea
         autoFocus={autoFocus}
@@ -163,6 +164,7 @@ function Composer({ onSend, busy, autoFocus, model, setModel, mode, setMode }: {
         }}
         className="max-h-60 min-h-14 resize-none border-0 bg-transparent px-4 pt-3 shadow-none focus-visible:ring-0"
       />
+      <VoiceInline />
       <div className="flex items-center justify-between gap-2 px-3 pb-2.5">
         <div className="flex items-center gap-2">
           <select aria-label="Modelo" value={model} onChange={(e) => setModel(e.target.value)} className="h-7 rounded-md border bg-card px-2 text-xs text-muted-foreground">
@@ -180,9 +182,12 @@ function Composer({ onSend, busy, autoFocus, model, setModel, mode, setMode }: {
             ))}
           </select>
         </div>
+        <div className="flex items-center gap-1">
+        <VoiceButton />
         <Button size="icon-sm" className="rounded-full" onClick={send} disabled={busy || !text.trim()} aria-label="Enviar">
           {busy ? <Loader2Icon className="animate-spin" /> : <ArrowUpIcon />}
         </Button>
+        </div>
       </div>
     </div>
   );

@@ -10,6 +10,18 @@ contextBridge.exposeInMainWorld("agenticDesktop", {
   checkForUpdates: () => ipcRenderer.invoke("agentic:check-for-updates"),
   openPrivacySettings: () => ipcRenderer.invoke("agentic:open-privacy"),
   copyText: (text) => ipcRenderer.invoke("agentic:copy", String(text)),
+  // Dictation: a native helper listens and sends back text and levels (see lib/voice.cjs).
+  voice: {
+    available: () => ipcRenderer.invoke("voice:available"),
+    start: (lang) => ipcRenderer.invoke("voice:start", String(lang)),
+    stop: () => ipcRenderer.send("voice:stop"),
+    cancel: () => ipcRenderer.send("voice:cancel"),
+    onEvent: (cb) => {
+      const h = (_e, o) => cb(o);
+      ipcRenderer.on("voice:event", h);
+      return () => ipcRenderer.removeListener("voice:event", h);
+    },
+  },
   lock: {
     info: () => ipcRenderer.invoke("agentic:lock-info"),
     setTouchId: (on) => ipcRenderer.invoke("agentic:set-touch-id", !!on),

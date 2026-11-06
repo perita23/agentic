@@ -16,7 +16,11 @@ module.exports = {
   directories: { output: "dist", buildResources: "build" },
   files: ["main.cjs", "preload.cjs", "server-entry.cjs", "lock.html", "lock.js", "lock-preload.cjs", "island-preload.cjs", "update-key.pem", "lib/**/*", "package.json"],
   // The Next.js standalone server (incl. its .next folder) runs with Electron's Node.
-  extraResources: [{ from: "../.next/standalone", to: "app-server", filter: ["**/*", ".next/**/*", "**/.next/**/*"] }],
+  extraResources: [
+    { from: "../.next/standalone", to: "app-server", filter: ["**/*", ".next/**/*", "**/.next/**/*"] },
+    // The dictation helper (built by scripts/build-voice.sh); builds without it simply have no dictation.
+    ...(require("node:fs").existsSync(require("node:path").join(__dirname, "build", "agentic-listen")) ? [{ from: "build/agentic-listen", to: "agentic-listen" }] : []),
+  ],
   asar: true,
   afterPack: "build/after-pack.cjs",
   mac: {
@@ -38,6 +42,8 @@ module.exports = {
       LSApplicationCategoryType: "public.app-category.developer-tools",
       NSHumanReadableCopyright: "Agentic Console — PolyForm Noncommercial 1.0.0",
       // Shown by macOS when Agentic first reads a project in these folders.
+      NSMicrophoneUsageDescription: "Agentic escucha tu voz para escribir lo que dictas.",
+      NSSpeechRecognitionUsageDescription: "Agentic convierte tu voz en texto cuando dictas.",
       NSDocumentsFolderUsageDescription: "Agentic lee tus proyectos y los agentes de Claude Code (.claude) que están en Documentos.",
       NSDesktopFolderUsageDescription: "Agentic lee tus proyectos y los agentes de Claude Code (.claude) que están en el Escritorio.",
       NSDownloadsFolderUsageDescription: "Agentic lee tus proyectos y los agentes de Claude Code (.claude) que están en Descargas.",
