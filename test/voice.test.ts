@@ -125,3 +125,75 @@ describe("reading aloud: choosing the voice", () => {
     expect(pickVoice(voices, "ja-JP")).toBeNull();
   });
 });
+
+describe("the voices of macOS, through `say`", () => {
+  it("lists voices with their quality, without novelty voices", async () => {
+    const { createRequire } = await import("node:module");
+    const { parseVoices } = createRequire(import.meta.url)("../desktop/lib/speak.cjs") as { parseVoices: (o: string) => { name: string; lang: string; quality: string }[] };
+    const out = [
+      "Albert              en_US    # I have a frog in my throat. No, I mean a real frog!",
+      "Mónica              es_ES    # Hola, me llamo Mónica y soy una voz española.",
+      "Mónica (Premium)    es_ES    # Hola, me llamo Mónica y soy una voz española.",
+      "Paulina (Mejorada)  es_MX    # Hola, me llamo Paulina y soy una voz mexicana.",
+      "Samantha (Enhanced)  en_US    # Hello! My name is Samantha.",
+      "línea que no es una voz",
+    ].join("\n");
+    expect(parseVoices(out)).toEqual([
+      { name: "Mónica", lang: "es-ES", quality: "standard" },
+      { name: "Mónica (Premium)", lang: "es-ES", quality: "premium" },
+      { name: "Paulina (Mejorada)", lang: "es-MX", quality: "enhanced" },
+      { name: "Samantha (Enhanced)", lang: "en-US", quality: "enhanced" },
+    ]);
+  });
+
+  it("speaks through stdin, one piece at a time, and can be stopped", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const { tmpDir } = await import("./helpers");
+    const { createRequire } = await import("node:module");
+    const dir = tmpDir();
+    const log = path.join(dir, "say.log");
+    const bin = path.join(dir, "fake-say");
+    fs.writeFileSync(
+      bin,
+      `#!/usr/bin/env node
+const fs = require("node:fs");
+const a = process.argv.slice(2);
+if (a[0] === "-v" && a[1] === "?") { console.log("Mónica (Premium)    es_ES    # Hola"); process.exit(0); }
+let t = ""; process.stdin.on("data", (d) => (t += d)); process.stdin.on("end", () => {
+  fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ a, t }) + "\\n");
+  setTimeout(() => process.exit(0), t.includes("LARGO") ? 5000 : 30);
+});
+`,
+    );
+    fs.chmodSync(bin, 0o755);
+    const { createSpeak } = createRequire(import.meta.url)("../desktop/lib/speak.cjs") as { createSpeak: (o: object) => { stop(): void } };
+    const h = new Map<string, (...a: unknown[]) => unknown>();
+    const ev = {};
+    const sp = createSpeak({ fromApp: () => true, sayPath: bin, ipcMain: { handle: (c: string, f: (...a: unknown[]) => unknown) => h.set(c, f), on: (c: string, f: (...a: unknown[]) => unknown) => h.set(c, f) } });
+    try {
+      expect(await h.get("speak:available")!(ev)).toBe(true);
+      expect(await h.get("speak:voices")!(ev)).toEqual([{ name: "Mónica (Premium)", lang: "es-ES", quality: "premium" }]);
+      expect(await h.get("speak:say")!(ev, "--version hola", "Mónica (Premium)", 1.2)).toBe(true);
+      expect(await h.get("speak:say")!(ev, "otra", "una voz que no existe", 9)).toBe(true);
+      const lines = fs.readFileSync(log, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+      expect(lines[0]).toEqual({ a: ["-v", "Mónica (Premium)", "-r", "210"], t: "--version hola" }); // the text is data, never an option
+      expect(lines[1]).toEqual({ a: ["-r", "175"], t: "otra" });
+      expect(await h.get("speak:say")!(ev, "   ", null, 1)).toBe(false);
+      const long = h.get("speak:say")!(ev, "LARGO", null, 1) as Promise<boolean>;
+      await new Promise((r) => setTimeout(r, 200));
+      h.get("speak:stop")!(ev);
+      expect(await long).toBe(false);
+    } finally {
+      sp.stop();
+    }
+  });
+
+  it("prefers a natural voice of the language over a compact one", () => {
+    const v = (voiceURI: string, lang = "es-ES") => ({ voiceURI, name: voiceURI.replace("say:", ""), lang, localService: true });
+    const voices = [v("say:Mónica"), v("say:Jorge (Premium)"), v("say:Paulina (Mejorada)", "es-MX"), v("say:Samantha (Premium)", "en-US")];
+    expect(pickVoice(voices, "es-ES")?.voiceURI).toBe("say:Jorge (Premium)");
+    expect(pickVoice(voices, "es-MX")?.voiceURI).toBe("say:Paulina (Mejorada)");
+    expect(pickVoice(voices, "en-US")?.voiceURI).toBe("say:Samantha (Premium)");
+  });
+});

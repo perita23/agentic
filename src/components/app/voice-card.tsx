@@ -87,17 +87,22 @@ export function VoiceCard() {
 
 function ReadAloudSettings({ voice, set }: { voice: VoicePrefs; set: (p: Partial<VoicePrefs>) => Promise<void> }) {
   const sp = useSpeaker();
-  const [voices, setVoices] = React.useState<SpeechSynthesisVoice[]>([]);
+  const [, setTick] = React.useState(0);
   React.useEffect(() => {
-    if (!speaker.available()) return;
-    const load = () => setVoices(speaker.voices());
-    load();
-    window.speechSynthesis.addEventListener("voiceschanged", load);
-    return () => window.speechSynthesis.removeEventListener("voiceschanged", load);
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const bump = () => setTick((n) => n + 1);
+    window.speechSynthesis.addEventListener("voiceschanged", bump);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", bump);
   }, []);
+  // The natural voices first (Premium, then Enhanced), then the rest by name.
+  const rank = (n: string) => (/premium/i.test(n) ? 0 : /enhanced|mejorad/i.test(n) ? 1 : 2);
+  const voices = speaker
+    .voices()
+    .filter((x) => x.lang.toLowerCase().startsWith(resolveLang(voice.lang).split("-")[0]!.toLowerCase()) || x.voiceURI === voice.voiceURI)
+    .sort((x, y) => rank(x.name) - rank(y.name) || x.name.localeCompare(y.name));
   if (!sp.available) return <p className="text-xs text-muted-foreground">Este navegador no puede leer en voz alta.</p>;
   const lang = resolveLang(voice.lang);
-  const auto = pickVoice(voices, lang);
+  const auto = pickVoice(speaker.voices(), lang);
   const test = () => speaker.speak("Hola, soy Agentic. Así sonará la lectura de mis respuestas.", { id: "test", lang, voiceURI: voice.voiceURI, rate: voice.rate });
   return (
     <>
@@ -107,7 +112,7 @@ function ReadAloudSettings({ voice, set }: { voice: VoicePrefs; set: (p: Partial
           <option value="">Automática{auto ? ` (${auto.name})` : ""}</option>
           {voices.map((x) => (
             <option key={x.voiceURI} value={x.voiceURI}>
-              {x.name} · {x.lang}
+              {x.name} · {x.lang}{rank(x.name) === 0 ? " · muy natural" : rank(x.name) === 1 ? " · natural" : ""}
             </option>
           ))}
         </select>
@@ -126,9 +131,11 @@ function ReadAloudSettings({ voice, set }: { voice: VoicePrefs; set: (p: Partial
         <Button type="button" size="sm" variant="outline" onClick={test}>
           Probar la voz
         </Button>
-        {!auto && voices.length > 0 && <span className="text-xs text-muted-foreground">No hay voz instalada para este idioma.</span>}
+        {!auto && speaker.voices().length > 0 && <span className="text-xs text-muted-foreground">No hay voz instalada para este idioma.</span>}
       </div>
-      <p className="text-xs text-muted-foreground">En macOS puedes descargar voces más naturales en Ajustes del Sistema → Accesibilidad → Contenido leído → Voz del sistema → Gestionar voces (las «Mejoradas» y «Premium» suenan mucho mejor).</p>
+      <p className="text-xs text-muted-foreground">
+        Para que suene mucho más natural, descarga una voz <b>Premium</b> o <b>Mejorada</b> en macOS: Ajustes del Sistema → Accesibilidad → Contenido leído → Voz del sistema → Gestionar voces (por ejemplo, Mónica, Jorge, Paulina o Marisol en español). La app de Mac las usa todas; vuelve a abrir esta pantalla y aparecerán marcadas como «muy natural».
+      </p>
     </>
   );
 }

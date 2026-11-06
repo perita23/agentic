@@ -11,7 +11,7 @@ import { CyclingOrb, LiquidOrb } from "@/components/app/liquid-orb";
 import { LiveStatus } from "@/components/app/live-status";
 import { Appear } from "@/components/app/appear";
 import { AssistChip, ImproveButton, usePromptAssist } from "@/components/app/prompt-assist";
-import { ReadAloudButton, VoiceLoop, VoiceModeButton } from "@/components/app/speak";
+import { AnimatePresence, ReadAloudButton, useSpeaker, VoiceLoop, VoiceModeButton, VoiceStage } from "@/components/app/speak";
 import { VoiceButton, VoiceInline } from "@/components/app/voice";
 import { replaceAll } from "@/lib/voice/insert";
 import { useStickToBottom } from "@/lib/use-stick-bottom";
@@ -352,6 +352,8 @@ export default function ChatPage() {
     }
   }
   const lastSent = [...(chat?.messages ?? [])].reverse().find((m) => m.role === "user")?.text ?? "";
+  const talk = useSpeaker();
+  const lastAnswer = [...(chat?.messages ?? [])].reverse().find((m) => m.role === "assistant")?.text ?? "";
 
   async function remove(id: string) {
     if (!confirm("¿Borrar esta conversación del historial?")) return;
@@ -370,6 +372,8 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <VoiceLoop running={!!chat?.running} last={lastAnswer} />
+      <AnimatePresence>{talk.voiceMode && <VoiceStage key="stage" activity={chat?.activity} busy={sending || !!chat?.running} />}</AnimatePresence>
       <PageHeader
         icon={SparklesIcon}
         title="Chat"
@@ -431,7 +435,7 @@ export default function ChatPage() {
               {/* The orb walks through all its states, a new one every two or three seconds. */}
               <CyclingOrb size={120} />
               <h2 className="text-xl font-semibold tracking-tight">¿En qué te ayudo?</h2>
-              <div className="w-full max-w-2xl">
+              <div className={cn("w-full max-w-2xl", talk.voiceMode && "sr-only")}>
                 <Composer onSend={newChat} busy={sending} lastSent={lastSent} autoFocus model={model} setModel={setModel} mode={mode} setMode={setMode} />
               </div>
               <div className="grid w-full max-w-2xl gap-2 sm:grid-cols-2">
@@ -448,7 +452,6 @@ export default function ChatPage() {
                 <span className="truncate text-sm font-semibold">{chat?.title ?? "…"}</span>
                 {chat?.model && <span className="rounded border px-1.5 font-mono text-[11px] text-muted-foreground">{chat.model}</span>}
               </div>
-              <VoiceLoop running={!!chat?.running} last={[...(chat?.messages ?? [])].reverse().find((m) => m.role === "assistant")?.text ?? ""} />
               <ChatScroll key={selected ?? "new"}>
                   {!chat && <Skeleton className="h-40" />}
                   {chat?.messages.map((m, i) => (
@@ -463,7 +466,7 @@ export default function ChatPage() {
                   ) : null}
                   {chat?.error && !chat.running && <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{chat.error}</p>}
               </ChatScroll>
-              <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
+              <div className={cn("mx-auto w-full max-w-3xl shrink-0 px-4 pb-4", talk.voiceMode && "sr-only")}>
                 <Composer onSend={reply} busy={sending || !!chat?.running} running={!!chat?.running} onStop={stopChat} lastSent={lastSent} model={model} setModel={setModel} mode={mode} setMode={setMode} />
               </div>
             </>

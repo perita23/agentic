@@ -64,6 +64,7 @@ export function splitForSpeech(text: string, max = 220): string[] {
   return out;
 }
 
+export type VoiceInEntry = VoiceInfo | SpeechSynthesisVoice;
 export interface VoiceInfo {
   voiceURI: string;
   name: string;
@@ -71,7 +72,13 @@ export interface VoiceInfo {
   localService: boolean;
 }
 
-const NICE = /premium|enhanced|mejorad|siri|natural|neural/i;
+/** How natural a voice is by its name: the "Premium" and "Enhanced" voices of macOS sound far better than the compact ones. */
+function quality(name: string): number {
+  if (/premium/i.test(name)) return 3;
+  if (/enhanced|mejorad|am[ée]lior|erweitert|migliorat|aprimorad/i.test(name)) return 2;
+  if (/siri|natural|neural/i.test(name)) return 1;
+  return 0;
+}
 
 /** The voice to read with: the chosen one, else the best local voice of the language (never a remote one). */
 export function pickVoice<T extends VoiceInfo>(voices: T[], lang: string, uri = ""): T | null {
@@ -80,9 +87,11 @@ export function pickVoice<T extends VoiceInfo>(voices: T[], lang: string, uri = 
   if (chosen) return chosen;
   const base = lang.split("-")[0]!.toLowerCase();
   const norm = (l: string) => l.replace("_", "-").toLowerCase();
-  const score = (v: T) => (norm(v.lang) === lang.toLowerCase() ? 4 : 0) + (norm(v.lang).startsWith(`${base}-`) || norm(v.lang) === base ? 2 : 0) + (NICE.test(v.name) ? 1 : 0);
+  // Only a voice of the language counts; among those, the more natural one wins.
+  const fit = (v: T) => (norm(v.lang) === lang.toLowerCase() ? 4 : 0) + (norm(v.lang).startsWith(`${base}-`) || norm(v.lang) === base ? 2 : 0);
+  const score = (v: T) => (fit(v) ? fit(v) + quality(v.name) : 0);
   const best = [...local].sort((a, b) => score(b) - score(a))[0];
-  return best && score(best) >= 2 ? best : null;
+  return best && score(best) > 0 ? best : null;
 }
 
 export interface SpeakOptions {
@@ -99,12 +108,24 @@ export interface SpeakState {
   id: string | null;
   /** Talk mode: answers are read aloud and then it listens again. */
   voiceMode: boolean;
+  /** The piece being read right now. */
+  caption: string;
 }
 
-const MODE_KEY = "agentic.voiceMode";
+/** The Mac app's own voices (through macOS' `say`): all of them, the natural ones included. */
+export interface NativeSpeakBridge {
+  available(): Promise<boolean>;
+  voices(): Promise<{ name: string; lang: string; quality: string }[]>;
+  say(text: string, voice: string | null, rate: number): Promise<boolean>;
+  stop(): void;
+}
+const nativeBridge = (): NativeSpeakBridge | null => (typeof window === "undefined" ? null : ((window as unknown as { agenticDesktop?: { speak?: NativeSpeakBridge } }).agenticDesktop?.speak ?? null));
+export const SAY_PREFIX = "say:";
 
 class Speaker {
-  state: SpeakState = { speaking: false, id: null, voiceMode: false };
+  state: SpeakState = { speaking: false, id: null, voiceMode: false, caption: "" };
+  private native: VoiceInfo[] = [];
+  private nativeReady = false;
   private subs = new Set<() => void>();
   private gen = 0;
   private lvl = 0;
@@ -127,50 +148,69 @@ class Speaker {
     this.subs.forEach((f) => f());
   }
 
-  available() {
+  /** Can the browser speak (its own synthesiser)? */
+  private web() {
     return typeof window !== "undefined" && "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined";
   }
-
-  /** Local voices only. */
-  voices(): SpeechSynthesisVoice[] {
-    if (!this.available()) return [];
-    return window.speechSynthesis.getVoices().filter((v) => v.localService);
+  /** Can anything speak here: the browser's synthesiser, or the Mac app's voices. */
+  available() {
+    return this.web() || !!nativeBridge();
   }
 
-  /** Talk mode is remembered on this device. */
-  loadMode() {
+  /** Asks the Mac app for its voices (once). */
+  async loadNative() {
+    if (this.nativeReady) return;
+    const b = nativeBridge();
+    if (!b) return;
+    this.nativeReady = true;
     try {
-      const on = localStorage.getItem(MODE_KEY) === "1";
-      if (on !== this.state.voiceMode) this.set({ voiceMode: on });
+      if (!(await b.available())) return;
+      this.native = (await b.voices()).map((v) => ({ voiceURI: `${SAY_PREFIX}${v.name}`, name: v.name, lang: v.lang, localService: true }));
+      this.set({});
     } catch {}
   }
+
+  /** Local voices only: the Mac's own (all of them) and what the browser offers from the device. */
+  voices(): VoiceInEntry[] {
+    const web = this.web() ? window.speechSynthesis.getVoices().filter((v) => v.localService) : [];
+    // The browser lists some macOS voices too: the ones `say` has are taken from there, not twice.
+    const names = new Set(this.native.map((v) => v.name));
+    return [...this.native, ...web.filter((v) => !names.has(v.name))];
+  }
+
   setVoiceMode(on: boolean) {
-    try {
-      localStorage.setItem(MODE_KEY, on ? "1" : "0");
-    } catch {}
     if (!on) this.stop();
     this.set({ voiceMode: on });
   }
 
   speak(markdown: string, o: SpeakOptions) {
     this.stop();
-    if (!this.available()) return void o.onEnd?.();
+    if (!this.web() && !this.native.length) return void o.onEnd?.();
     const chunks = splitForSpeech(speechText(markdown));
     if (!chunks.length) return void o.onEnd?.();
     const gen = ++this.gen;
     const voice = pickVoice(this.voices(), o.lang, o.voiceURI);
-    this.set({ speaking: true, id: o.id });
+    const bridge = voice?.voiceURI.startsWith(SAY_PREFIX) ? nativeBridge() : null;
+    this.set({ speaking: true, id: o.id, caption: "" });
     const done = (natural: boolean) => {
       if (gen !== this.gen) return;
-      this.set({ speaking: false, id: null });
+      clearInterval(pulse);
+      this.set({ speaking: false, id: null, caption: "" });
       if (natural) o.onEnd?.();
     };
+    // The Mac's voices say nothing about words: the bars move at about the rhythm of speech.
+    const pulse = bridge ? setInterval(() => (this.lvl = 0.35 + Math.random() * 0.55), 230) : undefined;
     const next = (i: number) => {
       if (gen !== this.gen) return;
       if (i >= chunks.length) return done(true);
+      this.set({ caption: chunks[i]! });
+      if (bridge && voice) {
+        void bridge.say(chunks[i]!, voice.name, o.rate ?? 1).then((ok) => (ok ? next(i + 1) : gen === this.gen && done(false)));
+        return;
+      }
       const u = new SpeechSynthesisUtterance(chunks[i]);
       u.lang = voice?.lang ?? o.lang;
-      if (voice) u.voice = voice;
+      if (voice && "default" in voice) u.voice = voice as SpeechSynthesisVoice;
       u.rate = Math.min(2, Math.max(0.5, o.rate ?? 1));
       u.onboundary = () => (this.lvl = 0.85);
       u.onend = () => next(i + 1);
@@ -183,8 +223,9 @@ class Speaker {
   /** Silence (never counts as having finished: nobody listens afterwards). */
   stop() {
     this.gen++;
-    if (this.available()) window.speechSynthesis.cancel();
-    if (this.state.speaking) this.set({ speaking: false, id: null });
+    nativeBridge()?.stop();
+    if (this.web()) window.speechSynthesis.cancel();
+    if (this.state.speaking) this.set({ speaking: false, id: null, caption: "" });
   }
 }
 

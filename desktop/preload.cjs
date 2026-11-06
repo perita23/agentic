@@ -23,6 +23,13 @@ contextBridge.exposeInMainWorld("agenticDesktop", {
       return () => ipcRenderer.removeListener("voice:event", h);
     },
   },
+  // Reading aloud with the voices of macOS (see lib/speak.cjs).
+  speak: {
+    available: () => ipcRenderer.invoke("speak:available"),
+    voices: () => ipcRenderer.invoke("speak:voices"),
+    say: (text, voice, rate) => ipcRenderer.invoke("speak:say", String(text), voice == null ? null : String(voice), Number(rate)),
+    stop: () => ipcRenderer.send("speak:stop"),
+  },
   lock: {
     info: () => ipcRenderer.invoke("agentic:lock-info"),
     setTouchId: (on) => ipcRenderer.invoke("agentic:set-touch-id", !!on),
