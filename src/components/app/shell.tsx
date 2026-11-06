@@ -1,6 +1,7 @@
 "use client";
 
 import { AccountMenu } from "./account-menu";
+import { GlobalWordAssist } from "./global-assist";
 import { VoiceButton, VoiceProvider } from "./voice";
 import { Avatar, useProfile } from "./avatar";
 import { RouteProgress } from "./route-progress";
@@ -340,6 +341,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <LauncherProvider>
       <VoiceProvider>
         <ShellInner>{children}</ShellInner>
+        <GlobalWordAssist />
       </VoiceProvider>
     </LauncherProvider>
   );

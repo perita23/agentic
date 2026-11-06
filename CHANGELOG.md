@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.54.3] - 2026-11-06
+
+### Añadido
+- **La corrección palabra a palabra funciona en toda la app**, no sólo en los cuadros de mensaje: títulos y descripciones de tareas, notas, comentarios, el prompt de una sesión nueva, los campos de texto de los formularios… (con «Palabra a palabra» activado en Ajustes → IA local). Es la misma corrección, con el mismo morphing y el mismo «deshacer» (Ctrl/⌘+Z), y lo que el modelo aprende de una palabra vale para todos los campos. Se dejan en paz los campos que no son prosa: búsquedas, direcciones, rutas, claves y contraseñas, correos, comandos, ramas, etiquetas, nombres de archivo, JQL, expresiones regulares… (y cualquier campo puede excluirse con `data-no-assist`).
+
 ## [0.54.2] - 2026-11-06
 
 ### Añadido

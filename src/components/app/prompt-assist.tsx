@@ -5,8 +5,7 @@ import { CheckIcon, SparklesIcon, Undo2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { api, useApi } from "@/lib/api";
-import { rangeRect } from "@/lib/caret";
-import { checkable, shorthandFix, wordsOf, type Token } from "@/lib/word-fix";
+import { wordAssist, type Morph } from "@/lib/word-assist";
 import { replaceAll } from "@/lib/voice/insert";
 import { errorMessage } from "./common";
 import { MorphText } from "./live-status";
@@ -20,17 +19,6 @@ interface Settings {
 }
 type Chip = { kind: "suggest"; forText: string; corrected: string } | { kind: "applied"; forText: string; original: string };
 
-interface Morph {
-  id: number;
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-  from: string;
-  to: string;
-  bg: string;
-  font: React.CSSProperties;
-}
 
 const PAUSE_MS = 900;
 const MIN_CHARS = 12;
@@ -80,91 +68,25 @@ export function usePromptAssist(text: string, getField: () => Field | null) {
   }, [text, mode, phrase]);
 
 
-  // ---- Word by word: every word you finish is checked by the local model; a wrong one is fixed on the spot, morphing.
+  // ---- Word by word: every word you finish is checked; a wrong one is fixed on the spot, morphing (see lib/word-assist).
   const [morphs, setMorphs] = React.useState<Morph[]>([]);
-  const cache = React.useRef(new Map<string, string>()); // «previous word|word» → the word as it should be (itself when fine)
-  const queue = React.useRef<Token[]>([]);
-  const busyWord = React.useRef(false);
-  const downUntil = React.useRef(0); // after a failure it leaves the model alone for a while
-
-  const fix = React.useCallback((tok: Token, to: string) => {
-    const f = getRef.current();
-    if (!f || f.value.slice(tok.start, tok.end) !== tok.word) return false; // it moved or changed meanwhile
-    const rect = rangeRect(f, tok.start, tok.end);
-    const caret = f.selectionStart ?? f.value.length;
-    const caretEnd = f.selectionEnd ?? caret;
-    const delta = to.length - tok.word.length;
-    if (document.activeElement === f) {
-      f.setSelectionRange(tok.start, tok.end);
-      let done = false;
-      try {
-        done = document.execCommand("insertText", false, to);
-      } catch {}
-      if (!done || f.value.slice(tok.start, tok.start + to.length) !== to) f.setRangeText(to, tok.start, tok.end, "end");
-    } else f.setRangeText(to, tok.start, tok.end, "end");
-    const shift = (p: number) => (p >= tok.end ? p + delta : p > tok.start ? tok.start + to.length : p);
-    f.setSelectionRange(shift(caret), shift(caretEnd));
-    f.dispatchEvent(new Event("input", { bubbles: true }));
-    if (rect) {
-      const cs = getComputedStyle(f);
-      let bg = "";
-      for (let e: HTMLElement | null = f; e && !bg; e = e.parentElement) {
-        const c = getComputedStyle(e).backgroundColor;
-        if (c && !/rgba?\(0, 0, 0, 0\)|transparent/.test(c)) bg = c;
-      }
-      const id = Date.now() + Math.random();
-      const m: Morph = { id, ...rect, from: tok.word, to, bg: bg || "var(--card)", font: { fontSize: cs.fontSize, fontFamily: cs.fontFamily, fontWeight: cs.fontWeight, lineHeight: cs.lineHeight, letterSpacing: cs.letterSpacing } };
+  React.useEffect(() => {
+    return wordAssist.onMorph((f, m) => {
+      if (f !== getRef.current()) return;
       setMorphs((l) => [...l, m]);
-      setTimeout(() => setMorphs((l) => l.filter((x) => x.id !== id)), 1500);
-    }
-    return true;
+      setTimeout(() => setMorphs((l) => l.filter((x) => x.id !== m.id)), 1500);
+    });
   }, []);
-
-  const pump = React.useCallback(async () => {
-    if (busyWord.current) return;
-    busyWord.current = true;
-    try {
-      for (let tok = queue.current.shift(); tok; tok = queue.current.shift()) {
-        const key = `${tok.before.split(" ").pop() ?? ""}|${tok.word}`;
-        try {
-          const r = await api<{ word: string; changed: boolean }>("POST", "/api/ollama/word", { word: tok.word, before: tok.before.slice(-120) });
-          if (cache.current.size > 3000) cache.current.clear();
-          cache.current.set(key, r.word);
-          if (r.changed) fix(tok, r.word);
-        } catch {
-          // A model that is not there never interrupts typing (the settings page says what is wrong).
-          downUntil.current = Date.now() + 20_000;
-          queue.current = [];
-          break;
-        }
-      }
-    } finally {
-      busyWord.current = false;
-    }
-  }, [fix]);
-
+  React.useEffect(() => {
+    // This box is looked after here, not by the app-wide corrector.
+    const f = getRef.current();
+    if (f) f.dataset.assist = "own";
+  });
   React.useEffect(() => {
     if (mode !== "words") return;
-    const timer = setTimeout(() => {
-      const f = getRef.current();
-      if (!f || f.value !== text || text.length > MAX_CHARS) return;
-      const caret = f.selectionStart ?? text.length;
-      for (const tok of wordsOf(text)) {
-        if (!checkable(text, tok) || (caret > tok.start && caret <= tok.end)) continue; // not the one being edited
-        const key = `${tok.before.split(" ").pop() ?? ""}|${tok.word}`;
-        const short = shorthandFix(tok.word);
-        const known = short ?? cache.current.get(key);
-        if (known !== undefined) {
-          if (known !== tok.word && fix(tok, known)) return; // the next scan (this edit triggers one) carries on
-          continue;
-        }
-        if (Date.now() < downUntil.current) continue;
-        if (!queue.current.some((q) => q.start === tok.start && q.word === tok.word)) queue.current.push(tok);
-      }
-      void pump();
-    }, 140);
-    return () => clearTimeout(timer);
-  }, [text, mode, fix, pump]);
+    const f = getRef.current();
+    if (f && f.value === text) wordAssist.schedule(f);
+  }, [text, mode]);
 
   const shown = chip && chip.kind === "suggest" ? (text === chip.forText ? chip : null) : chip && text === chip.forText ? chip : null;
 
@@ -263,7 +185,7 @@ function AssistChipBody({ a, c }: { a: Assist; c: Chip }) {
 }
 
 /** A fixed word is shown morphing, right where it is: the old one blurs out into the new one in the orb's colours. */
-function MorphPill({ m }: { m: Morph }) {
+export function MorphPill({ m }: { m: Morph }) {
   const [text, setText] = React.useState(m.from);
   const [fading, setFading] = React.useState(false);
   React.useEffect(() => {
