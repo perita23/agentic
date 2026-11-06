@@ -252,6 +252,7 @@ try {
     const result = (t, final) => Object.assign([{ transcript: t }], { isFinal: final });
     window.SpeechRecognition = class {
       start() {
+        setTimeout(() => this.onaudiostart?.(), 40);
         this.a = setTimeout(() => this.onresult?.({ results: [result("hola claude", false)] }), 200);
         this.b = setTimeout(() => this.onresult?.({ results: [result("hola claude, resume la tarea", false)] }), 450);
       }
@@ -394,35 +395,32 @@ try {
   await chatBox.click();
   await page.waitForTimeout(500);
   await page.keyboard.down("Space");
-  await page.getByTestId("voice-text").getByText("hola claude, resume la tarea").waitFor({ timeout: 5000 });
-  check((await chatBox.locator("xpath=ancestor::*[@data-composer]").getByTestId("voice-text").count()) === 1, "while it listens, the transcript shows inside the message box itself (no floating bar)");
-  const longOv = await page.evaluate(() => {
-    const t = document.querySelector("[data-testid=voice-text]");
-    const box = t.closest("[data-composer]");
-    const inner = t.firstElementChild;
-    inner.textContent = "una frase muy larga que sigue y sigue sin parar ".repeat(20);
-    const r = box.getBoundingClientRect();
-    const tr = t.getBoundingClientRect();
-    return { page: document.documentElement.scrollWidth - document.documentElement.clientWidth, box: box.scrollWidth - box.clientWidth, inside: tr.left >= r.left - 1 && tr.right <= r.right + 1 };
-  });
-  check(longOv.page <= 1 && longOv.box <= 1 && longOv.inside, `a long dictation stays inside the message box ${JSON.stringify(longOv)}`);
+  const BOX = "textarea[aria-label='Mensaje para Claude']";
+  await page.waitForFunction((q) => document.querySelector(q).value === "hola claude", BOX, { timeout: 5000 });
+  check(true, "the words appear in the message box while still speaking");
+  await page.waitForFunction((q) => document.querySelector(q).value === "hola claude, resume la tarea", BOX, { timeout: 5000 });
+  check((await page.getByTestId("voice-text").count()) === 0 && (await chatBox.locator("xpath=ancestor::*[@data-composer]").getByTestId("voice-status").count()) === 1, "while it listens, the box shows the words and the status line only says it is listening");
   await shot("08-voice-listening");
   await page.keyboard.up("Space");
   await page.waitForFunction(() => document.querySelector("textarea[aria-label='Mensaje para Claude']").value === "hola claude, resume la tarea");
   check(true, "holding Space dictates into the message box (and types no spaces)");
+  await page.getByTestId("voice-status").waitFor({ state: "detached", timeout: 5000 });
   await chatBox.fill("");
+  await chatBox.fill("ya había: ");
   await page.getByRole("button", { name: "Dictar" }).first().click();
-  await page.getByTestId("voice-text").getByText("hola claude, resume la tarea").waitFor({ timeout: 5000 });
+  await page.waitForFunction((q) => document.querySelector(q).value === "ya había: hola claude, resume la tarea", BOX, { timeout: 5000 });
   await page.getByRole("button", { name: "Dictar" }).first().click(); // pressing the microphone again finishes
-  await page.waitForFunction(() => document.querySelector("textarea[aria-label='Mensaje para Claude']").value === "hola claude, resume la tarea");
-  check(true, "the microphone button dictates too");
+  await page.waitForFunction((q) => document.querySelector(q).value === "ya había: hola claude, resume la tarea", BOX);
+  check(true, "the microphone button dictates too, after what was already written");
   await chatBox.fill("");
   await page.getByRole("button", { name: "Dictar" }).first().click();
-  await page.getByTestId("voice-text").waitFor();
+  await chatBox.fill("borrador");
+  await page.getByRole("button", { name: "Dictar" }).first().click();
+  await page.waitForFunction((q) => document.querySelector(q).value.startsWith("borrador hola"), BOX, { timeout: 5000 });
   await page.keyboard.press("Escape");
-  await page.getByTestId("voice-text").waitFor({ state: "detached", timeout: 5000 });
+  await page.getByTestId("voice-status").waitFor({ state: "detached", timeout: 5000 });
   await page.waitForTimeout(500);
-  check((await chatBox.inputValue()) === "", "Esc cancels the dictation and writes nothing");
+  check((await chatBox.inputValue()) === "borrador", "Esc cancels the dictation and leaves the box as it was");
   await page.goto(`${base}/tasks`);
   await page.getByRole("heading", { name: "Tareas" }).first().waitFor();
   await page.waitForTimeout(700); // the page is interactive (its keyboard shortcuts are attached) a moment after it shows
@@ -442,6 +440,7 @@ try {
       voice: {
         available: async () => true,
         start: async () => {
+          setTimeout(() => cb({ type: "ready" }), 30);
           setTimeout(() => cb({ type: "level", v: 0.7 }), 40);
           setTimeout(() => cb({ type: "text", text: "dictado nativo", final: false }), 120);
           return { ok: true };
@@ -455,7 +454,7 @@ try {
   await nat.goto(`${base}/chat`);
   await nat.getByLabel("Mensaje para Claude").click();
   await nat.keyboard.down("Space");
-  await nat.getByTestId("voice-text").getByText("dictado nativo").waitFor({ timeout: 5000 });
+  await nat.waitForFunction(() => document.querySelector("textarea[aria-label='Mensaje para Claude']").value === "dictado nativo", null, { timeout: 5000 });
   await nat.keyboard.up("Space");
   await nat.waitForFunction(() => document.querySelector("textarea[aria-label='Mensaje para Claude']").value === "dictado nativo");
   check(true, "the Mac app's native engine dictates through the same overlay");

@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useApi } from "@/lib/api";
 import { pickEngine, resolveLang, type VoiceEngine, type VoiceSession } from "@/lib/voice/engine";
-import { dictationTarget, insertAtCaret, isTextField, sendButtonFor, trackFocus, type TextField } from "@/lib/voice/insert";
+import { LiveInsert, dictationTarget, insertAtCaret, isTextField, sendButtonFor, trackFocus, type TextField } from "@/lib/voice/insert";
 import { voiceColor } from "@/lib/voice/palette";
 import { cn } from "@/lib/utils";
 
@@ -32,15 +32,17 @@ interface VoiceCtx {
   level: MotionValue<number>;
   /** The message box (its `VoiceInline`) that is listening, or null when the text has no box to go to. */
   slot: string | null;
+  /** The words are written live into a field (so the status line does not repeat them). */
+  inField: boolean;
   toggle(): void;
   finish(): void;
   cancel(): void;
 }
-const NOOP: VoiceCtx = { phase: "idle", available: false, mode: "click", text: "", level: { get: () => 0 } as unknown as MotionValue<number>, slot: null, toggle() {}, finish() {}, cancel() {} };
+const NOOP: VoiceCtx = { phase: "idle", available: false, mode: "click", text: "", level: { get: () => 0 } as unknown as MotionValue<number>, slot: null, inField: false, toggle() {}, finish() {}, cancel() {} };
 const Ctx = React.createContext<VoiceCtx>(NOOP);
 export const useVoice = () => React.useContext(Ctx);
 
-const HOLD_MS = 350;
+const HOLD_MS = 300;
 const SILENCE_MS = 9000;
 
 /** The field a Space press would type into when it is empty: there, holding Space dictates instead. */
@@ -69,6 +71,8 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   const engineRef = React.useRef<VoiceEngine | null>(null);
   const sessionRef = React.useRef<VoiceSession | null>(null);
   const targetRef = React.useRef<TextField | null>(null);
+  const liveRef = React.useRef<LiveInsert | null>(null);
+  const [inField, setInField] = React.useState(false);
   const cancelledRef = React.useRef(false);
   const wantFinish = React.useRef(false);
   const silenceTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -105,10 +109,11 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   };
 
   /** What was heard goes where it belongs: the field you were in, or a new chat when there is none. */
-  const deliver = (t: string) => {
-    const field = targetRef.current?.isConnected ? targetRef.current : dictationTarget();
+  const deliver = (t: string, live: LiveInsert | null) => {
+    const field = live?.el.isConnected ? live.el : targetRef.current?.isConnected ? targetRef.current : dictationTarget();
     const put = (f: TextField) => {
-      insertAtCaret(f, t);
+      if (live && live.el === f) live.update(t); // already there word by word: this is the final version
+      else insertAtCaret(f, t);
       if (prefsRef.current.autoSend) setTimeout(() => sendButtonFor(f)?.click(), 150);
     };
     if (field) return put(field);
@@ -128,9 +133,13 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     sessionRef.current = null;
     const t = textRef.current.trim();
     const cancelled = cancelledRef.current;
+    const live = liveRef.current;
+    liveRef.current = null;
     setPhase("idle");
+    setInField(false);
     level.set(0);
-    if (!cancelled && t) deliver(t);
+    if (cancelled || !t) live?.restore();
+    else deliver(t, live);
   };
 
   const finish = () => {
@@ -173,6 +182,8 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     modeRef.current = m;
     setMode(m);
     targetRef.current = dictationTarget();
+    liveRef.current = targetRef.current ? new LiveInsert(targetRef.current) : null;
+    setInField(!!liveRef.current);
     setSlot(targetRef.current?.closest("[data-composer]")?.querySelector("[data-voice-slot]")?.getAttribute("data-voice-slot") ?? null);
     setPhase("starting");
     let smooth = 0;
@@ -181,6 +192,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         onText: (t) => {
           textRef.current = t;
           setText(t);
+          liveRef.current?.update(t);
           armSilence();
         },
         onLevel: (v) => {
@@ -195,6 +207,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       setPhase("idle");
       return void toast.error(e instanceof Error ? e.message : "No se pudo iniciar el dictado");
     }
+    if (phaseRef.current === "idle") return; // it ended while starting (no permission, no microphone…)
     if (cancelledRef.current) {
       sessionRef.current.cancel();
       return;
@@ -231,6 +244,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       if (!t) return;
       holding = t;
       started = false;
+      engineRef.current?.warm?.(); // the helper gets ready while the key is being held down
       e.preventDefault();
       holdTimer = setTimeout(() => {
         started = true;
@@ -274,9 +288,9 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const ctx = React.useMemo<VoiceCtx>(
-    () => ({ phase, available: info.available, reason: info.reason, engine: info.engine, mode, text, level, slot, toggle, finish, cancel }),
+    () => ({ phase, available: info.available, reason: info.reason, engine: info.engine, mode, text, level, slot, inField, toggle, finish, cancel }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [phase, info, mode, text, slot],
+    [phase, info, mode, text, slot, inField],
   );
 
   return (
@@ -326,13 +340,16 @@ const hint = (mode: "hold" | "click") => (mode === "hold" ? "Suelta Espacio" : "
  */
 /** What is being heard, on one line that always shows the END (the newest words) and fades out on the left. */
 function LiveText({ v, className }: { v: VoiceCtx; className?: string }) {
+  const status = v.phase === "starting" ? "Activando el micrófono…" : v.phase === "finishing" ? "Terminando…" : "Te escucho…";
+  // The words themselves are being written in the box; here only the state (or, with no box, the words).
+  if (v.inField) return <span data-testid="voice-status" className={cn("min-w-0 truncate text-muted-foreground", className)}>{status}</span>;
   const empty = !v.text;
   return (
     <span
       data-testid="voice-text"
       className={cn("flex min-w-0 justify-end overflow-hidden", !empty && "[mask-image:linear-gradient(to_right,transparent,#000_2rem)]", empty ? "justify-start text-muted-foreground" : "text-foreground/80", className)}
     >
-      <span className="shrink-0 whitespace-nowrap">{v.text || (v.phase === "starting" ? "Activando el micrófono…" : "Te escucho…")}</span>
+      <span className="shrink-0 whitespace-nowrap">{v.text || status}</span>
     </span>
   );
 }

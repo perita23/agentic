@@ -15,6 +15,7 @@ interface SRInstance {
   onresult: ((e: SREvent) => void) | null;
   onerror: ((e: { error: string }) => void) | null;
   onend: (() => void) | null;
+  onaudiostart: (() => void) | null;
   start(): void;
   stop(): void;
   abort(): void;
@@ -74,6 +75,7 @@ export function webSpeechEngine(): VoiceEngine | null {
       rec.interimResults = true;
       let text = "";
       let cancelled = false;
+      let ended = false;
       let stopMeter = () => {};
       rec.onresult = (e) => {
         let out = "";
@@ -86,17 +88,22 @@ export function webSpeechEngine(): VoiceEngine | null {
         h.onError(ERRORS[e.error] ?? `Error de reconocimiento de voz (${e.error})`);
       };
       rec.onend = () => {
+        ended = true;
         stopMeter();
         if (!cancelled && text) h.onText(text, true);
         h.onEnd();
       };
-      stopMeter = await startMeter(h.onLevel);
-      try {
-        rec.start();
-      } catch (err) {
-        stopMeter();
-        throw err;
-      }
+      // Listening first; the loudness meter (which asks for the microphone a second time) comes up beside it, never in front.
+      const audio = new Promise<void>((res) => {
+        rec.onaudiostart = () => res();
+        setTimeout(res, 2000); // some browsers never say it
+      });
+      rec.start();
+      void startMeter(h.onLevel).then((stop) => {
+        if (cancelled || ended) stop();
+        else stopMeter = stop;
+      });
+      await audio;
       return {
         stop: () => rec.stop(),
         cancel: () => {
