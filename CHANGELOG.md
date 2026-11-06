@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.50.1] - 2026-11-06
+
+### Corregido
+- **Dictado: el texto largo ya no se sale de la caja de escritura.** Al hablar mucho, lo que oyes se queda en una sola línea dentro de la caja y muestra siempre **lo último que dices** (con un desvanecido a la izquierda), en vez de desbordarse. Lo mismo en la píldora flotante.
+
 ## [0.50.0] - 2026-11-06
 
 ### Añadido
