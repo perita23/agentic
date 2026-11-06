@@ -56,6 +56,26 @@ fs.writeFileSync(path.join(claudeHome, "projects", enc, `${sid2}.jsonl`), JSON.s
 fs.writeFileSync(path.join(claudeHome, "sessions", `${process.pid}.json`), JSON.stringify({ pid: process.pid, sessionId: sid, cwd: project, status: "busy", name: "demo-app", entrypoint: "cli", startedAt: Date.now(), updatedAt: Date.now() }));
 
 
+// A local model (Ollama) stand-in: it fixes two typos, or organises a prompt.
+const ollama = http.createServer((req, res) => {
+  let raw = "";
+  req.on("data", (d) => (raw += d));
+  req.on("end", () => {
+    res.setHeader("content-type", "application/json");
+    if (req.url === "/api/tags") return res.end(JSON.stringify({ models: [{ name: "fake:1b", size: 1.2e9 }] }));
+    if (req.url === "/api/chat") {
+      const m = JSON.parse(raw).messages;
+      const text = m[1].content.replace(/^<texto>\n/, "").replace(/\n<\/texto>$/, "");
+      const out = m[0].content.includes("corrector") ? text.replace("herrores", "errores").replace("q tal", "qué tal") : `## Objetivo\n${text}`;
+      return setTimeout(() => res.end(JSON.stringify({ message: { role: "assistant", content: out } })), 120);
+    }
+    res.statusCode = 404;
+    res.end("{}");
+  });
+});
+await new Promise((r) => ollama.listen(0, "127.0.0.1", r));
+const ollamaUrl = `http://127.0.0.1:${ollama.address().port}`;
+
 // Minimal Slack Web API stand-in so integrations can be exercised end to end.
 const slackPosted = [];
 const slack = http.createServer((req, res) => {
@@ -904,6 +924,48 @@ try {
   await page.getByTestId("voice-status").waitFor({ state: "detached", timeout: 5000 });
   await page.getByRole("button", { name: "Modo voz" }).dispatchEvent("click"); // a toast about the finished run may cover it
   check((await page.getByRole("button", { name: "Modo voz" }).getAttribute("aria-pressed")) === "false", "talk mode switches off");
+  // Chat: edit a sent message, ↑ recalls the last one, stop a long answer, and a message waits its turn.
+  await page.getByRole("button", { name: "Editar y reenviar" }).first().dispatchEvent("click");
+  check((await page.getByLabel("Mensaje para Claude").inputValue()) === "Hola Claude, ¿me explicas los closures?", "«Editar y reenviar» puts a sent message back in the box");
+  await page.getByLabel("Mensaje para Claude").fill("");
+  await page.keyboard.press("ArrowUp");
+  check((await page.getByLabel("Mensaje para Claude").inputValue()).includes("segunda pregunta"), "↑ in an empty box recalls the last message");
+  await page.getByLabel("Mensaje para Claude").fill("SLEEP respuesta larga");
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Detener" }).waitFor({ timeout: 10000 });
+  await page.getByLabel("Mensaje para Claude").fill("después, otra cosa");
+  await page.keyboard.press("Enter");
+  await page.getByTestId("queued").waitFor();
+  check(true, "a message written while Claude answers waits its turn");
+  await page.getByRole("button", { name: "Detener" }).dispatchEvent("click");
+  await page.getByTestId("queued").waitFor({ state: "detached", timeout: 15000 });
+  await page.locator("main").getByText("después, otra cosa").first().waitFor({ timeout: 15000 });
+  check(true, "stopping the answer sends the waiting message");
+  // The local model: it corrects while you type (applied, undoable) and improves the prompt on request.
+  const auth = { authorization: `Bearer ${token}`, "content-type": "application/json" };
+  await fetch(base + "/api/ollama", { method: "PUT", headers: auth, body: JSON.stringify({ enabled: true, baseUrl: ollamaUrl, model: "fake:1b", autocorrect: "auto" }) });
+  await page.goto(`${base}/chat`);
+  const OBOX = "textarea[aria-label='Mensaje para Claude']";
+  await page.locator(OBOX).waitFor();
+  await page.waitForTimeout(600); // the settings reach the page
+  await page.locator(OBOX).fill("hola q tal, tengo herrores en mi codigo");
+  await page.waitForFunction((q) => document.querySelector(q).value === "hola qué tal, tengo errores en mi codigo", OBOX, { timeout: 8000 });
+  check(true, "the local model corrects what is typed when you pause");
+  await page.getByTestId("assist-chip").waitFor();
+  await page.getByRole("button", { name: "Deshacer" }).click();
+  check((await page.locator(OBOX).inputValue()) === "hola q tal, tengo herrores en mi codigo", "the correction can be undone");
+  await page.locator(OBOX).fill("arregla el login que falla");
+  await page.getByRole("button", { name: "Mejorar prompt" }).click();
+  await page.waitForFunction((q) => document.querySelector(q).value === "## Objetivo\narregla el login que falla", OBOX, { timeout: 8000 });
+  check(true, "«Mejorar prompt» rewrites and organises the prompt with the local model");
+  await page.goto(`${base}/settings`);
+  await page.getByText("IA local (Ollama)").first().waitFor();
+  await page.getByText("conectado", { exact: true }).waitFor({ timeout: 8000 });
+  check((await page.getByLabel("Modelo de Ollama").inputValue()) === "fake:1b", "Ajustes shows the local model and that it is connected");
+  await fetch(base + "/api/ollama", { method: "PUT", headers: auth, body: JSON.stringify({ enabled: false }) });
+  await page.goto(`${base}/chat`);
+  await page.getByRole("button", { name: /Nuevo chat/ }).first().waitFor();
+
   // A long curl pasted into the chat must not widen the conversation either.
   await page.getByRole("button", { name: /Nuevo chat/ }).first().click();
   const tok = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9".repeat(8);
@@ -1296,6 +1358,7 @@ try {
   await browser?.close();
   server.kill("SIGTERM");
   slack.close();
+  ollama.close();
   github.close();
   jira.close();
   fs.rmSync(tmp, { recursive: true, force: true });

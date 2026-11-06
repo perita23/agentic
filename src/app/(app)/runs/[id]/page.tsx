@@ -30,6 +30,7 @@ import { FileList, useFileMenu } from "@/components/app/file-menu";
 import { LiveStatus } from "@/components/app/live-status";
 import { Appear } from "@/components/app/appear";
 import { ObsidianNotes } from "@/components/app/obsidian";
+import { AssistChip, ImproveButton, usePromptAssist } from "@/components/app/prompt-assist";
 import { VoiceButton, VoiceInline } from "@/components/app/voice";
 import { LiveStatsAcc, compactTokens, type LiveStats } from "@/lib/live-stats";
 import { useStickToBottom } from "@/lib/use-stick-bottom";
@@ -426,6 +427,7 @@ function ReplyBox({ run }: { run: Run }) {
   const menu = useSlashMenu(text, setText, commands);
   const boxRef = React.useRef<HTMLTextAreaElement>(null);
   const files = useFileMenu(text, setText, boxRef, run.projectPath);
+  const assist = usePromptAssist(text, () => boxRef.current);
   const att = useAttachments();
   const [drag, setDrag] = React.useState(false);
   const waiting = run.status === "running";
@@ -570,10 +572,12 @@ function ReplyBox({ run }: { run: Run }) {
           placeholder={waiting ? "Claude está trabajando. Escribe y tu mensaje se enviará en cuanto termine (puedes dejar varios en cola)." : noSession ? "Esta ejecución no tiene sesión que continuar." : "Responde a Claude. Escribe / para comandos y @ para archivos, o pega o arrastra imágenes y textos largos."}
           className="min-h-32 w-full resize-y rounded-md border bg-inset p-3 text-sm disabled:opacity-60"
         />
+        <AssistChip a={assist} />
         <VoiceInline />
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <AttachButton att={att} disabled={off} />
+        <ImproveButton a={assist} />
         <VoiceButton />
         <BranchSwitcher project={run.projectPath} disabled={waiting} disabledReason="Claude está trabajando: espera a que termine para cambiar de rama" />
         <select aria-label="Permisos" value={mode} onChange={(e) => setMode(e.target.value)} className="h-8 rounded-md border bg-inset px-2 text-xs" disabled={off}>
