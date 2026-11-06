@@ -114,6 +114,19 @@ h1 { margin: 0 auto; max-width: 880px; font-size: clamp(38px, 6.4vw, 72px); line
 .chip:focus-visible, .btn:focus-visible, .nav a:focus-visible { outline: 2px solid var(--glow); outline-offset: 3px; }
 .hint { margin: 12px 0 0; font-size: 13px; color: #6d6d6d; }
 
+/* ---- What it works with ---- */
+.engine { padding: 70px 0 10px; }
+.engine-head { max-width: 720px; }
+.engine-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 34px; }
+.engine-card { padding: 26px 26px 28px; background: var(--card); border: 1px solid var(--border); border-radius: 18px; transition: border-color 0.3s, transform 0.3s; }
+.engine-card:hover { border-color: var(--border-strong); transform: translateY(-2px); }
+.engine-card:first-child { background: radial-gradient(ellipse at 0% 0%, color-mix(in srgb, #8b6cf5 16%, #111), #111 70%); }
+.engine-card:last-child { background: radial-gradient(ellipse at 100% 0%, color-mix(in srgb, #34d399 14%, #111), #111 70%); }
+.engine-card h3 { font-size: 22px; }
+.engine-card p { margin: 10px 0 0; color: #b0b0b0; font-size: 16px; }
+.engine-note { margin: 16px 2px 0; color: var(--muted); font-size: 14px; }
+@media (max-width: 760px) { .engine-grid { grid-template-columns: 1fr; } }
+
 /* ---- Story: a sticky orb that follows what you read ---- */
 .story { padding: 90px 0 30px; }
 .story-head { max-width: 640px; margin-bottom: 40px; }
