@@ -995,6 +995,23 @@ try {
   await page.waitForFunction((q) => document.querySelector(q).value === "dime que tengo errores en el código y corrige escribiendo ", OBOX, { timeout: 8000 });
   check(await page.locator(OBOX).evaluate((e) => e.selectionStart === e.value.length), "the caret stays where you were typing");
   await page.locator(OBOX).fill("");
+  // Not only the message boxes: any field for prose (a task's title and description) is corrected too, and searches are left alone.
+  await page.goto(`${base}/tasks`);
+  await page.getByRole("button", { name: "Nueva tarea" }).first().click();
+  await page.getByPlaceholder("Título de la tarea").waitFor();
+  await page.waitForTimeout(500);
+  await page.getByPlaceholder("Título de la tarea").click();
+  await page.getByPlaceholder("Título de la tarea").pressSequentially("corrije los herrores del login ", { delay: 40 });
+  await page.waitForFunction(() => document.querySelector("input[placeholder='Título de la tarea']").value === "corrige los errores del login ", null, { timeout: 8000 });
+  check(true, "task titles are corrected word by word too");
+  await page.getByPlaceholder("Contexto, criterios de aceptación…").click();
+  await page.getByPlaceholder("Contexto, criterios de aceptación…").pressSequentially("tambien hay herrores en el codigo ", { delay: 35 });
+  await page.waitForFunction(() => document.querySelector("textarea[placeholder='Contexto, criterios de aceptación…']").value === "también hay errores en el código ", null, { timeout: 8000 });
+  check(true, "and so are task descriptions");
+  await page.getByPlaceholder("bug, frontend").pressSequentially("codigo ", { delay: 30 });
+  await page.waitForTimeout(900);
+  check((await page.getByPlaceholder("bug, frontend").inputValue()) === "codigo ", "tag fields are left as typed");
+  await page.keyboard.press("Escape");
   await page.goto(`${base}/settings`);
   await page.getByText("IA local (Ollama)").first().waitFor();
   await page.getByText("conectado", { exact: true }).waitFor({ timeout: 8000 });
