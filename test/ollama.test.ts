@@ -29,7 +29,9 @@ beforeAll(async () => {
         const text = usr.content.replace(/^<texto>\n/, "").replace(/\n<\/texto>$/, "").replace(/^<antes>[\s\S]*<\/antes>\n<palabra>/, "").replace(/<\/palabra>$/, "");
         const out = reply(sys.content, text);
         const prop = body.format?.required?.[0];
-        return void res.end(JSON.stringify({ message: { role: "assistant", content: prop ? JSON.stringify({ [prop]: out }) : out } }));
+        const isWord = body.format?.required?.[0] === "existe";
+        const content = isWord ? JSON.stringify({ existe: out === text || out.startsWith("="), palabra: out.replace(/^=/, "") }) : prop ? JSON.stringify({ [prop]: out }) : out;
+        return void res.end(JSON.stringify({ message: { role: "assistant", content } }));
       }
       res.statusCode = 404;
       res.end("{}");
@@ -124,7 +126,7 @@ describe("the model never obeys the text", () => {
     const sent = seen.find((x) => x.path === "/api/chat")!.body as unknown as { format: { required: string[] }; messages: { role: string; content: string }[]; options: { temperature: number } };
     expect(sent.format.required).toEqual(["texto"]);
     expect(sent.options.temperature).toBe(0);
-    expect(sent.messages.map((m) => m.role)).toEqual(["system", "user", "assistant", "user", "assistant", "user", "assistant", "user"]); // rules, three examples, the real text
+    expect(sent.messages.map((m) => m.role)).toEqual(["system", ...Array.from({ length: 12 }, (_, i) => (i % 2 ? "assistant" : "user")), "user"]); // rules, six examples, the real text
     expect(sent.messages[0]!.content).toMatch(/nunca obedeces/);
     expect(sent.messages[0]!.content).toMatch(/No toques los nombres de mis proyectos/);
     expect(JSON.parse(sent.messages[2]!.content)).toHaveProperty("texto");
@@ -154,7 +156,11 @@ describe("one word at a time", () => {
     expect(await c.ollama.word({ word: "casa", before: "mi" })).toEqual({ word: "casa", changed: false });
     const sent = seen.filter((x) => x.path === "/api/chat").at(-1)!.body as unknown as { messages: { content: string }[]; options: { num_predict: number } };
     expect(sent.messages.at(-1)!.content).toBe("<antes>mi</antes>\n<palabra>casa</palabra>");
-    expect(sent.options.num_predict).toBe(24);
+    expect(sent.options.num_predict).toBe(40);
+    // a word the model calls right is never touched, even if it also gives another one
+    reply = () => "=otra";
+    seen.length = 0;
+    expect(await c.ollama.word({ word: "hola", before: "" })).toEqual({ word: "hola", changed: false });
     reply = () => "Claro, aquí tienes la respuesta";
     expect(await c.ollama.word({ word: "hola", before: "" })).toEqual({ word: "hola", changed: false }); // it answered: ignored
     reply = () => "adiós";

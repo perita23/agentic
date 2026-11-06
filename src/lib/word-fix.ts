@@ -48,6 +48,30 @@ const SHORTHAND: Record<string, string> = {
   pls: "por favor",
 };
 
+/**
+ * Frequent misspellings in Spanish with one sure correction: fixed on the spot, the same every time (a small model is
+ * unreliable on exactly these). Only forms that are not words of their own, or of English/other languages.
+ */
+const MISSPELT: Record<string, string> = {
+  // verbs and common words
+  corrije: "corrige", corrijes: "corriges", escrivir: "escribir", escrivo: "escribo", escrive: "escribe", eskribir: "escribir",
+  aora: "ahora", haora: "ahora", agradesco: "agradezco", entonses: "entonces", entonzes: "entonces",
+  nesesito: "necesito", nesecito: "necesito", nesesitas: "necesitas", nesecitas: "necesitas", nesesitamos: "necesitamos", nesecitamos: "necesitamos", nesesario: "necesario", nesecario: "necesario",
+  probrema: "problema", porblema: "problema", probelma: "problema", probremas: "problemas", porblemas: "problemas",
+  exelente: "excelente", exepcion: "excepción", excepcion: "excepción", exixtir: "existir",
+  desir: "decir", dise: "dice", disen: "dicen", dijistes: "dijiste", fuistes: "fuiste", vistes: "viste", hicistes: "hiciste",
+  haver: "haber", abeces: "a veces", aveces: "a veces", osea: "o sea", talvez: "tal vez", sinembargo: "sin embargo", porfabor: "por favor",
+  ise: "hice", hize: "hice", prueva: "prueba", pruevas: "pruebas", boluntad: "voluntad", bolver: "volver", bamos: "vamos",
+  imbitar: "invitar", inbitar: "invitar", enbiar: "enviar", embiar: "enviar", ablar: "hablar", ablo: "hablo", abla: "habla", aser: "hacer", asemos: "hacemos", azer: "hacer",
+  // missing accents (only forms that are no word of their own)
+  tambien: "también", asi: "así", ademas: "además", despues: "después", aqui: "aquí", alli: "allí", ahi: "ahí", detras: "detrás", atras: "atrás",
+  facil: "fácil", dificil: "difícil", rapido: "rápido", manana: "mañana", espanol: "español", contrasena: "contraseña", diseno: "diseño",
+  codigo: "código", funcion: "función", informacion: "información", configuracion: "configuración", aplicacion: "aplicación", sesion: "sesión", direccion: "dirección", pagina: "página",
+  telefono: "teléfono", numero: "número", musica: "música", ejecucion: "ejecución", conexion: "conexión", descripcion: "descripción", opcion: "opción",
+  instalacion: "instalación", actualizacion: "actualización", organizacion: "organización", relacion: "relación", solucion: "solución", ubicacion: "ubicación",
+  operacion: "operación", decision: "decisión", desision: "decisión", revision: "revisión", razon: "razón", corazon: "corazón",
+};
+
 /** The words of a text with their place. Code blocks are not text: nothing inside them is a word. */
 export function wordsOf(text: string): Token[] {
   const out: Token[] = [];
@@ -85,13 +109,15 @@ export function checkable(text: string, t: Token): boolean {
     if (/[\p{L}\p{N}][/\\@#_$%=<>{}[\]][\p{L}\p{N}]|\w\.\w|:\/\/|[0-9]/u.test(chunk)) return false;
   }
   if (text.startsWith("/") && t.start < text.indexOf(" ") + 1) return false; // a /command
+  if (shorthandFix(t.word)) return true; // a known misspelling is always worth fixing
   if (COMMON.has(t.word.toLowerCase())) return false;
   return true;
 }
 
-/** The fix that needs no model (chat shorthand), keeping a capital letter if it had one. */
+/** The fix that needs no model (chat shorthand and frequent misspellings), keeping a capital letter if it had one. */
 export function shorthandFix(word: string): string | null {
-  const fix = SHORTHAND[word.toLowerCase()];
+  const w = word.toLowerCase();
+  const fix = SHORTHAND[w] ?? (Object.hasOwn(MISSPELT, w) ? MISSPELT[w] : undefined);
   if (!fix) return null;
   return /^[A-ZÁÉÍÓÚÑ]/.test(word) ? fix[0]!.toUpperCase() + fix.slice(1) : fix;
 }

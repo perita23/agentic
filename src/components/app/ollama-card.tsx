@@ -103,7 +103,7 @@ export function OllamaCard() {
           </div>
         </details>
         <p className="text-xs text-muted-foreground">
-          Con un modelo pequeño basta (por ejemplo <code>qwen2.5:3b</code>, <code>llama3.2:3b</code> o <code>gemma3:4b</code>; se instalan con <code>ollama pull qwen2.5:3b</code>). Además, el botón «Mejorar» del cuadro de mensaje reescribe tu prompt y lo organiza. Si Ollama no está instalado, es gratis en ollama.com.
+          Para escribir bien en español conviene un modelo de unos <b>7-8 mil millones</b> de parámetros (por ejemplo <code>qwen2.5:7b</code> o <code>llama3.1:8b</code>: <code>ollama pull qwen2.5:7b</code>); los de 3B (<code>qwen2.5:3b</code>, <code>llama3.2:3b</code>) son más rápidos pero se equivocan más. Las faltas más frecuentes (como «corrije» o «tambien») se arreglan siempre, sin depender del modelo. Además, el botón «Mejorar» del cuadro de mensaje reescribe tu prompt y lo organiza. Si Ollama no está instalado, es gratis en ollama.com.
         </p>
       </CardContent>
     </Card>
