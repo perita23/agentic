@@ -10,6 +10,8 @@ export interface LiveStats {
   thinking: string;
   /** The answer being written right now, streamed piece by piece (empty between messages). */
   partial: string;
+  /** All the text Claude has written in this turn so far (finished messages and the one being written), in order. */
+  answer: string;
 }
 
 type Block = { type?: string; id?: string; name?: string; input?: unknown; text?: string; thinking?: string; tool_use_id?: string };
@@ -25,6 +27,7 @@ export class LiveStatsAcc {
   private lastTool: string | null = null;
   private thinking = "";
   private partial = "";
+  private texts = new Map<string, string>(); // finished text messages of the turn, in order
 
   add(ev: unknown) {
     const e = ev as Ev;
@@ -48,6 +51,8 @@ export class LiveStatsAcc {
         } else if (b?.type === "thinking" && typeof b.thinking === "string") this.thinking = b.thinking.slice(-400);
         else if (b?.type === "text") this.thinking = "";
       }
+      const text = (Array.isArray(m.content) ? (m.content as Block[]) : []).flatMap((b) => (b?.type === "text" && typeof b.text === "string" ? [b.text] : [])).join("\n");
+      if (text.trim()) this.texts.set(m.id ?? `anon${this.texts.size}`, text);
     } else if (e.type === "user" && m) {
       for (const b of Array.isArray(m.content) ? (m.content as Block[]) : []) if (b?.type === "tool_result" && b.tool_use_id) this.open.delete(b.tool_use_id);
     }
@@ -58,7 +63,7 @@ export class LiveStatsAcc {
     for (const v of this.out.values()) outputTokens += v;
     // The newest call still waiting for its result.
     const tool = this.lastTool && this.open.has(this.lastTool) ? this.open.get(this.lastTool)! : [...this.open.values()].pop() ?? null;
-    return { outputTokens, contextTokens: this.ctx, tool, thinking: this.thinking, partial: this.partial };
+    return { outputTokens, contextTokens: this.ctx, tool, thinking: this.thinking, partial: this.partial, answer: [...this.texts.values(), this.partial].filter((t) => t.trim()).join("\n") };
   }
 }
 

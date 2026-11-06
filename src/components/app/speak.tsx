@@ -6,9 +6,10 @@ import { AudioLinesIcon, MicIcon, MicOffIcon, SquareIcon, Volume2Icon, XIcon } f
 import { Button } from "@/components/ui/button";
 import { useApi } from "@/lib/api";
 import { resolveLang } from "@/lib/voice/engine";
-import { speaker, type SpeakOptions } from "@/lib/voice/speak";
+import { speaker, streamSentences, type SpeakOptions } from "@/lib/voice/speak";
 import type { Activity, OrbState } from "@/lib/orb-state";
 import { cn } from "@/lib/utils";
+import { MorphText } from "./live-status";
 import { LiquidOrb } from "./liquid-orb";
 import { DEFAULT_VOICE, useVoice, type VoicePrefs } from "./voice";
 
@@ -76,28 +77,57 @@ export function VoiceModeButton({ className }: { className?: string }) {
   );
 }
 
-/** When Claude finishes answering in talk mode, it reads the answer aloud (the stage then listens again). */
-export function VoiceLoop({ running, last }: { running: boolean; last: string }) {
+/**
+ * In talk mode the answer is read as it is written, like Claude Desktop: each finished sentence is spoken while the next
+ * ones are still being produced, instead of waiting for the whole answer.
+ */
+export function VoiceLoop({ running, answer, fallback }: { running: boolean; answer: string; fallback: string }) {
   const v = useVoice();
   const opts = useSpeakOptions();
   const vRef = React.useRef(v);
   const optsRef = React.useRef(opts);
-  const lastRef = React.useRef(last);
+  const fallbackRef = React.useRef(fallback);
   React.useEffect(() => {
     vRef.current = v;
     optsRef.current = opts;
-    lastRef.current = last;
+    fallbackRef.current = fallback;
   });
+  const reading = React.useRef({ on: false, said: 0, text: "" });
   const was = React.useRef(running);
+
   React.useEffect(() => {
+    const r = reading.current;
     const finished = was.current && !running;
     was.current = running;
-    if (!finished || !speaker.state.voiceMode || !lastRef.current.trim()) return;
-    speaker.speak(lastRef.current, {
-      ...optsRef.current,
-      id: "reply",
-    });
-  }, [running]);
+    if (!speaker.state.voiceMode) {
+      r.on = false;
+      return;
+    }
+    if (running) r.text = answer || r.text;
+    if (!running && !finished) return;
+    const text = finished ? r.text || fallbackRef.current : answer;
+    const sentences = streamSentences(text, finished);
+    if (!r.on && sentences.length) {
+      if (!speaker.begin({ ...optsRef.current, id: "reply" })) return;
+      r.on = true;
+      r.said = 0;
+    }
+    if (r.on && sentences.length > r.said) {
+      speaker.push(sentences.slice(r.said).join(" "));
+      r.said = sentences.length;
+    }
+    if (finished) {
+      if (!r.on && text.trim() && speaker.begin({ ...optsRef.current, id: "reply" })) {
+        r.on = true;
+        speaker.push(text);
+      }
+      if (r.on) speaker.end();
+      r.on = false;
+      r.said = 0;
+      r.text = "";
+    }
+  }, [running, answer]);
+
   // Leaving the page silences it and ends talk mode (the microphone is never left open behind your back).
   React.useEffect(
     () => () => {
@@ -107,6 +137,17 @@ export function VoiceLoop({ running, last }: { running: boolean; last: string })
     [],
   );
   return null;
+}
+
+/** A value that changes only after it has held for a moment: the orb never flickers between states. */
+function useSettled<T>(value: T, ms: number): T {
+  const [shown, setShown] = React.useState(value);
+  React.useEffect(() => {
+    if (value === shown) return;
+    const t = setTimeout(() => setShown(value), ms);
+    return () => clearTimeout(t);
+  }, [value, shown, ms]);
+  return shown;
 }
 
 /**
@@ -162,7 +203,9 @@ export function VoiceStage({ activity, busy }: { activity: Activity | null | und
     return () => cancelAnimationFrame(raf);
   }, [reduce]);
 
-  const orb: OrbState = sp.speaking ? "writing" : busy ? (activity?.state ?? "thinking") : paused ? "idle" : v.phase !== "idle" ? "waiting" : "idle";
+  // The orb's own states: blue and alive while it listens, violet while Claude thinks, coral while Claude speaks.
+  const target: OrbState = sp.speaking ? "writing" : busy ? (activity?.state ?? "thinking") : paused ? "idle" : v.phase === "listening" ? "reading" : v.phase !== "idle" ? "thinking" : "idle";
+  const orb = useSettled(target, 650);
   const status = paused
     ? "En pausa"
     : sp.speaking
@@ -206,12 +249,17 @@ export function VoiceStage({ activity, busy }: { activity: Activity | null | und
           <LiquidOrb state={orb} size={200} />
         </div>
       </button>
-      <p data-testid="voice-stage-status" role="status" aria-live="polite" className="text-sm text-muted-foreground">
-        {status}
-      </p>
-      <p data-testid="voice-stage-caption" className="line-clamp-4 min-h-[5.5rem] max-w-xl text-center text-xl leading-snug text-foreground/85">
-        {caption}
-      </p>
+      <div data-testid="voice-stage-status" role="status" aria-live="polite" className="flex max-w-full justify-center">
+        <MorphText text={status} state={orb} glow={!["idle", "waiting", "done", "error"].includes(orb)} className="text-base font-medium" />
+      </div>
+      <div data-testid="voice-stage-caption" className="flex min-h-[5.5rem] max-w-xl justify-center text-center text-xl leading-snug">
+        {sp.speaking ? (
+          // Each sentence Claude says morphs into the next one.
+          <MorphText text={caption} state="writing" glow={false} wrap className="text-xl leading-snug text-foreground/85" />
+        ) : (
+          <p className="line-clamp-4 text-foreground/85">{caption}</p>
+        )}
+      </div>
       <div className="flex items-center gap-3">
         <Button
           type="button"

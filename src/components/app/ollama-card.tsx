@@ -13,7 +13,7 @@ import { api, refresh, useApi } from "@/lib/api";
 import { errorMessage } from "./common";
 
 interface View {
-  settings: { enabled: boolean; baseUrl: string; model: string; autocorrect: "off" | "suggest" | "auto" };
+  settings: { enabled: boolean; baseUrl: string; model: string; autocorrect: "off" | "words" | "suggest" | "auto"; correctExtra: string; improveExtra: string };
   reachable: boolean;
   models: { name: string; size: number }[];
   error: string | null;
@@ -79,14 +79,29 @@ export function OllamaCard() {
         <label className="flex items-center justify-between gap-4">
           <span>
             Corregir mientras escribo
-            <span className="block text-xs text-muted-foreground">Cuando haces una pausa. «Aplicar solo» lo cambia por ti (Ctrl/⌘+Z lo deshace); «Sugerir» te lo propone.</span>
+            <span className="block text-xs text-muted-foreground">«Palabra a palabra» revisa cada palabra en cuanto la terminas y la arregla al instante (Ctrl/⌘+Z lo deshace). «Al pausar» revisa la frase entera cuando dejas de escribir.</span>
           </span>
           <select aria-label="Corrección al escribir" value={s.autocorrect} disabled={!s.enabled} onChange={(e) => void save({ autocorrect: e.target.value as View["settings"]["autocorrect"] })} className="h-8 rounded-md border bg-transparent px-2 text-sm">
             <option value="off">Desactivada</option>
-            <option value="suggest">Sugerir</option>
-            <option value="auto">Aplicar solo</option>
+            <option value="words">Palabra a palabra</option>
+            <option value="suggest">Al pausar: sugerir</option>
+            <option value="auto">Al pausar: aplicar sola</option>
           </select>
         </label>
+        <details className="rounded-lg border px-3 py-2">
+          <summary className="cursor-pointer text-xs text-muted-foreground">Instrucciones para el modelo</summary>
+          <div className="mt-2 grid gap-3">
+            <p className="text-xs text-muted-foreground">El modelo ya viene instruido para corregir y reescribir <b>sin responder nunca</b> a lo que escribes, aunque parezca una orden. Aquí puedes añadir tus propias reglas.</p>
+            <label className="grid gap-1.5 text-xs">
+              <span className="font-medium text-foreground">Al corregir</span>
+              <textarea aria-label="Instrucciones al corregir" rows={3} maxLength={1500} defaultValue={s.correctExtra} disabled={!s.enabled} onBlur={(e) => e.target.value !== s.correctExtra && void save({ correctExtra: e.target.value })} placeholder="Ej.: No toques los nombres de mis proyectos (Agentic, Obsidian). Escribo en español de España." className="min-h-16 w-full resize-y rounded-md border bg-transparent p-2 text-sm" />
+            </label>
+            <label className="grid gap-1.5 text-xs">
+              <span className="font-medium text-foreground">Al mejorar el prompt</span>
+              <textarea aria-label="Instrucciones al mejorar el prompt" rows={3} maxLength={1500} defaultValue={s.improveExtra} disabled={!s.enabled} onBlur={(e) => e.target.value !== s.improveExtra && void save({ improveExtra: e.target.value })} placeholder="Ej.: Escribe siempre en español, con los pasos numerados y pidiendo que Claude primero lea el código antes de cambiar nada." className="min-h-16 w-full resize-y rounded-md border bg-transparent p-2 text-sm" />
+            </label>
+          </div>
+        </details>
         <p className="text-xs text-muted-foreground">
           Con un modelo pequeño basta (por ejemplo <code>qwen2.5:3b</code>, <code>llama3.2:3b</code> o <code>gemma3:4b</code>; se instalan con <code>ollama pull qwen2.5:3b</code>). Además, el botón «Mejorar» del cuadro de mensaje reescribe tu prompt y lo organiza. Si Ollama no está instalado, es gratis en ollama.com.
         </p>

@@ -29,3 +29,17 @@ describe("formatting", () => {
     expect([formatElapsed(4200), formatElapsed(65_000)]).toEqual(["4 s", "1 min 05 s"]);
   });
 });
+
+describe("the answer so far", () => {
+  it("is every finished text message of the turn plus the one being written, in order, each once", () => {
+    const text = (id: string, t: string) => ({ type: "assistant", message: { id, content: [{ type: "text", text: t }] } });
+    const delta = (d: string) => ({ type: "agentic", subtype: "partial", delta: d });
+    expect(liveStats([delta("Voy a ")]).answer).toBe("Voy a ");
+    expect(liveStats([delta("Voy a revisar."), text("m1", "Voy a revisar.")]).answer).toBe("Voy a revisar.");
+    // the same message arriving twice (growing usage) is counted once
+    expect(liveStats([text("m1", "Voy a revisar."), text("m1", "Voy a revisar.")]).answer).toBe("Voy a revisar.");
+    const events = [text("m1", "Voy a revisar."), { type: "assistant", message: { id: "m2", content: [{ type: "tool_use", id: "t1", name: "Read", input: {} }] } }, delta("Ya lo he "), ];
+    expect(liveStats(events).answer).toBe("Voy a revisar.\nYa lo he ");
+    expect(liveStats([...events, text("m3", "Ya lo he visto.")]).answer).toBe("Voy a revisar.\nYa lo he visto.");
+  });
+});

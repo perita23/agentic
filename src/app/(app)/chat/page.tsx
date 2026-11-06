@@ -10,10 +10,11 @@ import { Markdown } from "@/components/app/markdown";
 import { CyclingOrb, LiquidOrb } from "@/components/app/liquid-orb";
 import { LiveStatus } from "@/components/app/live-status";
 import { Appear } from "@/components/app/appear";
-import { AssistChip, ImproveButton, usePromptAssist } from "@/components/app/prompt-assist";
+import { AssistChip, ImproveButton, usePromptAssist, WordMorphs } from "@/components/app/prompt-assist";
 import { AnimatePresence, ReadAloudButton, useSpeaker, VoiceLoop, VoiceModeButton, VoiceStage } from "@/components/app/speak";
 import { VoiceButton, VoiceInline } from "@/components/app/voice";
 import { replaceAll } from "@/lib/voice/insert";
+import { speaker } from "@/lib/voice/speak";
 import { useStickToBottom } from "@/lib/use-stick-bottom";
 import type { LiveStats } from "@/lib/live-stats";
 import { SlashList, useSlashCommands, useSlashMenu } from "@/components/app/slash-menu";
@@ -259,6 +260,7 @@ function Composer({ onSend, busy, running, onStop, lastSent, autoFocus, model, s
         </div>
       )}
       <AssistChip a={assist} />
+      <WordMorphs a={assist} />
       <VoiceInline />
       <div className="flex items-center justify-between gap-2 px-3 pb-2.5">
         <div className="flex items-center gap-2">
@@ -304,7 +306,7 @@ export default function ChatPage() {
   const [sending, setSending] = React.useState(false);
   // Shown the instant you send, before the server answers (the conversation feels immediate).
   const [optimistic, setOptimistic] = React.useState<string | null>(null);
-  const { data: chat } = useApi<ChatDetail>(selected ? `/api/chats/${selected}` : null, { refreshInterval: (d) => (d?.running ? 700 : 0) });
+  const { data: chat } = useApi<ChatDetail>(selected ? `/api/chats/${selected}` : null, { refreshInterval: (d) => (d?.running ? (speaker.state.voiceMode ? 350 : 700) : 0) });
   // The optimistic bubble only stands in until the server shows the same message.
   const optimisticShown = optimistic && !chat?.pendingPrompt && !chat?.messages.some((m) => m.role === "user" && m.text.trim() === optimistic.trim()) ? optimistic : null;
 
@@ -312,7 +314,7 @@ export default function ChatPage() {
     setSending(true);
     setOptimistic(prompt);
     try {
-      const c = await api<ChatItem>("POST", "/api/chats", { prompt, model: o.model ?? model, permissionMode: o.mode ?? mode });
+      const c = await api<ChatItem>("POST", "/api/chats", { prompt, model: o.model ?? model, permissionMode: o.mode ?? mode, voice: speaker.state.voiceMode });
       setSelected(c.id);
       refresh("/api/chats");
       return true;
@@ -330,7 +332,7 @@ export default function ChatPage() {
     setSending(true);
     setOptimistic(prompt);
     try {
-      await api("POST", `/api/chats/${selected}/messages`, { prompt, model: o.model ?? model, permissionMode: o.mode ?? mode });
+      await api("POST", `/api/chats/${selected}/messages`, { prompt, model: o.model ?? model, permissionMode: o.mode ?? mode, voice: speaker.state.voiceMode });
       refresh(`/api/chats/${selected}`, "/api/chats");
       return true;
     } catch (e) {
@@ -353,7 +355,14 @@ export default function ChatPage() {
   }
   const lastSent = [...(chat?.messages ?? [])].reverse().find((m) => m.role === "user")?.text ?? "";
   const talk = useSpeaker();
-  const lastAnswer = [...(chat?.messages ?? [])].reverse().find((m) => m.role === "assistant")?.text ?? "";
+  // The answer of the turn as the transcript has it (when the stream did not show it).
+  const msgs = chat?.messages ?? [];
+  const lastUser = msgs.map((m) => m.role).lastIndexOf("user");
+  const turnAnswer = msgs
+    .slice(lastUser + 1)
+    .filter((m) => m.role === "assistant" && m.text.trim())
+    .map((m) => m.text)
+    .join("\n");
 
   async function remove(id: string) {
     if (!confirm("¿Borrar esta conversación del historial?")) return;
@@ -372,7 +381,7 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <VoiceLoop running={!!chat?.running} last={lastAnswer} />
+      <VoiceLoop running={!!chat?.running} answer={chat?.live?.answer ?? ""} fallback={turnAnswer} />
       <AnimatePresence>{talk.voiceMode && <VoiceStage key="stage" activity={chat?.activity} busy={sending || !!chat?.running} />}</AnimatePresence>
       <PageHeader
         icon={SparklesIcon}

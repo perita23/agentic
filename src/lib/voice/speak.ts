@@ -65,6 +65,27 @@ export function splitForSpeech(text: string, max = 220): string[] {
 }
 
 export type VoiceInEntry = VoiceInfo | SpeechSynthesisVoice;
+/**
+ * The sentences of a text that is still being written: what can already be said. The last piece, which has no end yet,
+ * waits (unless the answer is over, or it has gone on so long that it is better said in parts).
+ */
+export function streamSentences(text: string, final: boolean): string[] {
+  const t = speechText(text);
+  if (!t) return [];
+  const out: string[] = [];
+  for (const line of t.split("\n")) {
+    const pieces = line.match(/[^.!?…]+(?:[.!?…]+(?=\s|$)|$)\s*/g) ?? [];
+    for (const p of pieces) out.push(p.trim());
+  }
+  const lastLine = t.split("\n").pop() ?? "";
+  const open = !/[.!?…:]\s*$/.test(lastLine) && !t.endsWith("\n");
+  if (!final && open && out.length) {
+    const tail = out[out.length - 1]!;
+    if (tail.length < 180) out.pop(); // not finished: it waits
+  }
+  return out.filter(Boolean);
+}
+
 export interface VoiceInfo {
   voiceURI: string;
   name: string;
@@ -183,46 +204,104 @@ class Speaker {
     this.set({ voiceMode: on });
   }
 
-  speak(markdown: string, o: SpeakOptions) {
+  // ---- The queue: text can keep arriving while it speaks (an answer is read as it is written).
+  private queue: string[] = [];
+  private ended = true;
+  private talking = false;
+  private opts: SpeakOptions | null = null;
+  private voice: VoiceInEntry | null = null;
+  private pulse: ReturnType<typeof setInterval> | undefined;
+
+  /** Starts reading something that will arrive in pieces: `push` what comes, then `end`. */
+  begin(o: SpeakOptions) {
     this.stop();
-    if (!this.web() && !this.native.length) return void o.onEnd?.();
-    const chunks = splitForSpeech(speechText(markdown));
-    if (!chunks.length) return void o.onEnd?.();
-    const gen = ++this.gen;
-    const voice = pickVoice(this.voices(), o.lang, o.voiceURI);
-    const bridge = voice?.voiceURI.startsWith(SAY_PREFIX) ? nativeBridge() : null;
-    this.set({ speaking: true, id: o.id, caption: "" });
-    const done = (natural: boolean) => {
+    if (!this.web() && !this.native.length) return false;
+    this.gen++;
+    this.opts = o;
+    this.voice = pickVoice(this.voices(), o.lang, o.voiceURI);
+    this.queue = [];
+    this.ended = false;
+    this.talking = false;
+    return true;
+  }
+
+  push(text: string) {
+    if (!this.opts || this.ended) return;
+    this.queue.push(...splitForSpeech(speechText(text)));
+    this.pump();
+  }
+
+  /** Nothing more will come: when it has said everything, it is over. */
+  end() {
+    if (!this.opts) return;
+    this.ended = true;
+    this.pump();
+  }
+
+  /** Reads all of it (already complete). */
+  speak(markdown: string, o: SpeakOptions) {
+    if (!this.begin(o)) return void o.onEnd?.();
+    this.push(markdown);
+    this.end();
+  }
+
+  private finish(natural: boolean, gen: number) {
+    if (gen !== this.gen) return;
+    clearInterval(this.pulse);
+    const o = this.opts;
+    this.opts = null;
+    this.queue = [];
+    this.talking = false;
+    this.set({ speaking: false, id: null, caption: "" });
+    if (natural) o?.onEnd?.();
+  }
+
+  private pump() {
+    const o = this.opts;
+    if (!o || this.talking) return;
+    const gen = this.gen;
+    if (!this.queue.length) {
+      if (this.ended) this.finish(true, gen);
+      return;
+    }
+    // Pieces that are already waiting are joined into one breath (fewer gaps between them).
+    let chunk = this.queue.shift()!;
+    while (this.queue.length && (chunk + " " + this.queue[0]).length <= 220) chunk += " " + this.queue.shift();
+    this.talking = true;
+    const bridge = this.voice?.voiceURI.startsWith(SAY_PREFIX) ? nativeBridge() : null;
+    if (!this.state.speaking) {
+      this.set({ speaking: true, id: o.id });
+      // The Mac's voices say nothing about words: the bars move at about the rhythm of speech.
+      if (bridge) this.pulse = setInterval(() => (this.lvl = 0.35 + Math.random() * 0.55), 230);
+    }
+    this.set({ caption: chunk });
+    const next = (ok: boolean) => {
       if (gen !== this.gen) return;
-      clearInterval(pulse);
-      this.set({ speaking: false, id: null, caption: "" });
-      if (natural) o.onEnd?.();
+      this.talking = false;
+      if (!ok) return this.finish(false, gen);
+      this.pump();
     };
-    // The Mac's voices say nothing about words: the bars move at about the rhythm of speech.
-    const pulse = bridge ? setInterval(() => (this.lvl = 0.35 + Math.random() * 0.55), 230) : undefined;
-    const next = (i: number) => {
-      if (gen !== this.gen) return;
-      if (i >= chunks.length) return done(true);
-      this.set({ caption: chunks[i]! });
-      if (bridge && voice) {
-        void bridge.say(chunks[i]!, voice.name, o.rate ?? 1).then((ok) => (ok ? next(i + 1) : gen === this.gen && done(false)));
-        return;
-      }
-      const u = new SpeechSynthesisUtterance(chunks[i]);
-      u.lang = voice?.lang ?? o.lang;
-      if (voice && "default" in voice) u.voice = voice as SpeechSynthesisVoice;
-      u.rate = Math.min(2, Math.max(0.5, o.rate ?? 1));
-      u.onboundary = () => (this.lvl = 0.85);
-      u.onend = () => next(i + 1);
-      u.onerror = (e) => (e.error === "interrupted" || e.error === "canceled" ? undefined : done(false));
-      window.speechSynthesis.speak(u);
-    };
-    next(0);
+    if (bridge && this.voice) {
+      void bridge.say(chunk, this.voice.name, o.rate ?? 1).then(next);
+      return;
+    }
+    const u = new SpeechSynthesisUtterance(chunk);
+    u.lang = this.voice?.lang ?? o.lang;
+    if (this.voice && "default" in this.voice) u.voice = this.voice as SpeechSynthesisVoice;
+    u.rate = Math.min(2, Math.max(0.5, o.rate ?? 1));
+    u.onboundary = () => (this.lvl = 0.85);
+    u.onend = () => next(true);
+    u.onerror = (e) => (e.error === "interrupted" || e.error === "canceled" ? undefined : next(false));
+    window.speechSynthesis.speak(u);
   }
 
   /** Silence (never counts as having finished: nobody listens afterwards). */
   stop() {
     this.gen++;
+    clearInterval(this.pulse);
+    this.opts = null;
+    this.queue = [];
+    this.talking = false;
     nativeBridge()?.stop();
     if (this.web()) window.speechSynthesis.cancel();
     if (this.state.speaking) this.set({ speaking: false, id: null, caption: "" });

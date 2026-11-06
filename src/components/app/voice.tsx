@@ -47,6 +47,9 @@ export const useVoice = () => React.useContext(Ctx);
 
 const HOLD_MS = 300;
 const SILENCE_MS = 9000;
+/** Talk mode: how long after your last word it takes your sentence as finished, and how long it waits for you to start. */
+const TALK_END_MS = 1300;
+const TALK_IDLE_MS = 14000;
 
 /** The field a Space press would type into when it is empty: there, holding Space dictates instead. */
 function holdTarget(): "page" | "empty-field" | null {
@@ -164,10 +167,14 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     complete();
   };
 
-  const armSilence = () => {
-    if (silenceTimer.current) clearTimeout(silenceTimer.current);
+  const armSilence = (fromLevel = false) => {
     // Started with the microphone button, it stops by itself after a while of silence.
-    if (modeRef.current === "click") silenceTimer.current = setTimeout(finish, SILENCE_MS);
+    if (modeRef.current !== "click") return;
+    const talk = speaker.state.voiceMode;
+    // Talk mode: once words have been heard only words count as speech (noise in the room does not hold it back).
+    if (talk && fromLevel && textRef.current) return;
+    if (silenceTimer.current) clearTimeout(silenceTimer.current);
+    silenceTimer.current = setTimeout(finish, talk ? (textRef.current ? TALK_END_MS : TALK_IDLE_MS) : SILENCE_MS);
   };
 
   const start = async (m: "hold" | "click") => {
@@ -202,7 +209,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         onLevel: (v) => {
           smooth = v > smooth ? v : smooth * 0.8 + v * 0.2;
           level.set(smooth);
-          if (v > 0.15) armSilence();
+          if (v > 0.15) armSilence(true);
         },
         onError: (msg) => toast.error(msg),
         onEnd: complete,

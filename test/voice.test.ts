@@ -197,3 +197,29 @@ let t = ""; process.stdin.on("data", (d) => (t += d)); process.stdin.on("end", (
     expect(pickVoice(voices, "en-US")?.voiceURI).toBe("say:Samantha (Premium)");
   });
 });
+
+import { streamSentences } from "@/lib/voice/speak";
+
+describe("reading an answer while it is being written", () => {
+  it("offers the finished sentences and keeps the unfinished one for later", () => {
+    expect(streamSentences("Voy a revisar el archivo. Ahora miro", false)).toEqual(["Voy a revisar el archivo."]);
+    expect(streamSentences("Voy a revisar el archivo. Ahora miro", true)).toEqual(["Voy a revisar el archivo.", "Ahora miro"]);
+    expect(streamSentences("Hola", false)).toEqual([]);
+    expect(streamSentences("¿Qué tal? Muy bien!", false)).toEqual(["¿Qué tal?", "Muy bien!"]);
+  });
+  it("never grows backwards: more text only adds sentences at the end", () => {
+    const full = "Primero esto. Luego aquello, que es largo. Y al final eso otro.";
+    let prev: string[] = [];
+    for (let i = 1; i <= full.length; i++) {
+      const now = streamSentences(full.slice(0, i), false);
+      expect(now.slice(0, prev.length)).toEqual(prev);
+      prev = now;
+    }
+    expect(prev).toEqual(["Primero esto.", "Luego aquello, que es largo.", "Y al final eso otro."]);
+  });
+  it("skips code while it is being written, and a very long unfinished sentence is spoken in parts", () => {
+    expect(streamSentences("Mira esto.\n```js\nconst a", false)).toEqual(["Mira esto."]);
+    expect(streamSentences("a".repeat(30) + " " + "b".repeat(170), false)).toHaveLength(1);
+    expect(streamSentences("Un título\n\nOtra línea sin punto", false)).toEqual(["Un título"]);
+  });
+});
