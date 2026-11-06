@@ -3,6 +3,21 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.52.0] - 2026-11-06
+
+### Añadido
+- **IA local con Ollama.** En **Ajustes → IA local (Ollama)** activas un modelo que corre en tu ordenador (eliges cuál de los que tengas instalados; se detecta solo en `127.0.0.1:11434`, y puedes cambiar la dirección). Nada sale de tu equipo. Sirve para dos cosas, en el chat y en la respuesta de una ejecución:
+  - **Corregir mientras escribes.** Cuando haces una pausa corrige faltas, tildes y puntuación sin tocar el significado, el tono, el idioma, el código ni las rutas. Tres modos: desactivada, **sugerir** (una línea con la propuesta y «Aplicar») o **aplicar sola** (lo cambia por ti y aparece «Deshacer»; **Ctrl/⌘+Z** también lo deshace). Si el modelo se pasa de listo (responde, traduce, reescribe), se ignora su corrección.
+  - **Botón «Mejorar»** (la chispa, junto al micrófono): reescribe tu prompt y lo organiza (objetivo, contexto, requisitos…) conservando toda la información y el idioma, listo para Claude. También se puede deshacer.
+- **Chat más cómodo.**
+  - **Detener** la respuesta con el botón del cuadrado.
+  - Puedes **seguir escribiendo mientras Claude responde**: el mensaje queda en cola y se envía solo al terminar (o se recupera con la ✕).
+  - **↑ en la caja vacía** trae de vuelta tu último mensaje.
+  - Bajo tus mensajes: **Copiar** y **Editar y reenviar** (lo devuelve a la caja); bajo las respuestas: **Copiar**, junto al altavoz.
+
+### Corregido
+- (Incluido en 0.51.1) Los ajustes de «Agentic para Claude» ya no se pierden al actualizar.
+
 ## [0.51.1] - 2026-11-06
 
 ### Corregido

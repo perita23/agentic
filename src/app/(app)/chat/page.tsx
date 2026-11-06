@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowDownIcon, ArrowUpIcon, BookOpenIcon, CodeIcon, ListChecksIcon, Loader2Icon, MessageSquarePlusIcon, PinIcon, RegexIcon, SearchIcon, SparklesIcon, Trash2Icon, WrenchIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowUpIcon, BookOpenIcon, CheckIcon, CodeIcon, CopyIcon, ListChecksIcon, ListPlusIcon, Loader2Icon, MessageSquarePlusIcon, PencilIcon, PinIcon, RegexIcon, SearchIcon, SparklesIcon, SquareIcon, Trash2Icon, WrenchIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,8 +10,10 @@ import { Markdown } from "@/components/app/markdown";
 import { CyclingOrb, LiquidOrb } from "@/components/app/liquid-orb";
 import { LiveStatus } from "@/components/app/live-status";
 import { Appear } from "@/components/app/appear";
+import { AssistChip, ImproveButton, usePromptAssist } from "@/components/app/prompt-assist";
 import { ReadAloudButton, VoiceLoop, VoiceModeButton } from "@/components/app/speak";
 import { VoiceButton, VoiceInline } from "@/components/app/voice";
+import { replaceAll } from "@/lib/voice/insert";
 import { useStickToBottom } from "@/lib/use-stick-bottom";
 import type { LiveStats } from "@/lib/live-stats";
 import { SlashList, useSlashCommands, useSlashMenu } from "@/components/app/slash-menu";
@@ -39,6 +41,7 @@ interface ChatMessage {
   timestamp?: string;
 }
 interface ChatDetail extends ChatItem {
+  lastRunId: string | null;
   messages: ChatMessage[];
   pendingPrompt: string | null;
   error: string | null;
@@ -66,11 +69,49 @@ function toolLabel(t: { name: string; input: string }) {
   return { group: info.group, title: info.title };
 }
 
+/** Copies a message's text; the icon says it worked. */
+function CopyButton({ text, className }: { text: string; className?: string }) {
+  const [done, setDone] = React.useState(false);
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      className={cn("size-7 rounded-full text-muted-foreground", className)}
+      aria-label="Copiar"
+      title="Copiar"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setDone(true);
+          setTimeout(() => setDone(false), 1400);
+        } catch {
+          toast.error("No se pudo copiar");
+        }
+      }}
+    >
+      {done ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
+    </Button>
+  );
+}
+
+/** Puts a sent message back in the box to change it and send it again. */
+function editInBox(text: string) {
+  const box = document.querySelector<HTMLTextAreaElement>("textarea[aria-label='Mensaje para Claude']");
+  if (box) replaceAll(box, text);
+}
+
 /** The user's message on the right; Claude's answer as plain Markdown across the column (no avatar clutter). */
 function BubbleImpl({ m, reveal }: { m: ChatMessage; reveal?: boolean }) {
   if (m.role === "user")
     return (
-      <div className="flex justify-end">
+      <div className="group flex items-end justify-end gap-1">
+        <div className="flex opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+          <CopyButton text={m.text} />
+          <Button type="button" variant="ghost" size="icon-sm" className="size-7 rounded-full text-muted-foreground" aria-label="Editar y reenviar" title="Editar y reenviar" onClick={() => editInBox(m.text)}>
+            <PencilIcon className="size-3.5" />
+          </Button>
+        </div>
         <div className="max-w-[80%] rounded-2xl rounded-br-md bg-secondary px-4 py-2.5 text-sm break-words whitespace-pre-wrap">{m.text}</div>
       </div>
     );
@@ -90,7 +131,12 @@ function BubbleImpl({ m, reveal }: { m: ChatMessage; reveal?: boolean }) {
         </div>
       )}
       {m.text.trim() && <Markdown reveal={reveal}>{m.text}</Markdown>}
-      {m.text.trim() && <ReadAloudButton text={m.text} className="-ml-1.5 mt-1 opacity-50 hover:opacity-100 focus-visible:opacity-100" />}
+      {m.text.trim() && (
+        <div className="-ml-1.5 mt-1 flex opacity-50 transition-opacity focus-within:opacity-100 hover:opacity-100">
+          <CopyButton text={m.text} />
+          <ReadAloudButton text={m.text} />
+        </div>
+      )}
     </div>
   );
 }
@@ -125,13 +171,35 @@ function ChatScroll({ children }: { children: React.ReactNode }) {
 
 type SendOpts = { model?: string; mode?: PermMode };
 
-function Composer({ onSend, busy, autoFocus, model, setModel, mode, setMode }: { onSend: (t: string, o: SendOpts) => Promise<boolean>; busy: boolean; autoFocus?: boolean; model: string; setModel: (m: string) => void; mode: PermMode; setMode: (m: PermMode) => void }) {
+function Composer({ onSend, busy, running, onStop, lastSent, autoFocus, model, setModel, mode, setMode }: { onSend: (t: string, o: SendOpts) => Promise<boolean>; busy: boolean; running?: boolean; onStop?: () => void; lastSent?: string; autoFocus?: boolean; model: string; setModel: (m: string) => void; mode: PermMode; setMode: (m: PermMode) => void }) {
   const [text, setText] = React.useState("");
   const commands = useSlashCommands(null);
   const menu = useSlashMenu(text, setText, commands);
+  const boxRef = React.useRef<HTMLTextAreaElement>(null);
+  const assist = usePromptAssist(text, () => boxRef.current);
+  // One message can wait while Claude is still answering: it is sent the moment it finishes.
+  const [queued, setQueued] = React.useState<string | null>(null);
+  const queuedRef = React.useRef<string | null>(null);
+  const sendRef = React.useRef(onSend);
+  React.useEffect(() => {
+    sendRef.current = onSend;
+  });
+  React.useEffect(() => {
+    if (busy || queuedRef.current === null) return;
+    const q = queuedRef.current;
+    queuedRef.current = null;
+    void sendRef.current(q, {}).then(() => setQueued(null));
+  }, [busy]);
   async function send() {
     const t = text.trim();
-    if (!t || busy) return;
+    if (!t) return;
+    if (busy) {
+      if (t.startsWith("/")) return toast.message("Los comandos / se envían cuando Claude termine");
+      queuedRef.current = t;
+      setQueued(t);
+      setText("");
+      return;
+    }
     // /plan, /edits, /ask, /auto and /model are handled here; other /commands go to Claude Code.
     const cmd = parseSlash(t);
     if (cmd.error) {
@@ -151,6 +219,7 @@ function Composer({ onSend, busy, autoFocus, model, setModel, mode, setMode }: {
     <div data-composer className="relative rounded-xl border bg-card transition-colors focus-within:border-border-strong">
       {menu.open && <SlashList items={menu.items} active={menu.active} onPick={menu.pick} className="mx-2" />}
       <Textarea
+        ref={boxRef}
         autoFocus={autoFocus}
         rows={2}
         value={text}
@@ -163,9 +232,33 @@ function Composer({ onSend, busy, autoFocus, model, setModel, mode, setMode }: {
             e.preventDefault();
             void send();
           }
+          // ↑ in an empty box brings back what you sent last (to fix it or send it again).
+          if (e.key === "ArrowUp" && !text && lastSent) {
+            e.preventDefault();
+            setText(lastSent);
+          }
         }}
         className="max-h-60 min-h-14 resize-none border-0 bg-transparent px-4 pt-3 shadow-none focus-visible:ring-0"
       />
+      {queued && (
+        <div data-testid="queued" className="flex min-w-0 items-center gap-2 px-4 pb-1 text-xs text-muted-foreground">
+          <ListPlusIcon className="size-3.5 shrink-0" />
+          <span className="min-w-0 flex-1 truncate">En cola, se envía al terminar: {queued}</span>
+          <button
+            type="button"
+            aria-label="Quitar el mensaje en cola"
+            className="shrink-0 cursor-pointer rounded px-1 hover:bg-accent hover:text-foreground"
+            onClick={() => {
+              queuedRef.current = null;
+              setText(queued);
+              setQueued(null);
+            }}
+          >
+            <XIcon className="size-3.5" />
+          </button>
+        </div>
+      )}
+      <AssistChip a={assist} />
       <VoiceInline />
       <div className="flex items-center justify-between gap-2 px-3 pb-2.5">
         <div className="flex items-center gap-2">
@@ -185,10 +278,16 @@ function Composer({ onSend, busy, autoFocus, model, setModel, mode, setMode }: {
           </select>
         </div>
         <div className="flex items-center gap-1">
+          <ImproveButton a={assist} />
           <VoiceModeButton />
           <VoiceButton />
-          <Button size="icon-sm" className="rounded-full" onClick={send} disabled={busy || !text.trim()} aria-label="Enviar">
-            {busy ? <Loader2Icon className="animate-spin" /> : <ArrowUpIcon />}
+          {running && (
+            <Button type="button" size="icon-sm" variant="outline" className="rounded-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={onStop} aria-label="Detener" title="Detener la respuesta (Esc)">
+              <SquareIcon />
+            </Button>
+          )}
+          <Button size="icon-sm" className="rounded-full" onClick={send} disabled={!text.trim()} aria-label={busy ? "Añadir a la cola" : "Enviar"} title={busy ? "Se enviará cuando Claude termine" : "Enviar"}>
+            {busy ? <ListPlusIcon /> : <ArrowUpIcon />}
           </Button>
         </div>
       </div>
@@ -242,6 +341,17 @@ export default function ChatPage() {
       setSending(false);
     }
   }
+
+  async function stopChat() {
+    if (!chat?.lastRunId) return;
+    try {
+      await api("POST", `/api/runs/${chat.lastRunId}/stop`);
+      refresh(`/api/chats/${selected}`, "/api/chats");
+    } catch (e) {
+      toast.error(errorMessage(e));
+    }
+  }
+  const lastSent = [...(chat?.messages ?? [])].reverse().find((m) => m.role === "user")?.text ?? "";
 
   async function remove(id: string) {
     if (!confirm("¿Borrar esta conversación del historial?")) return;
@@ -322,7 +432,7 @@ export default function ChatPage() {
               <CyclingOrb size={120} />
               <h2 className="text-xl font-semibold tracking-tight">¿En qué te ayudo?</h2>
               <div className="w-full max-w-2xl">
-                <Composer onSend={newChat} busy={sending} autoFocus model={model} setModel={setModel} mode={mode} setMode={setMode} />
+                <Composer onSend={newChat} busy={sending} lastSent={lastSent} autoFocus model={model} setModel={setModel} mode={mode} setMode={setMode} />
               </div>
               <div className="grid w-full max-w-2xl gap-2 sm:grid-cols-2">
                 {SUGGESTIONS.map((s) => (
@@ -354,7 +464,7 @@ export default function ChatPage() {
                   {chat?.error && !chat.running && <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{chat.error}</p>}
               </ChatScroll>
               <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
-                <Composer onSend={reply} busy={sending || !!chat?.running} model={model} setModel={setModel} mode={mode} setMode={setMode} />
+                <Composer onSend={reply} busy={sending || !!chat?.running} running={!!chat?.running} onStop={stopChat} lastSent={lastSent} model={model} setModel={setModel} mode={mode} setMode={setMode} />
               </div>
             </>
           )}

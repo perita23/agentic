@@ -107,3 +107,22 @@ export class LiveInsert {
     this.write(this.before + this.after, this.before.length);
   }
 }
+
+/**
+ * Replaces everything in the field the way typing would, so Ctrl/Cmd+Z brings the old text back
+ * (the browser keeps an undo history for edits made through `insertText`).
+ */
+export function replaceAll(el: TextField, value: string) {
+  el.focus();
+  el.setSelectionRange(0, el.value.length);
+  let done = false;
+  try {
+    done = document.execCommand("insertText", false, value);
+  } catch {}
+  if (!done || el.value !== value) {
+    const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, "value")!.set!.call(el, value);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  el.setSelectionRange(value.length, value.length);
+}
