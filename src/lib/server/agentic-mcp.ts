@@ -53,7 +53,9 @@ export class AgenticMcp {
   ) {}
 
   get(): McpSettings {
-    const r = mcpSettingsSchema.safeParse(this.store.read<unknown>("mcp", {}));
+    const raw = this.store.read<unknown>("mcp", {});
+    // 0.50.0 wrote Claude's config file over the settings (same name): what is there is not settings.
+    const r = mcpSettingsSchema.safeParse(raw && typeof raw === "object" && "mcpServers" in raw ? {} : raw);
     return r.success ? r.data : DEFAULTS;
   }
 
@@ -100,7 +102,8 @@ export class AgenticMcp {
 
   /** The config file claude is started with (--mcp-config): this server, with its own token. Written fresh each time. */
   configFile(): string {
-    const f = path.join(this.dataDir, "mcp.json");
+    // Not "mcp.json": that is where the settings themselves live (the store keeps one `<name>.json` per collection).
+    const f = path.join(this.dataDir, "claude-mcp-config.json");
     const cfg = { mcpServers: { [SERVER_NAME]: { type: "http", url: this.url(), headers: { Authorization: `Bearer ${this.token()}` } } } };
     fs.writeFileSync(f, JSON.stringify(cfg), { mode: 0o600 });
     return f;

@@ -201,3 +201,30 @@ describe("handing the server to Claude", () => {
     expect(buildClaudeArgs({ mode: "headless", projectPath: "/x", prompt: "hola", permissionMode: "default" })).not.toContain("--mcp-config");
   });
 });
+
+describe("the settings survive (they and Claude's config file are different files)", () => {
+  it("keeps them after handing the server to Claude and after a restart", () => {
+    const claudeHome = tmpDir();
+    const dataDir = tmpDir();
+    const open = () => createContext({ dataDir, claudeHome, claudeBin: FAKE_CLAUDE, maxConcurrentRuns: 2, maxLogBytes: 1e6 });
+    const a = open();
+    a.agenticMcp.set({ write: true, groups: { mail: true, obsidian: false } });
+    a.agenticMcp.forRun(); // writes Claude's config file
+    expect(a.agenticMcp.get()).toMatchObject({ write: true, groups: { mail: true, obsidian: false } });
+    expect(fs.existsSync(path.join(dataDir, "mcp.json"))).toBe(true);
+    expect(JSON.parse(fs.readFileSync(path.join(dataDir, "mcp.json"), "utf8")).mcpServers).toBeUndefined();
+    const b = open(); // a restart (an update): nothing is cached
+    expect(b.agenticMcp.get()).toMatchObject({ write: true, groups: { mail: true, obsidian: false } });
+    b.agenticMcp.forRun();
+    expect(b.agenticMcp.get().write).toBe(true);
+  });
+  it("starts from the defaults when 0.50.0 left its config file where the settings go", () => {
+    const dataDir = tmpDir();
+    fs.writeFileSync(path.join(dataDir, "mcp.json"), JSON.stringify({ mcpServers: { agentic: { type: "http" } } }));
+    const c = createContext({ dataDir, claudeHome: tmpDir(), claudeBin: FAKE_CLAUDE, maxConcurrentRuns: 2, maxLogBytes: 1e6 });
+    expect(c.agenticMcp.get()).toMatchObject({ enabled: true, write: false });
+    expect(c.agenticMcp.set({ write: true }).write).toBe(true);
+    expect(c.agenticMcp.forRun()).not.toBeNull();
+    expect(c.agenticMcp.get().write).toBe(true);
+  });
+});

@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.51.1] - 2026-11-06
+
+### Corregido
+- **Los ajustes de «Agentic para Claude» se perdían en cada actualización.** El archivo de configuración que se le entrega a Claude se llamaba igual que el archivo donde se guardan esos ajustes (`mcp.json`) y lo pisaba al lanzar cualquier chat o ejecución, así que al reiniciar la app volvían a los valores por defecto (grupos, «Dejar que Claude escriba»…). Ahora son archivos distintos (`claude-mcp-config.json`). Los ajustes que ya se hubieran pisado vuelven a los valores por defecto una vez; desde ahora se conservan.
+
 ## [0.51.0] - 2026-11-06
 
 ### Añadido
