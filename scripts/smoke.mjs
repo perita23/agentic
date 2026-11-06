@@ -412,8 +412,7 @@ try {
   await page.getByRole("button", { name: "Dictar" }).first().click(); // pressing the microphone again finishes
   await page.waitForFunction((q) => document.querySelector(q).value === "ya había: hola claude, resume la tarea", BOX);
   check(true, "the microphone button dictates too, after what was already written");
-  await chatBox.fill("");
-  await page.getByRole("button", { name: "Dictar" }).first().click();
+  await page.getByTestId("voice-status").waitFor({ state: "detached", timeout: 5000 });
   await chatBox.fill("borrador");
   await page.getByRole("button", { name: "Dictar" }).first().click();
   await page.waitForFunction((q) => document.querySelector(q).value.startsWith("borrador hola"), BOX, { timeout: 5000 });
