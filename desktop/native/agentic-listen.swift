@@ -19,6 +19,8 @@ guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: lang)) else
 }
 
 final class Listener {
+    let recognizer: SFSpeechRecognizer
+    init(_ recognizer: SFSpeechRecognizer) { self.recognizer = recognizer }
     let engine = AVAudioEngine()
     var request: SFSpeechAudioBufferRecognitionRequest?
     var task: SFSpeechRecognitionTask?
@@ -81,7 +83,7 @@ final class Listener {
     }
 }
 
-let listener = Listener()
+let listener = Listener(recognizer)
 
 SFSpeechRecognizer.requestAuthorization { status in
     guard status == .authorized else {
