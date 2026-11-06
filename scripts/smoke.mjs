@@ -265,6 +265,26 @@ try {
         this.onend?.();
       }
     };
+    // Reading aloud: the system's synthesiser, stood in for (it records what it is asked to say).
+    window.__spoken = [];
+    window.SpeechSynthesisUtterance = class {
+      constructor(t) {
+        this.text = t;
+      }
+    };
+    const syn = {
+      getVoices: () => [{ voiceURI: "fake", name: "Fake", lang: "es-ES", localService: true }],
+      speak(u) {
+        window.__spoken.push(u.text);
+        this.t = setTimeout(() => u.onend?.({}), 600);
+      },
+      cancel() {
+        clearTimeout(this.t);
+      },
+      addEventListener() {},
+      removeEventListener() {},
+    };
+    Object.defineProperty(window, "speechSynthesis", { value: syn, configurable: true });
     navigator.mediaDevices.getUserMedia = async () => {
       const c = new AudioContext();
       const o = c.createOscillator();
@@ -862,6 +882,28 @@ try {
   const chatRun = (await (await fetch(base + "/api/runs", { headers: { authorization: `Bearer ${token}` } })).json()).runs.find((r) => r.prompt.startsWith("Hola Claude"));
   check(chats.chats.length === 1 && chatRun && chatRun.projectPath.endsWith("/chat"), "chat starts a Claude conversation outside any project and keeps it in the history");
   await shot("05b-chat");
+  // Reading the answer aloud, and talk mode (it reads, then it listens).
+  await page.getByRole("button", { name: "Enviar", exact: true }).waitFor({ timeout: 20000 });
+  await page.getByRole("button", { name: "Leer en voz alta" }).first().click();
+  await page.getByTestId("speak-status").waitFor({ timeout: 5000 });
+  const spoken = await page.evaluate(() => window.__spoken.join(" "));
+  check(spoken.length > 5 && !/[`*#|]/.test(spoken), `«Leer en voz alta» reads the answer without markup (${spoken.slice(0, 40)}…)`);
+  await page.keyboard.press("Escape");
+  await page.getByTestId("speak-status").waitFor({ state: "detached", timeout: 5000 });
+  check(true, "Esc silences the reading");
+  await page.getByRole("button", { name: "Modo voz" }).click();
+  check((await page.getByRole("button", { name: "Modo voz" }).getAttribute("aria-pressed")) === "true", "talk mode switches on");
+  await page.evaluate(() => (window.__spoken.length = 0));
+  await page.getByLabel("Mensaje para Claude").fill("segunda pregunta en modo voz");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => window.__spoken.length > 0, null, { timeout: 25000 });
+  check(true, "in talk mode the answer is read aloud on its own");
+  await page.getByTestId("voice-status").waitFor({ timeout: 8000 });
+  check(true, "and then it listens again");
+  await page.keyboard.press("Escape");
+  await page.getByTestId("voice-status").waitFor({ state: "detached", timeout: 5000 });
+  await page.getByRole("button", { name: "Modo voz" }).dispatchEvent("click"); // a toast about the finished run may cover it
+  check((await page.getByRole("button", { name: "Modo voz" }).getAttribute("aria-pressed")) === "false", "talk mode switches off");
   // A long curl pasted into the chat must not widen the conversation either.
   await page.getByRole("button", { name: /Nuevo chat/ }).first().click();
   const tok = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9".repeat(8);

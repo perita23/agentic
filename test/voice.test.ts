@@ -79,3 +79,49 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
     }
   });
 });
+
+import { pickVoice, speechText, splitForSpeech } from "@/lib/voice/speak";
+
+describe("reading aloud: what is worth hearing", () => {
+  it("drops code, tables, addresses and markup", () => {
+    const md = "## Resultado\n\nHe cambiado **dos** archivos: `src/app.ts` y [la guía](https://x.dev/g).\n\n```ts\nconst a = 1;\n```\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n- primero\n- segundo\n\nMira https://example.com/algo ahora.";
+    const t = speechText(md);
+    expect(t).not.toMatch(/[`*#|]|const a|https?:/);
+    expect(t).toContain("He cambiado dos archivos");
+    expect(t).toContain("la guía");
+    expect(t).toContain("primero\nsegundo");
+    expect(t).toContain("un enlace");
+    expect(speechText("rutas: /home/user/proyecto/src/lib/a.ts")).toContain("una ruta");
+  });
+  it("says so when there is only code, and copes with an unclosed block", () => {
+    expect(speechText("```js\nfoo()\n```")).toBe("Te dejo el código en pantalla.");
+    expect(speechText("Hola\n```js\nfoo(")).toBe("Hola");
+    expect(speechText("")).toBe("");
+  });
+});
+
+describe("reading aloud: pieces", () => {
+  it("splits into sentences and never makes a piece too long", () => {
+    expect(splitForSpeech("Hola. ¿Qué tal? Muy bien!")).toEqual(["Hola. ¿Qué tal? Muy bien!"]);
+    const long = Array.from({ length: 60 }, (_, i) => `palabra${i}`).join(" ");
+    const parts = splitForSpeech(`Primera frase. ${long}.`, 100);
+    expect(parts.length).toBeGreaterThan(3);
+    for (const p of parts) expect(p.length).toBeLessThanOrEqual(100);
+    expect(parts.join(" ").replace(/\s+/g, " ")).toContain("palabra59");
+    expect(splitForSpeech("uno\n\ndos")).toEqual(["uno", "dos"]);
+  });
+});
+
+describe("reading aloud: choosing the voice", () => {
+  const v = (voiceURI: string, lang: string, localService = true, name = voiceURI) => ({ voiceURI, name, lang, localService });
+  it("takes the chosen one, else the best local one of the language, and never a remote one", () => {
+    const voices = [v("remote-es", "es-ES", false), v("paulina", "es-MX"), v("monica", "es-ES"), v("Mónica (mejorada)", "es-ES", true, "Mónica (mejorada)"), v("samantha", "en-US")];
+    expect(pickVoice(voices, "es-ES")?.voiceURI).toBe("Mónica (mejorada)");
+    expect(pickVoice(voices, "es-MX")?.voiceURI).toBe("paulina");
+    expect(pickVoice(voices, "en-GB")?.voiceURI).toBe("samantha");
+    expect(pickVoice(voices, "es-ES", "paulina")?.voiceURI).toBe("paulina");
+    expect(pickVoice(voices, "es-ES", "remote-es")?.voiceURI).not.toBe("remote-es");
+    expect(pickVoice([v("remote-es", "es-ES", false)], "es-ES")).toBeNull();
+    expect(pickVoice(voices, "ja-JP")).toBeNull();
+  });
+});

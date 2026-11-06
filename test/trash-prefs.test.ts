@@ -70,10 +70,12 @@ describe("session trash", () => {
 describe("menu preferences", () => {
   it("stores hidden menu items but never Dashboard or Ajustes", () => {
     const { c } = setup();
-    expect(c.prefs.get()).toEqual({ hiddenNav: [], island: { enabled: true, working: true, alerts: true }, voice: { enabled: true, holdSpace: true, lang: "auto", autoSend: false } });
+    expect(c.prefs.get()).toEqual({ hiddenNav: [], island: { enabled: true, working: true, alerts: true }, voice: { enabled: true, holdSpace: true, lang: "auto", autoSend: false, voiceURI: "", rate: 1 } });
     expect(c.prefs.set({ hiddenNav: ["/mcp", "/", "/settings", "/mcp", "/jira"] }).hiddenNav).toEqual(["/mcp", "/jira"]);
-    expect(c.prefs.set({ voice: { lang: "en-US", autoSend: true } }).voice).toEqual({ enabled: true, holdSpace: true, lang: "en-US", autoSend: true });
+    expect(c.prefs.set({ voice: { lang: "en-US", autoSend: true } }).voice).toEqual({ enabled: true, holdSpace: true, lang: "en-US", autoSend: true, voiceURI: "", rate: 1 });
     expect(() => c.prefs.set({ voice: { lang: "no es un idioma" } })).toThrow();
+    expect(c.prefs.set({ voice: { rate: 1.25, voiceURI: "Mónica" } }).voice).toMatchObject({ rate: 1.25, voiceURI: "Mónica" });
+    expect(() => c.prefs.set({ voice: { rate: 5 } })).toThrow();
     expect(c.prefs.set({ island: { enabled: false } })).toMatchObject({ hiddenNav: ["/mcp", "/jira"], island: { enabled: false, working: true, alerts: true } });
     expect(c.prefs.get().hiddenNav).toEqual(["/mcp", "/jira"]);
     expect(() => c.prefs.set({ hiddenNav: ["javascript:alert(1)"] })).toThrow();
