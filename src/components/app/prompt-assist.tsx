@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CheckIcon, Loader2Icon, SparklesIcon, Undo2Icon } from "lucide-react";
+import { CheckIcon, SparklesIcon, Undo2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { api, useApi } from "@/lib/api";
@@ -10,6 +10,7 @@ import { checkable, shorthandFix, wordsOf, type Token } from "@/lib/word-fix";
 import { replaceAll } from "@/lib/voice/insert";
 import { errorMessage } from "./common";
 import { MorphText } from "./live-status";
+import { LiquidOrb } from "./liquid-orb";
 
 type Field = HTMLTextAreaElement | HTMLInputElement;
 interface Settings {
@@ -47,6 +48,7 @@ export function usePromptAssist(text: string, getField: () => Field | null) {
   const phrase = mode === "suggest" || mode === "auto";
   const [chip, setChip] = React.useState<Chip | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const [fresh, setFresh] = React.useState(false); // the improved text has just come in
   const wrote = React.useRef<string | null>(null); // what this wrote itself: it is not corrected again
   const req = React.useRef(0);
   const getRef = React.useRef(getField);
@@ -191,13 +193,15 @@ export function usePromptAssist(text: string, getField: () => Field | null) {
       wrote.current = r.text;
       replaceAll(f, r.text);
       setChip({ kind: "applied", forText: r.text, original });
+      setFresh(true);
+      setTimeout(() => setFresh(false), 1000);
     } catch (e) {
       toast.error("No se pudo mejorar el prompt", { description: errorMessage(e) });
     } finally {
       setBusy(false);
     }
   };
-  return { ready, busy, chip: shown, apply, undo, improve, morphs };
+  return { ready, busy, fresh, chip: shown, apply, undo, improve, morphs };
 }
 
 type Assist = ReturnType<typeof usePromptAssist>;
@@ -207,7 +211,8 @@ export function ImproveButton({ a, className }: { a: Assist; className?: string 
   if (!a.ready) return null;
   return (
     <Button type="button" variant="ghost" size="sm" className={className ?? "h-7 gap-1.5 rounded-full px-2.5 text-xs text-muted-foreground"} aria-label="Mejorar prompt" title="Mejorar y organizar el prompt con el modelo local" disabled={a.busy} onMouseDown={(e) => e.preventDefault()} onClick={() => void a.improve()}>
-      {a.busy ? <Loader2Icon className="animate-spin" /> : <SparklesIcon />} {a.busy ? "Mejorando…" : "Mejorar"}
+      {a.busy ? <LiquidOrb state="thinking" size={16} /> : <SparklesIcon />}
+      {a.busy ? <span className="orb-text" data-state="thinking">Mejorando…</span> : "Mejorar"}
     </Button>
   );
 }
@@ -215,7 +220,23 @@ export function ImproveButton({ a, className }: { a: Assist; className?: string 
 /** The correction: a suggestion to accept, or what was applied (with its undo). */
 export function AssistChip({ a }: { a: Assist }) {
   const c = a.chip;
-  if (!c) return null;
+  // Markers the box's CSS reacts to (see globals.css): the shimmer while it works, the soft entrance of the new text.
+  const markers = (
+    <>
+      {a.busy && <span data-improving hidden />}
+      {a.fresh && <span data-improved hidden />}
+    </>
+  );
+  if (!c) return markers;
+  return (
+    <>
+      {markers}
+      <AssistChipBody a={a} c={c} />
+    </>
+  );
+}
+
+function AssistChipBody({ a, c }: { a: Assist; c: Chip }) {
   return (
     <div data-testid="assist-chip" role="status" className="flex min-w-0 items-center gap-2 px-4 pb-1 text-xs text-muted-foreground">
       {c.kind === "suggest" ? (

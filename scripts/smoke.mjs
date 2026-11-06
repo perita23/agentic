@@ -77,7 +77,7 @@ const ollama = http.createServer((req, res) => {
         const text = last.replace(/^<texto>\n/, "").replace(/\n<\/texto>$/, "");
         out = m[0].content.includes("CORRECTOR") ? text.replace("herrores", "errores").replace("q tal", "qué tal") : `## Objetivo\n${text}`;
       }
-      return setTimeout(() => res.end(JSON.stringify({ message: { role: "assistant", content: prop === "existe" ? JSON.stringify(out) : prop ? JSON.stringify({ [prop]: out }) : out } })), 120);
+      return setTimeout(() => res.end(JSON.stringify({ message: { role: "assistant", content: prop === "existe" ? JSON.stringify(out) : prop ? JSON.stringify({ [prop]: out }) : out } })), m[0].content.includes("REESCRITOR") ? 1600 : 120);
     }
     res.statusCode = 404;
     res.end("{}");
@@ -973,6 +973,10 @@ try {
   check((await page.locator(OBOX).inputValue()) === "hola q tal, tengo herrores en mi codigo", "the correction can be undone");
   await page.locator(OBOX).fill("arregla el login que falla");
   await page.getByRole("button", { name: "Mejorar prompt" }).click();
+  await page.locator("[data-improving]").waitFor({ state: "attached", timeout: 3000 });
+  check(true, "while the prompt is improved the box shimmers and the button shows the orb working");
+  await page.waitForTimeout(500);
+  await shot("08e-improving");
   await page.waitForFunction((q) => document.querySelector(q).value === "## Objetivo\narregla el login que falla", OBOX, { timeout: 8000 });
   check(true, "«Mejorar prompt» rewrites and organises the prompt with the local model");
   // Word by word: each finished word is checked, and a wrong one is fixed on the spot, morphing.

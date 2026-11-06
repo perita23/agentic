@@ -197,6 +197,26 @@ html[data-desktop="mac"]:not([data-fullscreen]) .traffic-light-gap {
 }
 @media (prefers-reduced-motion: reduce) { [data-composer]:has([data-voice-live])::after { animation: none; } }
 
+/* ---- Improve prompt: while the local model rewrites it, the box shimmers and its border flows; the new text then comes in out of focus ---- */
+@keyframes improve-sweep { from { background-position: 180% 0; } to { background-position: -80% 0; } }
+@keyframes improve-in { from { filter: blur(7px); opacity: 0.25; transform: translateY(5px); } to { filter: blur(0); opacity: 1; transform: none; } }
+[data-composer]:has([data-improving])::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none; z-index: 1;
+  background: linear-gradient(90deg, #8b6cf5, #ff8a5b, #5aa9ff, #8b6cf5, #ff8a5b, #5aa9ff); background-size: 300% 100%; animation: voice-flow 2.2s linear infinite;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+}
+[data-composer]:has([data-improving])::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 1;
+  background: linear-gradient(100deg, transparent 30%, rgb(139 108 245 / 0.16) 46%, rgb(255 138 91 / 0.14) 54%, transparent 70%); background-size: 220% 100%; background-repeat: no-repeat; animation: improve-sweep 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+[data-composer] textarea { transition: filter 0.4s ease, opacity 0.4s ease; }
+[data-composer]:has([data-improving]) textarea { filter: blur(1.4px); opacity: 0.7; }
+[data-composer]:has([data-improved]) textarea { animation: improve-in 0.9s cubic-bezier(0.22, 0.8, 0.3, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  [data-composer]:has([data-improving])::after, [data-composer]:has([data-improving])::before { animation: none; }
+  [data-composer]:has([data-improved]) textarea { animation: none; }
+}
+
 /* ---- Liquid orb: Claude's live status ----
    Eight blobs share one clock (--t, advanced from JS at a per-state speed that eases). A state decides
    HOW MANY blobs are alive (--k), how big (--bs), their orbit (--ax/--ay) and spacing (--gap), so each
