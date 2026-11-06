@@ -1,0 +1,76 @@
+/* The orb of the app, copied as it is (src/app/globals.css): its colours, shapes and motion per state, and the glowing, morphing status text. */
+/* ---- Glowing status text: slow flow through the colours of the orb's current state ---- */
+@keyframes orb-text-flow { to { background-position: 200% 0; } }
+.orb-text { --g1: #d8ccff; --g2: #8b6cf5; --g3: #ff8a5b;
+  background-image: linear-gradient(90deg, var(--g2), var(--g3), var(--g1), var(--g2)); background-size: 200% 100%; background-repeat: repeat-x;
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: orb-text-flow 9s linear infinite; will-change: background-position; }
+.orb-text[data-state="writing"] { --g1: #ffe0d0; --g2: #ff8a5b; --g3: #ff6fa0; }
+.orb-text[data-state="reading"] { --g1: #cdeaff; --g2: #5aa9ff; --g3: #8b6cf5; }
+.orb-text[data-state="editing"] { --g1: #d9ffe9; --g2: #34d399; --g3: #a78bfa; }
+.orb-text[data-state="running"] { --g1: #fff3c4; --g2: #fbbf24; --g3: #ff8a5b; }
+.orb-text[data-state="searching"] { --g1: #c7f9ff; --g2: #22d3ee; --g3: #a78bfa; }
+.orb-text[data-state="waiting"] { --g1: #ffe9b8; --g2: #f59e0b; --g3: #fb7185; }
+.orb-text[data-state="error"] { --g1: #ffd0d0; --g2: #ef4444; --g3: #fb923c; }
+@media (prefers-reduced-motion: reduce) { .orb-text { animation: none; } }
+/* ---- Status text morph: when the words change, the old ones blur away and the new ones blur in ---- */
+@keyframes morph-in { from { opacity: 0; filter: blur(7px); transform: translateY(6px) scale(0.98); } to { opacity: 1; filter: blur(0); transform: none; } }
+@keyframes morph-out { from { opacity: 1; filter: blur(0); transform: none; } to { opacity: 0; filter: blur(7px); transform: translateY(-6px) scale(0.98); } }
+.morph-in { animation: morph-in 0.5s cubic-bezier(0.22, 0.8, 0.3, 1) both; }
+.morph-out { animation: morph-out 0.4s ease-in both; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .morph-in, .morph-out { animation: none; } .morph-out { display: none; } }
+
+/* ---- Liquid orb: Claude's live status ----
+   Eight blobs share one clock (--t, advanced from JS at a per-state speed that eases). A state decides
+   HOW MANY blobs are alive (--k), how big (--bs), their orbit (--ax/--ay) and spacing (--gap), so each
+   state has its own silhouette: one ball sweeping sideways, a swarm circling, two scanning up and down...
+   All of it is registered properties that CSS transitions, so blobs split and merge instead of jumping. */
+@property --c1 { syntax: "<color>"; inherits: true; initial-value: #d8ccff; }
+@property --c2 { syntax: "<color>"; inherits: true; initial-value: #8b6cf5; }
+@property --c3 { syntax: "<color>"; inherits: true; initial-value: #ff8a5b; }
+@property --k { syntax: "<number>"; inherits: true; initial-value: 1; }
+@property --bs { syntax: "<number>"; inherits: true; initial-value: 0.5; }
+@property --ax { syntax: "<number>"; inherits: true; initial-value: 0; }
+@property --ay { syntax: "<number>"; inherits: true; initial-value: 0; }
+@property --gap { syntax: "<number>"; inherits: true; initial-value: 1; }
+@property --pulse { syntax: "<number>"; inherits: true; initial-value: 0.05; }
+@property --shake { syntax: "<number>"; inherits: true; initial-value: 0; }
+@property --tilt { syntax: "<angle>"; inherits: true; initial-value: 0deg; }
+.orb { position: relative; flex: none; display: inline-block; --t: 0;
+  --c1: #d8ccff; --c2: #8b6cf5; --c3: #ff8a5b; --k: 1; --bs: 0.5; --ax: 0; --ay: 0; --gap: 1; --pulse: 0.05; --shake: 0; --tilt: 0deg;
+  transition: --c1 1.2s ease, --c2 1.2s ease, --c3 1.2s ease, --k 1.2s ease, --bs 1.2s ease, --ax 1.2s ease, --ay 1.2s ease, --gap 1.2s ease, --pulse 1.2s ease, --shake 1.2s ease, --tilt 1.2s ease;
+  animation: orb-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+/* Silhouettes. ax/ay are orbit radii in % of the orb's size. */
+.orb[data-state="idle"] { --k: 1; --bs: 0.5; --ax: 0; --ay: 0; --pulse: 0.05; }
+/* thinking: four blobs merged into one wobbling jelly */
+.orb[data-state="thinking"] { --c1: #d8ccff; --c2: #8b6cf5; --c3: #ff8a5b; --k: 4; --gap: 1.57; --bs: 0.42; --ax: 17; --ay: 17; --pulse: 0; }
+/* writing: the ball breaks into a swarm of small balls circling */
+.orb[data-state="writing"] { --c1: #ffe0d0; --c2: #ff8a5b; --c3: #ff6fa0; --k: 8; --gap: 0.785; --bs: 0.24; --ax: 36; --ay: 36; --pulse: 0; }
+/* reading: two balls scanning up and down, like eyes on a page */
+.orb[data-state="reading"] { --c1: #cdeaff; --c2: #5aa9ff; --c3: #8b6cf5; --k: 2; --gap: 3.14; --bs: 0.3; --ax: 0; --ay: 36; --pulse: 0; }
+/* editing: three balls tracing a flat, tilted ellipse (a pen stroke) */
+.orb[data-state="editing"] { --c1: #d9ffe9; --c2: #34d399; --c3: #a78bfa; --k: 3; --gap: 2.09; --bs: 0.27; --ax: 38; --ay: 12; --tilt: -24deg; --pulse: 0; }
+/* running a command: one small ball sweeping left and right */
+.orb[data-state="running"] { --c1: #fff3c4; --c2: #fbbf24; --c3: #ff8a5b; --k: 1; --bs: 0.24; --ax: 40; --ay: 0; --pulse: 0; }
+/* searching: two small balls on a wide orbit, like a radar */
+.orb[data-state="searching"] { --c1: #c7f9ff; --c2: #22d3ee; --c3: #a78bfa; --k: 2; --gap: 3.14; --bs: 0.22; --ax: 40; --ay: 40; --pulse: 0; }
+/* waiting for you: one big ball pulsing like a heartbeat */
+.orb[data-state="waiting"] { --c1: #ffe9b8; --c2: #f59e0b; --c3: #fb7185; --k: 1; --bs: 0.62; --ax: 0; --ay: 0; --pulse: 0.16; }
+.orb[data-state="done"] { --c1: #d9ffe9; --c2: #34d399; --c3: #bef264; --k: 1; --bs: 0.5; --ax: 0; --ay: 0; --pulse: 0.03; }
+/* error: three balls shaking */
+.orb[data-state="error"] { --c1: #ffd0d0; --c2: #ef4444; --c3: #fb923c; --k: 3; --gap: 2.09; --bs: 0.3; --ax: 9; --ay: 9; --shake: 14; --tilt: -18deg; --pulse: 0; }
+.orb-goo { position: absolute; inset: 0; }
+.orb-pose { position: absolute; inset: 0;
+  transform: rotate(var(--tilt)) translateX(calc(sin(calc(var(--t) * 6rad)) * var(--shake) * 0.01 * var(--px)))
+    scale(calc(1 + var(--pulse) * sin(calc(var(--t) * 1.4rad)))); }
+.orb-ball { position: absolute; left: 50%; top: 50%; aspect-ratio: 1; border-radius: 50%;
+  width: calc(var(--px) * var(--bs));
+  margin: calc(var(--px) * var(--bs) * -0.5) 0 0 calc(var(--px) * var(--bs) * -0.5);
+  scale: clamp(0, calc(var(--k) - var(--i)), 1);
+  background: radial-gradient(circle at 35% 30%, #fff, var(--c1) 40%, var(--c2));
+  transform: translate(
+    calc(cos(calc(var(--t) * (1 + var(--i) * 0.04) * 1rad + var(--i) * var(--gap) * 1rad)) * var(--ax) * 0.01 * var(--px)),
+    calc(sin(calc(var(--t) * (1 + var(--i) * 0.04) * 1rad + var(--i) * var(--gap) * 1rad)) * var(--ay) * 0.01 * var(--px))); }
+.orb-ball:nth-child(3n + 2) { background: radial-gradient(circle at 40% 30%, var(--c1), var(--c2) 75%); }
+.orb-ball:nth-child(3n) { background: radial-gradient(circle at 40% 30%, #fff, var(--c3) 65%); }
+@keyframes orb-in { from { opacity: 0; scale: 0.6; } to { opacity: 1; scale: 1; } }
+@media (prefers-reduced-motion: reduce) { .orb { animation: none; } }
