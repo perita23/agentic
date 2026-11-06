@@ -3,6 +3,15 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.50.0] - 2026-11-06
+
+### Añadido
+- **Agentic para Claude.** Agentic es ahora un servidor MCP: cuando le preguntas a Claude en un chat «¿qué dice esta tarea?» o «¿qué hay en mis notas?», puede **consultar Agentic por su cuenta** en vez de adivinar. Son unas veinte herramientas (`agentic_*`): resumen general, consumo, proyectos y agentes, tareas y programaciones, ejecuciones, sesiones y chats (con sus mensajes), buscar y leer notas de Obsidian y, si lo permites, el correo. Se activan solas en los chats y ejecuciones de aquí.
+- **Tú decides qué ve.** En **Servidores MCP → Agentic para Claude**: un interruptor general, uno por grupo (tareas, ejecuciones y chats, proyectos, consumo, Obsidian, correo; el correo viene apagado) y **«Dejar que Claude escriba»** (apagado: sólo lee) para crear y editar tareas y escribir notas. Lo que no esté permitido ni se le ofrece.
+- **Seguro por diseño.** Su dirección es local y tiene su **propia clave**, distinta de la de la app (que nunca sale de ella); se puede renovar. Claude sólo lee notas de la carpeta de Agentic (o de todo el vault si así lo tienes ajustado), sólo escribe `.md` dentro de esa carpeta y no sigue enlaces que salgan de ella. Cada llamada queda en el registro de actividad.
+- **También para otro Claude Code**: «Copiar comando» te da el `claude mcp add …` listo para pegar.
+- La bolita de Agentic no se ha tocado.
+
 ## [0.49.0] - 2026-11-06
 
 ### Añadido

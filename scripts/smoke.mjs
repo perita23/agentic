@@ -203,6 +203,17 @@ try {
   check(r.status === 303 && (r.headers.get("location") || "").includes("/login"), "page without session -> redirect to /login");
   r = await fetch(base + "/api/tasks");
   check(r.status === 401, "API without token -> 401");
+  // Agentic's own MCP server: its own token, never the master one; the servers page stays behind the session.
+  r = await fetch(base + "/api/agentic-mcp", { method: "POST", headers: { "content-type": "application/json" }, body: '{"jsonrpc":"2.0","id":1,"method":"ping"}' });
+  check(r.status === 401, "Agentic MCP without its token -> 401");
+  r = await fetch(base + "/api/agentic-mcp", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: '{"jsonrpc":"2.0","id":1,"method":"ping"}' });
+  check(r.status === 401, "Agentic MCP refuses the master token");
+  const mcpTok = fs.readFileSync(path.join(dataDir, "mcp-token"), "utf8").trim();
+  r = await fetch(base + "/api/agentic-mcp", { method: "POST", headers: { authorization: `Bearer ${mcpTok}`, "content-type": "application/json" }, body: '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' });
+  const mcpList = r.ok ? await r.json() : null;
+  check(!!mcpList?.result?.tools?.some((t) => t.name === "agentic_tasks"), "Agentic MCP lists its tools with its own token");
+  r = await fetch(base + "/api/mcp");
+  check(r.status === 401, "the MCP servers API stays behind the session");
   // fetch() cannot override Host, so use a raw HTTP request.
   const rebindStatus = await new Promise((resolve, reject) =>
     http
@@ -857,6 +868,12 @@ try {
   // MCP servers: add a popular one through `claude mcp add`.
   await page.goto(`${base}/mcp`);
   await page.getByRole("heading", { name: "Servidores MCP" }).waitFor();
+  await page.getByText("Agentic para Claude").first().waitFor();
+  check((await page.getByLabel("Activar las herramientas de Agentic para Claude").getAttribute("aria-checked")) === "true", "Agentic's tools for Claude are on by default");
+  await page.getByLabel("Que Claude pueda escribir en Agentic").click();
+  await page.waitForFunction(() => document.querySelector('[aria-label="Que Claude pueda escribir en Agentic"]')?.getAttribute("aria-checked") === "true");
+  r = await fetch(base + "/api/agentic-mcp/settings", { headers: { authorization: `Bearer ${token}` } });
+  check((await r.json()).settings.write === true, "allowing Claude to write is saved");
   await page.getByRole("button", { name: "Añadir servidor" }).first().click();
   await page.getByRole("button", { name: "Playwright" }).click();
   check((await page.getByLabel("Argumentos").inputValue()).includes("@playwright/mcp"), "MCP presets fill the server definition");

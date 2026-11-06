@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AgenticMcpCard } from "@/components/app/agentic-mcp-card";
 import { EmptyState, errorMessage, PageHeader } from "@/components/app/common";
 import { api, refresh, useApi, type ProjectListItem } from "@/lib/api";
 
@@ -217,6 +218,7 @@ export default function McpPage() {
           </Button>
         }
       />
+      <AgenticMcpCard />
       {error && <p className="text-sm text-destructive">{error.message}</p>}
       {!data && !error && <Skeleton className="h-40" />}
       {data && !data.servers.length && (
