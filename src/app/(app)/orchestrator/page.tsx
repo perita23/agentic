@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { BookOpenIcon, BotIcon, BrainIcon, CircleCheckBigIcon, EyeIcon, FlaskConicalIcon, GaugeIcon, LayoutTemplateIcon, PencilLineIcon, PlusIcon, SearchIcon, ShieldCheckIcon, TargetIcon, Trash2Icon, WorkflowIcon } from "lucide-react";
+import { BookOpenIcon, BotIcon, BrainIcon, CheckIcon, CircleCheckBigIcon, EyeIcon, FlaskConicalIcon, GaugeIcon, LayoutTemplateIcon, LoaderCircleIcon, PencilLineIcon, SaveIcon, PlusIcon, SearchIcon, ShieldCheckIcon, TargetIcon, Trash2Icon, WorkflowIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -148,32 +148,32 @@ function Cube({ n, selected, onPointerDown, onSelect, onPortDown, linking, hot }
       data-kind={n.kind}
       onPointerDown={onPointerDown}
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onSelect())}
-      className={cn("pop-in absolute grid cursor-grab touch-none select-none content-between gap-1 rounded-2xl border bg-card p-3 text-left transition-[box-shadow,border-color,transform] duration-200 active:cursor-grabbing", k.ring, selected && "ring-2 ring-ring/70", hot && "ring-2 ring-success/70", !selected && !hot && "hover:border-border-strong")}
+      className={cn("pop-in absolute z-20 grid cursor-grab touch-none grid-cols-[minmax(0,1fr)] select-none content-between gap-1 rounded-2xl border bg-card p-3 text-left transition-[box-shadow,border-color,transform] duration-200 active:cursor-grabbing", k.ring, selected && "ring-2 ring-ring/70", hot && "ring-2 ring-success/70", !selected && !hot && "hover:border-border-strong")}
       style={{ left: n.x, top: n.y, width: W, height: H }}
     >
       <div className="flex items-start gap-2.5">
         <span className={cn("grid size-9 shrink-0 place-items-center rounded-xl", k.chip)}>{n.kind === "planner" ? <LiquidOrb state="thinking" size={22} /> : n.kind === "agent" ? (() => { const I = JOB_ICON[n.job]; return <I className="size-4" />; })() : n.kind === "goal" ? <TargetIcon className="size-4" /> : n.kind === "memory" ? <BrainIcon className="size-4" /> : n.kind === "check" ? <CircleCheckBigIcon className="size-4" /> : <GaugeIcon className="size-4" />}</span>
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold">{n.label}</div>
-          <div className="text-[11px] text-muted-foreground">{n.kind === "agent" && n.job !== "custom" ? `${k.label} · ${JOBLABEL[n.job]}` : k.label}</div>
+          <div className="truncate text-[11px] text-muted-foreground">{n.kind === "agent" && n.job !== "custom" ? `${k.label} · ${JOBLABEL[n.job]}` : k.label}</div>
         </div>
       </div>
-      <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+      <div className="flex min-w-0 items-center justify-between gap-2 text-[11px] text-muted-foreground">
         {n.kind === "context" ? (
-          <span>Compacta al {n.threshold}%</span>
+          <span className="truncate">Compacta al {n.threshold}%</span>
         ) : n.kind === "goal" ? (
-          <span className="truncate">{n.role || "Define el objetivo"}</span>
+          <span className="line-clamp-2 min-w-0 break-words" title={n.role}>{n.role || "Define el objetivo"}</span>
         ) : n.kind === "memory" ? (
-          <span className="truncate">{n.prompt || "¿Qué debe leer?"}</span>
+          <span className="line-clamp-2 min-w-0 break-words" title={n.prompt}>{n.prompt || "¿Qué debe leer?"}</span>
         ) : n.kind === "check" ? (
-          <span>{n.retries ? `hasta ${n.retries} reintentos` : "sin reintentos"}</span>
+          <span className="truncate">{n.retries ? `hasta ${n.retries} reintentos` : "sin reintentos"}</span>
         ) : (
           <>
-            <span className="flex items-center gap-1.5">
-              <b className="font-medium text-foreground/80">{n.model === "default" && n.kind === "agent" ? "Igual que el planificador" : MODEL_LABEL[n.model]}{n.kind === "planner" && n.effort !== "default" ? ` · ${n.effort}` : ""}</b>
+            <span className="flex min-w-0 items-center gap-1.5">
+              <b className="truncate font-medium text-foreground/80">{n.model === "default" && n.kind === "agent" ? "Igual que el planificador" : MODEL_LABEL[n.model]}{n.kind === "planner" && n.effort !== "default" ? ` · ${n.effort}` : ""}</b>
               <Dots model={n.model} />
             </span>
-            {n.kind === "agent" && <span title={n.tools.join(", ") || "todas las herramientas"}>{n.tools.length && !n.tools.some((t) => WRITE_TOOLS.includes(t)) ? "solo lee" : n.tools.length ? `${n.tools.length} herram.` : "todas"}</span>}
+            {n.kind === "agent" && <span className="shrink-0" title={n.tools.join(", ") || "todas las herramientas"}>{n.tools.length && !n.tools.some((t) => WRITE_TOOLS.includes(t)) ? "solo lee" : n.tools.length ? `${n.tools.length} herram.` : "todas"}</span>}
           </>
         )}
       </div>
@@ -201,10 +201,30 @@ function curve(a: ONode, b: ONode) {
   return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
 }
 
+/** A point on the connection between two cubes, where its label goes: the middle, or the nearest spot not on top of a cube. */
+function labelAt(a: ONode, b: ONode, nodes: ONode[]): { x: number; y: number } {
+  const x1 = a.x + W + 2;
+  const y1 = a.y + H / 2;
+  const x2 = b.x - 4;
+  const y2 = b.y + H / 2;
+  const dx = Math.max(60, Math.abs(x2 - x1) / 2);
+  const at = (t: number) => {
+    const u = 1 - t;
+    return { x: u ** 3 * x1 + 3 * u * u * t * (x1 + dx) + 3 * u * t * t * (x2 - dx) + t ** 3 * x2, y: u ** 3 * y1 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t ** 3 * y2 };
+  };
+  // The label is about 80 × 22 px.
+  const free = (p: { x: number; y: number }) => !nodes.some((n) => p.x + 44 > n.x && p.x - 44 < n.x + W && p.y + 14 > n.y && p.y - 14 < n.y + H);
+  for (const t of [0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82]) {
+    const p = at(t);
+    if (free(p)) return p;
+  }
+  return at(0.5);
+}
+
 function Editor({ initial }: { initial: View }) {
   const [g, setG] = React.useState<Graph>(initial.graph);
   const [sel, setSel] = React.useState<{ type: "node"; id: string } | { type: "edge"; i: number } | null>(null);
-  const [status, setStatus] = React.useState<"saved" | "saving" | "error">("saved");
+  const [status, setStatus] = React.useState<"saved" | "dirty" | "saving" | "error">("saved");
   const [linking, setLinking] = React.useState<{ from: string; x: number; y: number } | null>(null);
   const [hot, setHot] = React.useState<string | null>(null);
   const [previewing, setPreviewing] = React.useState(false);
@@ -213,34 +233,58 @@ function Editor({ initial }: { initial: View }) {
   const scroller = React.useRef<HTMLDivElement>(null);
   const [panning, setPanning] = React.useState(false);
   const drag = React.useRef<{ id: string; ox: number; oy: number; moved: boolean } | null>(null);
-  const touched = React.useRef(false);
   const latest = React.useRef(g);
+  const rev = React.useRef(0); // grows with every change: tells a save whether more happened meanwhile
+  const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** Saves now (not waiting for the pause): what the button, Ctrl/⌘+S and the autosave all do. */
+  async function save() {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    const mine = rev.current;
+    setStatus("saving");
+    try {
+      const r = await api<View>("PUT", "/api/orchestrator", latest.current);
+      setLoad(r.load);
+      setStatus(rev.current === mine ? "saved" : "dirty"); // changed again while saving: another save is on its way
+    } catch (e) {
+      setStatus("error");
+      toast.error("No se pudo guardar", { description: errorMessage(e) });
+    }
+  }
+  const saveRef = React.useRef(save);
+  React.useEffect(() => {
+    saveRef.current = save;
+  });
+
+  /** Something changed: it is saved by itself a moment after the last change. */
+  const markChanged = () => {
+    rev.current++;
+    setStatus("dirty");
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => void saveRef.current(), 600);
+  };
 
   const change = (fn: (g: Graph) => Graph) => {
-    touched.current = true;
     setG((cur) => {
       const next = fn(cur);
       latest.current = next;
       return next;
     });
-    setStatus("saving");
+    markChanged();
   };
 
-  // Autosave, a moment after the last change.
+  // Ctrl/⌘+S saves.
   React.useEffect(() => {
-    if (!touched.current) return;
-    const t = setTimeout(async () => {
-      try {
-        const r = await api<View>("PUT", "/api/orchestrator", latest.current);
-        setLoad(r.load);
-        setStatus("saved");
-      } catch (e) {
-        setStatus("error");
-        toast.error("No se pudo guardar", { description: errorMessage(e) });
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        void saveRef.current();
       }
-    }, 600);
-    return () => clearTimeout(t);
-  }, [g]);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const selected = sel?.type === "node" ? g.nodes.find((n) => n.id === sel.id) : undefined;
   const patch = (id: string, p: Partial<ONode>) => change((cur) => ({ ...cur, nodes: cur.nodes.map((n) => (n.id === id ? { ...n, ...p } : n)) }));
@@ -382,9 +426,13 @@ function Editor({ initial }: { initial: View }) {
           ))}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <span data-testid="orch-status" className="text-xs text-muted-foreground" role="status">
-            {status === "saving" ? "Guardando…" : status === "error" ? "No guardado" : "Guardado"}
+          <span data-testid="orch-status" className={cn("text-xs", status === "dirty" || status === "error" ? "text-warning" : "text-muted-foreground")} role="status">
+            {status === "saving" ? "Guardando…" : status === "dirty" ? "Cambios sin guardar" : status === "error" ? "No guardado" : "Guardado"}
           </span>
+          <Button size="sm" variant={status === "dirty" || status === "error" ? "default" : "outline"} disabled={status === "saved" || status === "saving"} onClick={() => void save()} data-testid="orch-save" title="Guardar ahora (Ctrl/⌘+S)">
+            {status === "saving" ? <LoaderCircleIcon className="animate-spin" /> : status === "saved" ? <CheckIcon /> : <SaveIcon />}
+            {status === "saving" ? "Guardando…" : status === "saved" ? "Guardado" : "Guardar"}
+          </Button>
           <select aria-label="Plantillas" value="" onChange={(e) => e.target.value && applyPreset(e.target.value)} className="h-8 rounded-md border bg-transparent px-2 text-sm">
             <option value="">Plantillas…</option>
             {initial.presets.map((p) => (
@@ -522,11 +570,7 @@ function Editor({ initial }: { initial: View }) {
                     };
                     const up = () => {
                       window.removeEventListener("pointermove", move);
-                      if (drag.current?.moved) {
-                        touched.current = true;
-                        setStatus("saving");
-                        setG((cur) => ({ ...cur })); // saves the new place
-                      }
+                      if (drag.current?.moved) markChanged(); // the new place is saved
                       drag.current = null;
                     };
                     window.addEventListener("pointermove", move);
@@ -538,8 +582,7 @@ function Editor({ initial }: { initial: View }) {
                 const a = byId.get(e.from);
                 const b = byId.get(e.to);
                 if (!a || !b || a.kind === "context" || a.kind === "goal" || a.kind === "memory") return null;
-                const x = (a.x + W + b.x) / 2;
-                const y = (a.y + b.y) / 2 + H / 2;
+                const { x, y } = labelAt(a, b, g.nodes);
                 const on = sel?.type === "edge" && sel.i === i;
                 return (
                   <button key={`l${e.from}>${e.to}`} type="button" data-testid="orch-edge-label" aria-label={`Conexión ${a.label} a ${b.label}: ${PASS[e.pass].label}`} onClick={() => setSel({ type: "edge", i })} className={cn("absolute z-10 -translate-x-1/2 -translate-y-1/2 cursor-pointer rounded-full border bg-card px-2 py-0.5 text-[10px] leading-4 whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground", on && "border-purple/70 text-foreground")} style={{ left: x, top: y }}>

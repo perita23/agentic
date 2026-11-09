@@ -1090,6 +1090,49 @@ try {
   check(true, "the preview explains the check, its retries and the goal");
   await shot("09d-omega");
   await page.keyboard.press("Escape");
+  // Nothing spills out of a cube (even with a very long name), and no connection label sits on top of a cube.
+  await page.getByRole("button", { name: "Planificador: Omega" }).click();
+  await page.getByLabel("Nombre del cubo").fill("Un nombre larguísimo de cuarenta caracteres!");
+  await page.getByRole("button", { name: /Objetivo: Objetivo/ }).click();
+  await page.getByLabel("Objetivo", { exact: true }).fill("Un objetivo muy largo ".repeat(12));
+  const spill = await page.evaluate(() => {
+    const out = [];
+    const cubes = [...document.querySelectorAll("[data-node-id]")];
+    for (const c of cubes) {
+      const cr = c.getBoundingClientRect();
+      for (const el of c.querySelectorAll("*")) {
+        if (el.closest("[data-port]") || el.hasAttribute("data-port") || el.tagName === "svg" || el.tagName === "path") continue;
+        const r = el.getBoundingClientRect();
+        if (r.width && (r.right > cr.right + 0.5 || r.left < cr.left - 0.5 || r.bottom > cr.bottom + 0.5)) out.push(`${c.getAttribute("aria-label")} › ${el.tagName}.${String(el.className).slice(0, 30)}`);
+      }
+    }
+    const overlaps = [];
+    for (const l of document.querySelectorAll("[data-testid=orch-edge-label]")) {
+      const lr = l.getBoundingClientRect();
+      for (const c of cubes) {
+        const cr = c.getBoundingClientRect();
+        if (lr.left < cr.right && lr.right > cr.left && lr.top < cr.bottom && lr.bottom > cr.top) overlaps.push(`${l.textContent} on ${c.getAttribute("aria-label")}`);
+      }
+    }
+    return { out, overlaps };
+  });
+  check(spill.out.length === 0, `no text spills out of a cube ${JSON.stringify(spill.out.slice(0, 3))}`);
+  check(spill.overlaps.length === 0, `no connection label sits on top of a cube ${JSON.stringify(spill.overlaps.slice(0, 3))}`);
+  // The Save button: a change shows «Guardar» at once, and pressing it saves without waiting for the autosave.
+  await page.getByTestId("orch-status").getByText("Guardado").waitFor({ timeout: 5000 });
+  await page.getByRole("button", { name: /^Planificador: Un nombre larguísimo/ }).click();
+  await page.getByLabel("Nombre del cubo").fill("Omega 2");
+  check((await page.getByTestId("orch-status").textContent()) === "Cambios sin guardar" && (await page.getByTestId("orch-save").textContent()).includes("Guardar") && (await page.getByTestId("orch-save").isEnabled()), "a change shows «Cambios sin guardar» and an active Save button");
+  await page.getByTestId("orch-save").click();
+  const quick = await (await fetch(base + "/api/orchestrator", { headers: oauth })).json();
+  check(quick.graph.nodes.some((n) => n.label === "Omega 2"), "pressing Save saves at once, without waiting for the autosave");
+  await page.getByTestId("orch-status").getByText("Guardado").waitFor({ timeout: 5000 });
+  check(!(await page.getByTestId("orch-save").isEnabled()), "once saved, the button rests (Guardado)");
+  // And Ctrl/Cmd+S does the same.
+  await page.getByLabel("Nombre del cubo").fill("Omega 3");
+  await page.keyboard.press("Control+s");
+  await page.waitForFunction(async ([u, h]) => (await (await fetch(u, { headers: h })).json()).graph.nodes.some((n) => n.label === "Omega 3"), [base + "/api/orchestrator", oauth], { timeout: 1500 }).catch(() => {});
+  check((await (await fetch(base + "/api/orchestrator", { headers: oauth })).json()).graph.nodes.some((n) => n.label === "Omega 3"), "Ctrl/Cmd+S saves too");
   await fetch(base + "/api/orchestrator", { method: "PUT", headers: oauth, body: JSON.stringify({ enabled: false, nodes: [], edges: [] }) });
 
   // The local model: it corrects while you type (applied, undoable) and improves the prompt on request.

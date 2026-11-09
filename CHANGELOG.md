@@ -3,6 +3,14 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.59.1] - 2026-11-09
+
+### Añadido
+- **Orchestrator: botón «Guardar».** En la barra superior, junto al estado: mientras hay cambios aparece activo con «Cambios sin guardar» y guarda **al instante** (sin esperar a la pausa del autoguardado); cuando todo está guardado descansa en «Guardado». También se guarda con **Ctrl/⌘+S**. El autoguardado se mantiene, y si cambias algo mientras se guarda, vuelve a guardar.
+
+### Corregido
+- **El contenido de los cubos del Orchestrator se desbordaba.** El texto del Objetivo y de la Memoria (y los nombres, modelos o reintentos largos) se salía del cubo: ahora se recorta o se parte en dos líneas dentro de su caja. Las etiquetas de las conexiones («✓ si pasa», «resumen»…) ya no se montan sobre un cubo: se colocan en el punto más cercano que queda libre. Hay una prueba que carga la plantilla Omega con un nombre y un objetivo larguísimos y comprueba que nada se sale ni se solapa.
+
 ## [0.59.0] - 2026-11-09
 
 ### Añadido
