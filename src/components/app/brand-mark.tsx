@@ -29,8 +29,8 @@ export function BrandMark({ className }: { className?: string }) {
         </filter>
       </defs>
       <path d="M512 100c228 0 300 0 356 56s56 128 56 356 0 300-56 356-128 56-356 56-300 0-356-56-56-128-56-356 0-300 56-356 128-56 356-56z" fill="#000" stroke="#fff" strokeOpacity=".16" strokeWidth="10" />
-      <g filter={`url(#${id}f)`}>
-        <g transform="translate(219.50 251.75) scale(1.95)">
+      <g transform="translate(219.50 251.75) scale(1.95)">
+        <g filter={`url(#${id}f)`}>
           <circle cx="150" cy="84" r="63" fill={`url(#${id}a)`} />
           <circle cx="207" cy="183" r="63" fill={`url(#${id}b)`} />
           <circle cx="93" cy="183" r="63" fill={`url(#${id}c)`} />
