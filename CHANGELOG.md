@@ -3,6 +3,18 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.57.0] - 2026-11-09
+
+### Añadido
+- **Orchestrator: dibuja cómo trabaja Claude.** Una pestaña nueva con un lienzo donde arrastras cubos y los conectas con líneas animadas (con los colores de Morphy) para definir, **de forma global**, el equipo con el que Claude trabaja:
+  - **Planificador:** el agente principal. Eliges su modelo (Opus, Sonnet, Haiku, «Opus planifica y Sonnet ejecuta», o el de siempre), para qué sirve y sus instrucciones.
+  - **Subagentes** (escritor, revisor, especialista…): cada uno con **su propio modelo** (por ejemplo, uno más barato y rápido), cuándo usarlo, sus instrucciones y las herramientas que puede usar. Los que conectas desde el planificador son a los que puede delegar; las conexiones entre subagentes dicen «cuando termine éste, pasa el resultado a aquél».
+  - **Política de contexto:** a qué porcentaje de la ventana de contexto se compacta la conversación (por ejemplo, al 75 %).
+  - **Plantillas** para empezar (planificador listo + escritores baratos + revisor; Opus que planifica y Sonnet que ejecuta; equipo de revisión) y **«Vista previa»**, que enseña exactamente lo que recibe Claude: modelo principal, subagentes con sus modelos y herramientas, las instrucciones añadidas y el umbral de compactación.
+  - **Se aplica solo** a lo que Agentic lanza (puedes elegir: chats, ejecuciones y/o tareas): se traduce a las opciones de Claude Code `--model`, `--agents`, instrucciones adicionales y la variable `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`. Lo que elijas a mano en una ejecución (un modelo concreto, un agente de Agentic) manda siempre sobre el dibujo.
+  - Se guarda solo mientras dibujas; se puede arrastrar, conectar desde el panel, borrar con Supr, y todo funciona con teclado.
+- Las instrucciones de Obsidian ya no pisaban a las del modo voz cuando estaban las dos activas: ahora se suman.
+
 ## [0.56.1] - 2026-11-09
 
 ### Corregido

@@ -973,6 +973,55 @@ try {
   const evil = await fetch(`${base}/api/chats/${chats.chats[0].id}/file?path=${encodeURIComponent("/etc/passwd")}`, { headers: { authorization: `Bearer ${token}` } });
   check(evil.status === 404, "only files Claude wrote in that chat can be downloaded");
   await shot("08f-chat-files");
+  // The orchestrator: a graph of how Claude works as a team.
+  const oauth = { authorization: `Bearer ${token}`, "content-type": "application/json" };
+  await page.goto(`${base}/orchestrator`);
+  await page.getByRole("heading", { name: "Orchestrator" }).waitFor();
+  await page.getByText("Dibuja cómo quieres que trabaje Claude").waitFor();
+  await page.getByLabel("Plantillas").selectOption("planner-cheap-writers");
+  await page.getByRole("button", { name: /Planificador/ }).first().waitFor();
+  check((await page.locator("[data-node-id]").count()) === 4 && (await page.getByTestId("orch-edge").count()) === 3, "a template draws the team: planner, writer, reviewer and the context policy, connected");
+  await page.getByTestId("orch-status").getByText("Guardado").waitFor({ timeout: 5000 });
+  let saved = await (await fetch(base + "/api/orchestrator", { headers: oauth })).json();
+  check(saved.graph.enabled === true && saved.graph.nodes.length === 4, "the graph is saved by itself");
+  await shot("09-orchestrator");
+  // Select the writer: its model (a cheaper one) and tools are in the panel.
+  await page.getByRole("button", { name: "Subagente: Escritor" }).click();
+  check((await page.getByLabel("Modelo", { exact: true }).inputValue()) === "haiku", "the writer works with the cheaper model");
+  await page.getByLabel("Modelo", { exact: true }).selectOption("sonnet");
+  // A new subagent, connected from the panel of the planner.
+  await page.getByRole("button", { name: "Subagente", exact: true }).first().click();
+  await page.getByLabel("Nombre del cubo").fill("Probador");
+  await page.getByRole("button", { name: "Planificador: Planificador" }).click();
+  await page.getByLabel("Conectar con").selectOption({ label: "Probador" });
+  check((await page.getByTestId("orch-edge").count()) === 4, "a subagent is connected to the planner from its panel");
+  // Dragging a cube moves it (and the move is saved).
+  const cube = page.getByRole("button", { name: "Subagente: Revisor" });
+  const cubeBefore = await cube.boundingBox();
+  await page.mouse.move(cubeBefore.x + 40, cubeBefore.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(cubeBefore.x + 40, cubeBefore.y + 120, { steps: 6 });
+  await page.mouse.up();
+  const cubeAfter = await cube.boundingBox();
+  check(Math.abs(cubeAfter.y - cubeBefore.y - 100) < 6, "a cube can be dragged");
+  // The context policy: a threshold.
+  await page.getByRole("button", { name: "Contexto: Contexto" }).click();
+  await page.getByLabel("Umbral de contexto").fill("60");
+  await page.getByTestId("orch-status").getByText("Guardado").waitFor({ timeout: 5000 });
+  saved = await (await fetch(base + "/api/orchestrator", { headers: oauth })).json();
+  check(saved.graph.nodes.find((n) => n.kind === "context").threshold === 60 && saved.graph.nodes.find((n) => n.label === "Escritor").model === "sonnet" && saved.graph.nodes.some((n) => n.label === "Probador"), "every change is saved");
+  await page.getByRole("button", { name: "Vista previa" }).click();
+  await page.getByRole("dialog").getByText("al 60%", { exact: true }).waitFor();
+  check((await page.getByRole("dialog").getByText("probador", { exact: true }).count()) >= 1 && (await page.getByRole("dialog").getByText("Orquestación").count()) >= 1, "the preview shows what Claude receives (subagents, models, instructions, compaction)");
+  await shot("09b-orchestrator-preview");
+  await page.keyboard.press("Escape");
+  // Delete removes what is selected.
+  await page.getByRole("button", { name: "Subagente: Probador" }).click();
+  await page.keyboard.press("Delete");
+  await page.waitForFunction(() => document.querySelectorAll("[data-node-id]").length === 4);
+  check(true, "Delete removes the selected cube and its connections");
+  await fetch(base + "/api/orchestrator", { method: "PUT", headers: oauth, body: JSON.stringify({ enabled: false, nodes: [], edges: [] }) });
+
   // The local model: it corrects while you type (applied, undoable) and improves the prompt on request.
   const auth = { authorization: `Bearer ${token}`, "content-type": "application/json" };
   await fetch(base + "/api/ollama", { method: "PUT", headers: auth, body: JSON.stringify({ enabled: true, baseUrl: ollamaUrl, model: "fake:1b", autocorrect: "auto" }) });

@@ -22,6 +22,7 @@ import { PrefsService } from "./prefs";
 import { AgenticMcp } from "./agentic-mcp";
 import { ObsidianService } from "./obsidian";
 import { OllamaService } from "./ollama";
+import { OrchestratorService } from "./orchestrator";
 import { SpellService } from "./spell";
 import { ProfileService } from "./profile";
 import { SessionTrash } from "./trash";
@@ -62,6 +63,7 @@ export interface Context {
   prefs: PrefsService;
   obsidian: ObsidianService;
   ollama: OllamaService;
+  orchestrator: OrchestratorService;
   spell: SpellService;
   agenticMcp: AgenticMcp;
   profile: ProfileService;
@@ -83,10 +85,12 @@ export function createContext(config: Config): Context {
   const ollama = new OllamaService(store);
   const spell = new SpellService(store, ollama);
   const agenticMcp = new AgenticMcp(store, config.dataDir);
+  const orchestrator = new OrchestratorService(store);
   const runs = new RunManager(store, {
     dataDir: config.dataDir,
     obsidian: (cwd) => obsidian.forRun(cwd),
     mcp: () => agenticMcp.forRun(),
+    orchestrator: (kind) => orchestrator.forRun(kind),
     claudeBin: config.claudeBin,
     maxConcurrent: config.maxConcurrentRuns,
     maxLogBytes: config.maxLogBytes,
@@ -135,6 +139,7 @@ export function createContext(config: Config): Context {
     prefs: new PrefsService(store),
     obsidian,
     ollama,
+    orchestrator,
     spell,
     agenticMcp,
     profile: new ProfileService(store, config.dataDir),
