@@ -60,9 +60,46 @@ describe("what the graph becomes for claude", () => {
     expect(c.appendPrompt).toContain("«Planificador»");
     expect(c.appendPrompt).toContain("Sé breve.");
     expect(c.appendPrompt).toContain("«escritor-nandu» (Haiku)");
-    expect(c.appendPrompt).toContain("Cuando «escritor-nandu» termine, pasa su resultado a «revisor»");
+    expect(c.appendPrompt).toContain("Cuando «escritor-nandu» termine, a «revisor» pásale un resumen breve de lo hecho");
     expect(c.appendPrompt).toContain("70%");
     expect(c.appendPrompt).not.toContain("suelto");
+  });
+
+  it("says who writes and who only reads, what each connection hands over, and what runs together", () => {
+    const team = graph({
+      nodes: [
+        node("p", "planner", { label: "Jefe" }),
+        node("l", "agent", { label: "Lector", job: "reader", tools: ["Read", "Grep"], role: "Lee el código." }),
+        node("e", "agent", { label: "Escritor", job: "writer", tools: ["Read", "Edit"], role: "Escribe." }),
+        node("t", "agent", { label: "Probador", job: "tester", tools: ["Bash"], role: "Prueba." }),
+      ],
+      edges: [
+        { from: "p", to: "l", pass: "none", run: "parallel" },
+        { from: "p", to: "t", pass: "full", run: "parallel", note: "Dale también el comando de pruebas." },
+        { from: "p", to: "e", pass: "paths", run: "sequence" },
+        { from: "l", to: "e", pass: "paths", note: "Una línea por archivo." },
+        { from: "e", to: "t", pass: "none" },
+      ],
+    });
+    const t = compile(team, "chats")!.appendPrompt;
+    expect(t).toContain("«lector» (el modelo por defecto): lee; Lee el código. Sólo lee: no puede modificar archivos.");
+    expect(t).toContain("«escritor» (el modelo por defecto): escribe; Escribe.");
+    expect(t).not.toMatch(/«escritor»[^\n]*Sólo lee/);
+    expect(t).toContain("Lanza a la vez, en una misma respuesta con varias llamadas a Task: «lector», «probador».");
+    expect(t).toContain("Lanza uno tras otro, esperando su resultado antes de seguir: «escritor».");
+    expect(t).toContain("A «lector» pásale sólo la tarea, sin contexto previo.");
+    expect(t).toContain("A «probador» pásale todo el contexto relevante de la conversación. Dale también el comando de pruebas.");
+    expect(t).toContain("A «escritor» pásale sólo la tarea y las rutas de los archivos implicados.");
+    expect(t).toContain("Cuando «lector» termine, a «escritor» pásale sólo la lista de archivos que leyó o cambió, una línea por archivo. Una línea por archivo.");
+    expect(t).toContain("Cuando «escritor» termine, a «probador» pásale nada: empieza sin contexto de lo anterior.");
+    expect(t).toContain("Cada subagente te devuelve su resultado a ti");
+  });
+
+  it("an old graph (without jobs or connection details) still loads, with sensible defaults", () => {
+    const old = graphSchema.parse({ enabled: true, nodes: [node("p", "planner"), node("a", "agent")], edges: [{ from: "p", to: "a" }] });
+    expect(old.edges[0]).toEqual({ from: "p", to: "a", pass: "summary", run: "sequence", note: "" });
+    expect(old.nodes[1]!.job).toBe("custom");
+    expect(graphSchema.safeParse({ nodes: [], edges: [{ from: "a", to: "b", pass: "todo" }] }).success).toBe(false);
   });
 
   it("without a planner every agent is offered; same names get a suffix", () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { BotIcon, EyeIcon, GaugeIcon, LayoutTemplateIcon, PlusIcon, Trash2Icon, WorkflowIcon } from "lucide-react";
+import { BookOpenIcon, BotIcon, EyeIcon, FlaskConicalIcon, GaugeIcon, LayoutTemplateIcon, PencilLineIcon, PlusIcon, SearchIcon, ShieldCheckIcon, Trash2Icon, WorkflowIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -16,10 +16,21 @@ import { cn } from "@/lib/utils";
 
 type Kind = "planner" | "agent" | "context";
 type Model = "default" | "opus" | "sonnet" | "haiku" | "opusplan";
+type Job = "custom" | "writer" | "reader" | "reviewer" | "researcher" | "tester";
+type Pass = "summary" | "full" | "paths" | "none";
+interface JobInfo {
+  label: string;
+  verb: string;
+  model: Model;
+  tools: string[];
+  role: string;
+  prompt: string;
+}
 interface ONode {
   id: string;
   kind: Kind;
   label: string;
+  job: Job;
   x: number;
   y: number;
   model: Model;
@@ -31,6 +42,9 @@ interface ONode {
 interface Edge {
   from: string;
   to: string;
+  pass: Pass;
+  run: "parallel" | "sequence";
+  note: string;
 }
 interface Graph {
   enabled: boolean;
@@ -42,6 +56,7 @@ interface View {
   graph: Graph;
   models: Model[];
   tools: string[];
+  jobs: Record<Job, JobInfo>;
   presets: { id: string; name: string; description: string; graph: Omit<Graph, "enabled" | "scope"> }[];
 }
 interface Preview {
@@ -66,6 +81,15 @@ const KIND: Record<Kind, { label: string; help: string; ring: string; chip: stri
   agent: { label: "Subagente", help: "Trabaja para el planificador, con su propio modelo.", ring: "border-border-strong", chip: "bg-secondary text-muted-foreground" },
   context: { label: "Contexto", help: "Cuándo compactar la conversación.", ring: "border-warning/50", chip: "bg-warning/15 text-warning" },
 };
+const JOB_ICON: Record<Job, React.ElementType> = { custom: BotIcon, writer: PencilLineIcon, reader: BookOpenIcon, reviewer: ShieldCheckIcon, researcher: SearchIcon, tester: FlaskConicalIcon };
+const PASS: Record<Pass, { label: string; short: string; help: string }> = {
+  summary: { label: "Un resumen", short: "resumen", help: "La tarea y un resumen del contexto que necesite (no todo)." },
+  full: { label: "Todo el contexto", short: "todo", help: "Todo el contexto relevante de la conversación o el resultado completo." },
+  paths: { label: "Solo las rutas", short: "rutas", help: "Solo la tarea y la lista de archivos implicados: ahorra contexto." },
+  none: { label: "Nada", short: "nada", help: "Empieza de cero: sin contexto de lo anterior." },
+};
+const JOBLABEL: Record<Job, string> = { custom: "", writer: "escribe", reader: "lee", reviewer: "revisa", researcher: "investiga", tester: "prueba" };
+const WRITE_TOOLS = ["Edit", "Write", "NotebookEdit"];
 const MODEL_LABEL: Record<Model, string> = { default: "Por defecto", opus: "Opus", sonnet: "Sonnet", haiku: "Haiku", opusplan: "Opus → Sonnet" };
 /** How capable (and how costly) a model is, as dots: nothing is priced in money here. */
 const POWER: Record<Model, number> = { default: 0, opus: 3, sonnet: 2, haiku: 1, opusplan: 3 };
@@ -109,10 +133,10 @@ function Cube({ n, selected, onPointerDown, onSelect, onPortDown, linking, hot }
       style={{ left: n.x, top: n.y, width: W, height: H }}
     >
       <div className="flex items-start gap-2.5">
-        <span className={cn("grid size-9 shrink-0 place-items-center rounded-xl", k.chip)}>{n.kind === "planner" ? <LiquidOrb state="thinking" size={22} /> : n.kind === "agent" ? <BotIcon className="size-4" /> : <GaugeIcon className="size-4" />}</span>
+        <span className={cn("grid size-9 shrink-0 place-items-center rounded-xl", k.chip)}>{n.kind === "planner" ? <LiquidOrb state="thinking" size={22} /> : n.kind === "agent" ? (() => { const I = JOB_ICON[n.job]; return <I className="size-4" />; })() : <GaugeIcon className="size-4" />}</span>
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold">{n.label}</div>
-          <div className="text-[11px] text-muted-foreground">{k.label}</div>
+          <div className="text-[11px] text-muted-foreground">{n.kind === "agent" && n.job !== "custom" ? `${k.label} · ${JOBLABEL[n.job]}` : k.label}</div>
         </div>
       </div>
       <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
@@ -124,7 +148,7 @@ function Cube({ n, selected, onPointerDown, onSelect, onPortDown, linking, hot }
               <b className="font-medium text-foreground/80">{n.model === "default" && n.kind === "agent" ? "Igual que el planificador" : MODEL_LABEL[n.model]}</b>
               <Dots model={n.model} />
             </span>
-            {n.kind === "agent" && <span>{n.tools.length ? `${n.tools.length} herram.` : "todas"}</span>}
+            {n.kind === "agent" && <span title={n.tools.join(", ") || "todas las herramientas"}>{n.tools.length && !n.tools.some((t) => WRITE_TOOLS.includes(t)) ? "solo lee" : n.tools.length ? `${n.tools.length} herram.` : "todas"}</span>}
           </>
         )}
       </div>
@@ -192,19 +216,20 @@ function Editor({ initial }: { initial: View }) {
   const selected = sel?.type === "node" ? g.nodes.find((n) => n.id === sel.id) : undefined;
   const patch = (id: string, p: Partial<ONode>) => change((cur) => ({ ...cur, nodes: cur.nodes.map((n) => (n.id === id ? { ...n, ...p } : n)) }));
 
-  function add(kind: Kind) {
+  function add(kind: Kind, job: Job = "custom") {
     if (kind !== "agent" && g.nodes.some((n) => n.kind === kind)) return toast.message(kind === "planner" ? "Ya hay un planificador" : "Ya hay una política de contexto");
     const i = g.nodes.length;
     const n: ONode = {
       id: newId(kind),
       kind,
-      label: kind === "planner" ? "Planificador" : kind === "agent" ? `Subagente ${g.nodes.filter((x) => x.kind === "agent").length + 1}` : "Contexto",
+      label: kind === "planner" ? "Planificador" : kind === "agent" ? (job === "custom" ? `Subagente ${g.nodes.filter((x) => x.kind === "agent").length + 1}` : initial.jobs[job].label) : "Contexto",
+      job,
       x: 70 + ((i * 60) % 700),
       y: 70 + ((i * 90) % 500),
-      model: kind === "agent" ? "haiku" : "default",
-      role: "",
-      prompt: "",
-      tools: [],
+      model: kind === "agent" ? initial.jobs[job].model : "default",
+      role: kind === "agent" ? initial.jobs[job].role : "",
+      prompt: kind === "agent" ? initial.jobs[job].prompt : "",
+      tools: kind === "agent" ? initial.jobs[job].tools : [],
       threshold: 80,
     };
     change((cur) => ({ ...cur, nodes: [...cur.nodes, n] }));
@@ -214,8 +239,10 @@ function Editor({ initial }: { initial: View }) {
   function connect(from: string, to: string) {
     const why = whyNot(g.nodes, g.edges, from, to);
     if (why) return toast.message(why);
-    change((cur) => ({ ...cur, edges: [...cur.edges, { from, to }] }));
+    change((cur) => ({ ...cur, edges: [...cur.edges, { from, to, pass: "summary", run: "sequence", note: "" }] }));
   }
+
+  const patchEdge = (i: number, p: Partial<Edge>) => change((cur) => ({ ...cur, edges: cur.edges.map((e, k) => (k === i ? { ...e, ...p } : e)) }));
 
   function removeNode(id: string) {
     change((cur) => ({ ...cur, nodes: cur.nodes.filter((n) => n.id !== id), edges: cur.edges.filter((e) => e.from !== id && e.to !== id) }));
@@ -316,11 +343,20 @@ function Editor({ initial }: { initial: View }) {
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="min-w-0">
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            {(["planner", "agent", "context"] as const).map((k) => (
-              <Button key={k} size="sm" variant="outline" onClick={() => add(k)} title={KIND[k].help}>
-                <PlusIcon /> {KIND[k].label}
-              </Button>
-            ))}
+            <Button size="sm" variant="outline" onClick={() => add("planner")} title={KIND.planner.help}>
+              <PlusIcon /> Planificador
+            </Button>
+            {(["writer", "reader", "reviewer", "researcher", "tester", "custom"] as const).map((j) => {
+              const I = JOB_ICON[j];
+              return (
+                <Button key={j} size="sm" variant="outline" onClick={() => add("agent", j)} title={j === "custom" ? KIND.agent.help : initial.jobs[j].role}>
+                  <I /> {initial.jobs[j].label}
+                </Button>
+              );
+            })}
+            <Button size="sm" variant="outline" onClick={() => add("context")} title={KIND.context.help}>
+              <GaugeIcon /> Contexto
+            </Button>
             <span className="text-xs text-muted-foreground">Arrastra el círculo de un cubo hasta otro para conectarlos.</span>
           </div>
           <div className="relative h-[620px] overflow-auto rounded-xl border bg-inset" data-testid="orch-canvas" onPointerDown={(e) => e.target === e.currentTarget || (e.target as HTMLElement).dataset.bg ? setSel(null) : undefined}>
@@ -395,6 +431,20 @@ function Editor({ initial }: { initial: View }) {
                   }}
                 />
               ))}
+              {g.edges.map((e, i) => {
+                const a = byId.get(e.from);
+                const b = byId.get(e.to);
+                if (!a || !b || a.kind === "context") return null;
+                const x = (a.x + W + b.x) / 2;
+                const y = (a.y + b.y) / 2 + H / 2;
+                const on = sel?.type === "edge" && sel.i === i;
+                return (
+                  <button key={`l${e.from}>${e.to}`} type="button" data-testid="orch-edge-label" aria-label={`Conexión ${a.label} a ${b.label}: ${PASS[e.pass].label}`} onClick={() => setSel({ type: "edge", i })} className={cn("absolute z-10 -translate-x-1/2 -translate-y-1/2 cursor-pointer rounded-full border bg-card px-2 py-0.5 text-[10px] leading-4 whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground", on && "border-purple/70 text-foreground")} style={{ left: x, top: y }}>
+                    {a.kind === "planner" && e.run === "parallel" ? "∥ " : ""}
+                    {PASS[e.pass].short}
+                  </button>
+                );
+              })}
               {!g.nodes.length && (
                 <div className="absolute inset-0 grid place-items-center">
                   <div className="grid max-w-md gap-3 text-center">
@@ -433,6 +483,18 @@ function Editor({ initial }: { initial: View }) {
                 <span className="text-xs font-medium">Nombre</span>
                 <Input aria-label="Nombre del cubo" value={selected.label} maxLength={40} onChange={(e) => patch(selected.id, { label: e.target.value })} />
               </label>
+              {selected.kind === "agent" && (
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-medium">Qué hace</span>
+                  <select aria-label="Qué hace" value={selected.job} onChange={(e) => patch(selected.id, { job: e.target.value as Job })} className="h-9 rounded-md border bg-transparent px-2 text-sm">
+                    {(Object.keys(initial.jobs) as Job[]).map((j) => (
+                      <option key={j} value={j}>
+                        {initial.jobs[j].label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               {selected.kind !== "context" && (
                 <>
                   <label className="grid gap-1.5">
@@ -485,9 +547,10 @@ function Editor({ initial }: { initial: View }) {
                   const other = byId.get(e.from === selected.id ? e.to : e.from);
                   return (
                     <div key={`${e.from}>${e.to}`} className="flex items-center justify-between gap-2 rounded-md border px-2 py-1 text-xs">
-                      <span className="truncate">
+                      <button type="button" className="min-w-0 cursor-pointer truncate text-left hover:text-foreground" onClick={() => setSel({ type: "edge", i: g.edges.indexOf(e) })}>
                         {e.from === selected.id ? "→" : "←"} {other?.label}
-                      </span>
+                        {other?.kind !== "context" && selected.kind !== "context" ? <span className="text-muted-foreground"> · {PASS[e.pass].short}</span> : null}
+                      </button>
                       <button type="button" aria-label="Quitar la conexión" className="cursor-pointer text-muted-foreground hover:text-destructive" onClick={() => change((cur) => ({ ...cur, edges: cur.edges.filter((x) => x !== e) }))}>
                         <Trash2Icon className="size-3.5" />
                       </button>
@@ -507,16 +570,54 @@ function Editor({ initial }: { initial: View }) {
               </div>
             </div>
           ) : sel?.type === "edge" && g.edges[sel.i] ? (
-            <div className="grid gap-3 text-sm">
-              <div className="text-xs font-medium text-muted-foreground">Conexión</div>
-              <p>
-                <b>{byId.get(g.edges[sel.i]!.from)?.label}</b> → <b>{byId.get(g.edges[sel.i]!.to)?.label}</b>
-              </p>
-              <p className="text-xs text-muted-foreground">{byId.get(g.edges[sel.i]!.from)?.kind === "planner" ? "El planificador puede delegar en este subagente." : byId.get(g.edges[sel.i]!.from)?.kind === "context" ? "La política de contexto se aplica al planificador." : "Cuando termina el primero, pasa su resultado al segundo."}</p>
-              <Button size="sm" variant="outline" className="hover:text-destructive" onClick={() => (change((cur) => ({ ...cur, edges: cur.edges.filter((_, i) => i !== sel.i) })), setSel(null))}>
-                <Trash2Icon /> Quitar la conexión
-              </Button>
-            </div>
+            (() => {
+              const e = g.edges[sel.i]!;
+              const a = byId.get(e.from);
+              const b = byId.get(e.to);
+              const fromPlanner = a?.kind === "planner";
+              return (
+                <div className="grid gap-3 text-sm">
+                  <div className="text-xs font-medium text-muted-foreground">Conexión</div>
+                  <p>
+                    <b>{a?.label}</b> → <b>{b?.label}</b>
+                  </p>
+                  {a?.kind === "context" ? (
+                    <p className="text-xs text-muted-foreground">La política de contexto se aplica al planificador.</p>
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted-foreground">{fromPlanner ? "El planificador puede delegar en este subagente." : "Cuando termina el primero, el segundo recibe su trabajo."} Los resultados siempre vuelven al planificador.</p>
+                      <label className="grid gap-1.5">
+                        <span className="text-xs font-medium">{fromPlanner ? "Qué le da el planificador" : "Qué se pasa"}</span>
+                        <select aria-label="Qué se pasa" value={e.pass} onChange={(ev) => patchEdge(sel.i, { pass: ev.target.value as Pass })} className="h-9 rounded-md border bg-transparent px-2 text-sm">
+                          {(Object.keys(PASS) as Pass[]).map((k) => (
+                            <option key={k} value={k}>
+                              {PASS[k].label}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-xs text-muted-foreground">{PASS[e.pass].help}</span>
+                      </label>
+                      {fromPlanner && (
+                        <label className="grid gap-1.5">
+                          <span className="text-xs font-medium">Cómo se lanza</span>
+                          <select aria-label="Cómo se lanza" value={e.run} onChange={(ev) => patchEdge(sel.i, { run: ev.target.value as Edge["run"] })} className="h-9 rounded-md border bg-transparent px-2 text-sm">
+                            <option value="sequence">Uno tras otro (espera su resultado)</option>
+                            <option value="parallel">A la vez que los demás en paralelo</option>
+                          </select>
+                        </label>
+                      )}
+                      <label className="grid gap-1.5">
+                        <span className="text-xs font-medium">Nota</span>
+                        <Textarea aria-label="Nota de la conexión" rows={2} maxLength={200} value={e.note} onChange={(ev) => patchEdge(sel.i, { note: ev.target.value })} placeholder="Una indicación más sobre qué pasar o cómo…" />
+                      </label>
+                    </>
+                  )}
+                  <Button size="sm" variant="outline" className="hover:text-destructive" onClick={() => (change((cur) => ({ ...cur, edges: cur.edges.filter((_, i) => i !== sel.i) })), setSel(null))}>
+                    <Trash2Icon /> Quitar la conexión
+                  </Button>
+                </div>
+              );
+            })()
           ) : (
             <div className="grid gap-3 text-sm text-muted-foreground">
               <p className="font-medium text-foreground">Cómo funciona</p>
