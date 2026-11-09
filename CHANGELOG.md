@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.60.0] - 2026-11-09
+
+### Cambiado
+- **Nuevo logo de Agentic: un fotograma de Morphy.** El icono de la app, la marca de la barra lateral, el favicon, el icono de la landing y el del instalador ya no son la «A» geométrica: son Morphy en el momento de la animación en que sus tres bolas forman un triángulo redondeado (violeta arriba, coral y violeta abajo), sobre el cuadrado negro de macOS. La bola animada de la app no se ha tocado: el logo es solo una imagen fija de ella.
+
 ## [0.59.1] - 2026-11-09
 
 ### Añadido
