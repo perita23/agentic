@@ -962,6 +962,21 @@ try {
   await page.getByTestId("queued").waitFor({ state: "detached", timeout: 15000 });
   await page.locator("main").getByText("después, otra cosa").first().waitFor({ timeout: 15000 });
   check(true, "stopping the answer sends the waiting message");
+  // Subagents Claude launches are shown as a team of cards, with their own steps and what they handed back.
+  const subRun = await (await fetch(base + "/api/runs", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ projectPath: project, prompt: "SUBAGENTES reparte el trabajo" }) })).json();
+  await page.goto(`${base}/runs/${subRun.id}`);
+  await page.getByTestId("subagent-group").waitFor({ timeout: 15000 });
+  check((await page.getByTestId("subagent-card").count()) === 2 && (await page.getByTestId("subagent-group").getByText("en paralelo").count()) === 1, "the subagents launched together are shown as a team of cards, in parallel");
+  check((await page.getByTestId("subagent-card").first().getByText("lector").count()) >= 1 && (await page.getByTestId("subagent-card").nth(1).getByText("Haiku").count()) >= 1, "each card says who it is and its model");
+  check((await page.getByTestId("subagent-card").first().getByText(/Buscar en el código · login/).count()) === 1 && (await page.locator("main").getByText("Grep").count()) === 0, "a subagent's own steps stay inside its card, not in the main timeline");
+  await page.getByTestId("subagent-card").first().getByRole("button").first().click();
+  await page.getByText("Busca dónde se valida el login.").waitFor();
+  await page.getByText(/El login se valida en/).waitFor();
+  check(true, "opening a card shows what it was asked and what it handed back");
+  await shot("09c-subagents");
+  await page.goto(`${base}/chat`);
+  await page.getByRole("navigation", { name: "Historial de chats" }).getByText("Hola Claude, ¿me explicas los closures?").first().click();
+  await page.getByLabel("Mensaje para Claude").waitFor();
   // Files Claude creates in a chat come with a download button.
   await page.getByLabel("Mensaje para Claude").fill("CREAFICHERO haz un informe");
   await page.keyboard.press("Enter");
@@ -1039,6 +1054,29 @@ try {
   await page.keyboard.press("Delete");
   await page.waitForFunction(() => document.querySelectorAll("[data-node-id]").length === 5);
   check(true, "Delete removes the selected cube and its connections");
+  await fetch(base + "/api/orchestrator", { method: "PUT", headers: oauth, body: JSON.stringify({ enabled: false, nodes: [], edges: [] }) });
+  // Omega, light: goal, memory, context at 40%, Opus at medium effort, Haiku workers in parallel, a check that sends work back.
+  await page.reload();
+  await page.getByText("Dibuja cómo quieres que trabaje Claude").waitFor();
+  await page.getByLabel("Plantillas").selectOption("omega-light");
+  await page.getByRole("button", { name: "Planificador: Omega" }).waitFor();
+  check((await page.locator("[data-node-id]").count()) === 9 && (await page.getByRole("button", { name: "Planificador: Omega" }).textContent()).includes("medium"), "the Omega template: goal, memory, context, planner at medium effort, four workers and a check");
+  const lightOk = await page.waitForFunction(() => ["Muy ligero", "Ligero", "Medio"].includes(document.querySelector("[data-testid=orch-load-label]")?.textContent ?? ""), null, { timeout: 8000 }).then(() => true, () => false);
+  check(lightOk, "the weight meter says it is not a heavy team");
+  check((await page.getByTestId("orch-edge-label").filter({ hasText: "si falla" }).count()) === 1, "a failing check sends the work back (a red connection)");
+  const lightLabel = await page.getByTestId("orch-load-label").textContent();
+  await page.getByRole("button", { name: "Planificador: Omega" }).click();
+  await page.getByLabel("Esfuerzo").selectOption("max");
+  await page.waitForFunction((l) => document.querySelector("[data-testid=orch-load-label]")?.textContent !== l, lightLabel, { timeout: 8000 }).catch(() => {});
+  const heavyLabel = await page.getByTestId("orch-load-label").textContent();
+  check(heavyLabel !== lightLabel, `a higher effort weighs more (${lightLabel} → ${heavyLabel})`);
+  await page.getByLabel("Esfuerzo").selectOption("medium");
+  await page.getByRole("button", { name: "Vista previa" }).click();
+  await page.getByRole("dialog").getByText(/Comprobación «Comprobar»/).waitFor();
+  await page.getByRole("dialog").getByText(/Reintenta como máximo 2 veces/).waitFor();
+  check(true, "the preview explains the check, its retries and the goal");
+  await shot("09d-omega");
+  await page.keyboard.press("Escape");
   await fetch(base + "/api/orchestrator", { method: "PUT", headers: oauth, body: JSON.stringify({ enabled: false, nodes: [], edges: [] }) });
 
   // The local model: it corrects while you type (applied, undoable) and improves the prompt on request.

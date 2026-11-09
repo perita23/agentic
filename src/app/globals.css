@@ -220,7 +220,8 @@ html[data-desktop="mac"]:not([data-fullscreen]) .traffic-light-gap {
 /* ---- Orchestrator: the connections of the graph flow with the orb's colours ---- */
 @keyframes orch-flow { to { stroke-dashoffset: -28; } }
 .orch-edge { stroke-dasharray: 6 8; animation: orch-flow 1.1s linear infinite; }
-@media (prefers-reduced-motion: reduce) { .orch-edge { animation: none; } }
+.orch-edge-fail { stroke-dasharray: 3 7; animation: orch-flow 1.6s linear infinite reverse; }
+@media (prefers-reduced-motion: reduce) { .orch-edge, .orch-edge-fail { animation: none; } }
 
 /* ---- Liquid orb: Claude's live status ----
    Eight blobs share one clock (--t, advanced from JS at a per-state speed that eases). A state decides

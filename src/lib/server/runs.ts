@@ -118,7 +118,7 @@ export const runCreateSchema = z
     images: z.array(z.uuid()).max(6).optional(),
   })
   .refine((r) => r.mode === "tmux" || r.prompt.trim().length > 0, { message: "prompt is required for headless runs", path: ["prompt"] });
-export type RunInput = z.infer<typeof runCreateSchema> & { addDirs?: string[]; allowedTools?: string[]; appendPrompt?: string; mcpConfig?: string; agentsJson?: string };
+export type RunInput = z.infer<typeof runCreateSchema> & { addDirs?: string[]; allowedTools?: string[]; appendPrompt?: string; mcpConfig?: string; agentsJson?: string; effort?: string };
 
 export interface RunOptions {
   dataDir: string;
@@ -131,7 +131,7 @@ export interface RunOptions {
   /** Agentic's own MCP server (tools to look into Agentic): what to hand a headless run (null = off). */
   mcp?: () => { configPath: string; allow: string; hint: string } | null;
   /** The orchestrator graph compiled for this kind of run: model, subagents, instructions, environment (null = off). */
-  orchestrator?: (kind: "chats" | "runs" | "tasks") => { model?: string; agents?: Record<string, unknown>; appendPrompt: string; env: Record<string, string> } | null;
+  orchestrator?: (kind: "chats" | "runs" | "tasks") => { model?: string; effort?: string; agents?: Record<string, unknown>; appendPrompt: string; env: Record<string, string> } | null;
 }
 
 const R = "runs";
@@ -186,6 +186,7 @@ export function buildClaudeArgs(input: RunInput): string[] {
   for (const rule of input.allowedTools ?? []) args.push("--allowedTools", rule);
   if (input.mcpConfig) args.push("--mcp-config", input.mcpConfig);
   if (input.model) args.push("--model", input.model);
+  if (input.effort && /^(low|medium|high|xhigh|max)$/.test(input.effort)) args.push("--effort", input.effort);
   if (input.agent) args.push("--agent", input.agent);
   if (input.agentsJson) args.push("--agents", input.agentsJson);
   for (const d of input.addDirs ?? []) args.push("--add-dir", d);
@@ -339,6 +340,7 @@ export class RunManager {
         claudeInput = {
           ...claudeInput,
           model: claudeInput.model ?? orch.model,
+          effort: orch.effort,
           agentsJson: orch.agents ? JSON.stringify(orch.agents) : undefined,
           appendPrompt: [claudeInput.appendPrompt, orch.appendPrompt].filter(Boolean).join("\n\n"),
         };
