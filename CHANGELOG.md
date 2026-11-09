@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.60.1] - 2026-11-09
+
+### Corregido
+- **El logo no era idéntico al fotograma elegido.** El desenfoque que funde las tres bolas se aplicaba sin escalar, así que en el icono las bolas quedaban más separadas que en Morphy. Ahora la fusión es la misma que la de la orb (mismo triángulo redondeado), en el icono de la app, el instalador, el favicon, la landing y la marca de la barra lateral.
+
 ## [0.60.0] - 2026-11-09
 
 ### Cambiado
