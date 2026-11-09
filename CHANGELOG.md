@@ -3,6 +3,12 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.56.0] - 2026-11-09
+
+### Añadido
+- **Descargar los archivos que Claude crea, desde el propio chat.** Cuando Claude escribe un archivo en una conversación (su herramienta de escritura), debajo de su respuesta aparece una tarjeta con el nombre, el tamaño y un botón **Descargar**. Sólo se ofrecen archivos que Claude escribió en esa conversación y que siguen existiendo; no se sirven enlaces simbólicos ni nada más (ni siquiera con una ruta manipulada), se descargan siempre como adjunto (el navegador nunca los abre ni ejecuta) y hay un límite de 200 MB.
+- Los archivos creados por comandos de la terminal (por ejemplo, redirigiendo la salida de un script) todavía no se detectan: sólo los que Claude escribe con su herramienta de escritura.
+
 ## [0.55.1] - 2026-11-06
 
 ### Corregido

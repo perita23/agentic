@@ -962,6 +962,17 @@ try {
   await page.getByTestId("queued").waitFor({ state: "detached", timeout: 15000 });
   await page.locator("main").getByText("después, otra cosa").first().waitFor({ timeout: 15000 });
   check(true, "stopping the answer sends the waiting message");
+  // Files Claude creates in a chat come with a download button.
+  await page.getByLabel("Mensaje para Claude").fill("CREAFICHERO haz un informe");
+  await page.keyboard.press("Enter");
+  await page.getByTestId("chat-files").waitFor({ timeout: 20000 });
+  await page.getByText("informe-morphy.md").first().waitFor();
+  const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 10000 }), page.getByRole("link", { name: "Descargar informe-morphy.md" }).click()]);
+  const dlPath = await dl.path();
+  check(dl.suggestedFilename() === "informe-morphy.md" && fs.readFileSync(dlPath, "utf8").startsWith("# Informe de prueba"), "a file Claude created in the chat can be downloaded from the chat");
+  const evil = await fetch(`${base}/api/chats/${chats.chats[0].id}/file?path=${encodeURIComponent("/etc/passwd")}`, { headers: { authorization: `Bearer ${token}` } });
+  check(evil.status === 404, "only files Claude wrote in that chat can be downloaded");
+  await shot("08f-chat-files");
   // The local model: it corrects while you type (applied, undoable) and improves the prompt on request.
   const auth = { authorization: `Bearer ${token}`, "content-type": "application/json" };
   await fetch(base + "/api/ollama", { method: "PUT", headers: auth, body: JSON.stringify({ enabled: true, baseUrl: ollamaUrl, model: "fake:1b", autocorrect: "auto" }) });

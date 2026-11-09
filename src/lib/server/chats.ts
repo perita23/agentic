@@ -39,6 +39,26 @@ const sendSchema = z.object({
 export const VOICE_HINT = "Esta conversación es por voz: tu respuesta se va a escuchar, no a leer. Responde de forma breve, natural y directa, con frases cortas y completas, como si hablaras con la persona (empieza por lo importante). Sin Markdown, listas, tablas ni emojis. No leas código, rutas ni URL: di qué hace o resume. Si hace falta mucho detalle, da lo esencial y ofrece ampliarlo.";
 const patchSchema = z.object({ title: text(120).trim().min(1).optional(), pinned: z.boolean().optional() }).strict();
 
+/** The path of a file Claude wrote with its Write tool, read from the (possibly cut) JSON of the tool call. */
+export function writtenPath(toolInput: string, base: string): string | null {
+  const m = /"file_path":\s*"((?:[^"\\]|\\.)*)"/.exec(toolInput);
+  if (!m) return null;
+  try {
+    const p = JSON.parse(`"${m[1]}"`) as string;
+    return path.isAbsolute(p) ? path.normalize(p) : path.resolve(base, p);
+  } catch {
+    return null;
+  }
+}
+
+export interface ChatFile {
+  path: string;
+  name: string;
+  size: number;
+}
+
+const MAX_DOWNLOAD = 200 * 1024 * 1024;
+
 export function chatDir(dataDir: string) {
   return path.join(dataDir, "chat");
 }
@@ -99,8 +119,44 @@ export class ChatService {
       live: run?.status === "running" ? { ...this.runs.liveStats(run.id), startedAt: run.startedAt } : null,
       error: run && run.status === "failed" ? run.error || run.resultText || "La respuesta falló" : null,
       pendingPrompt: run?.status === "running" && !transcript?.messages.some((m) => m.role === "user" && m.text.trim() === run.prompt.trim()) ? run.prompt : null,
-      messages: (transcript?.messages ?? []).filter((m) => m.text.trim() || m.tools?.length),
+      messages: (transcript?.messages ?? []).filter((m) => m.text.trim() || m.tools?.length).map((m) => (m.role === "assistant" ? { ...m, files: this.filesOf(m.tools) } : m)),
     };
+  }
+
+  /** The files Claude created in a message (its Write calls) that are still there, to offer them for download. */
+  private filesOf(tools: { name: string; input: string }[] | undefined): ChatFile[] {
+    const out = new Map<string, ChatFile>();
+    for (const t of tools ?? []) {
+      if (t.name !== "Write") continue;
+      const p = writtenPath(t.input, chatDir(this.dataDir));
+      if (!p || out.has(p)) continue;
+      try {
+        const st = fs.lstatSync(p);
+        if (st.isFile()) out.set(p, { path: p, name: path.basename(p), size: st.size });
+      } catch {
+        // it was deleted or moved since
+      }
+    }
+    return [...out.values()];
+  }
+
+  /**
+   * A file of this chat to download: only one that Claude itself wrote in this conversation (a Write call in its
+   * transcript), still a plain file (never a link to somewhere else), and not enormous. Nothing else is ever served.
+   */
+  async fileFor(id: string, requested: string): Promise<ChatFile> {
+    const chat = this.sync(this.find(id));
+    const transcript = chat.sessionId ? await this.sessions.transcript(chat.sessionId, 100_000) : null;
+    const want = path.normalize(requested);
+    for (const m of transcript?.messages ?? []) {
+      if (m.role !== "assistant") continue;
+      for (const f of this.filesOf(m.tools)) {
+        if (f.path !== want) continue;
+        if (f.size > MAX_DOWNLOAD) throw new HttpError(413, "El archivo es demasiado grande para descargarlo desde aquí");
+        return f;
+      }
+    }
+    throw new HttpError(404, "Ese archivo no es de esta conversación");
   }
 
   async create(body: unknown) {
