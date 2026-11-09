@@ -5,6 +5,7 @@ import { CheckIcon, SparklesIcon, Undo2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { api, useApi } from "@/lib/api";
+import { rangeRect } from "@/lib/caret";
 import { wordAssist, type Morph } from "@/lib/word-assist";
 import { replaceAll } from "@/lib/voice/insert";
 import { errorMessage } from "./common";
@@ -190,6 +191,7 @@ function AssistChipBody({ a, c }: { a: Assist; c: Chip }) {
 export function MorphPill({ m }: { m: Morph }) {
   const [text, setText] = React.useState(m.from);
   const [fading, setFading] = React.useState(false);
+  const box = React.useRef<HTMLSpanElement>(null);
   React.useEffect(() => {
     const a = setTimeout(() => setText(m.to), 60);
     const b = setTimeout(() => setFading(true), 1000);
@@ -198,8 +200,36 @@ export function MorphPill({ m }: { m: Morph }) {
       clearTimeout(b);
     };
   }, [m.to]);
+  // Follow the word: the box grows when a line wraps, the chat scrolls, the page moves; the pill stays on the word.
+  React.useEffect(() => {
+    let raf = 0;
+    const follow = () => {
+      raf = requestAnimationFrame(follow);
+      const el = box.current;
+      if (!el) return;
+      const f = m.field;
+      if (!f.isConnected || f.value.slice(m.start, m.start + m.len) !== m.to) {
+        el.style.display = "none"; // the word was edited or is gone: nothing to show
+        return;
+      }
+      const r = rangeRect(f, m.start, m.start + m.len);
+      const fr = f.getBoundingClientRect();
+      if (!r || r.top + r.height < fr.top || r.top > fr.bottom) {
+        el.style.display = "none"; // scrolled out of the box
+        return;
+      }
+      el.style.display = "";
+      el.style.left = `${r.left - 2}px`;
+      el.style.top = `${r.top}px`;
+      el.style.height = `${r.height}px`;
+      el.style.minWidth = `${r.width + 4}px`;
+    };
+    raf = requestAnimationFrame(follow);
+    return () => cancelAnimationFrame(raf);
+  }, [m]);
   return (
     <span
+      ref={box}
       data-testid="word-morph"
       aria-hidden
       className="pointer-events-none fixed z-[90] flex items-center rounded-[3px] transition-opacity duration-500"

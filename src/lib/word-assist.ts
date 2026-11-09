@@ -7,6 +7,10 @@ export type Field = HTMLTextAreaElement | HTMLInputElement;
 /** A corrected word shown morphing in place (viewport pixels; the look of the field it is in). */
 export interface Morph {
   id: number;
+  /** Where the corrected word is, to follow it while the box changes (it grows, the page scrolls). */
+  field: Field;
+  start: number;
+  len: number;
   left: number;
   top: number;
   width: number;
@@ -58,7 +62,9 @@ export class WordAssist {
         continue;
       }
       if (Date.now() < this.downUntil) continue;
-      if (!this.queue.some((q) => q.field === field && q.tok.start === tok.start && q.tok.word === tok.word)) this.queue.push({ field, tok });
+      // The same word in the same context is asked once (a pasted text repeats words a lot).
+      const asked = (q: { tok: Token }) => `${q.tok.before.split(" ").pop() ?? ""}|${q.tok.word}` === key;
+      if (!this.queue.some((q) => asked(q))) this.queue.push({ field, tok });
     }
     void this.pump();
   }
@@ -111,7 +117,7 @@ export class WordAssist {
         const c = getComputedStyle(e).backgroundColor;
         if (c && !/rgba?\(0, 0, 0, 0\)|transparent/.test(c)) bg = c;
       }
-      const m: Morph = { id: Date.now() + Math.random(), ...rect, from: tok.word, to, bg: bg || "var(--card)", font: { fontSize: cs.fontSize, fontFamily: cs.fontFamily, fontWeight: cs.fontWeight, lineHeight: cs.lineHeight, letterSpacing: cs.letterSpacing } };
+      const m: Morph = { id: Date.now() + Math.random(), field: f, start: tok.start, len: to.length, ...rect, from: tok.word, to, bg: bg || "var(--card)", font: { fontSize: cs.fontSize, fontFamily: cs.fontFamily, fontWeight: cs.fontWeight, lineHeight: cs.lineHeight, letterSpacing: cs.letterSpacing } };
       for (const l of this.listeners) l(f, m);
     }
     return true;

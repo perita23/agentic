@@ -1015,6 +1015,23 @@ try {
   await page.waitForFunction((q) => document.querySelector(q).value.endsWith("I will receive the report "), OBOX, { timeout: 8000 });
   check(true, "the corrector works in English too (language detected from the words around)");
   await page.locator(OBOX).fill("");
+  // The morph stays on its word in a long text (the box wraps and scrolls): reply composer of an existing chat.
+  await page.getByRole("navigation", { name: "Historial de chats" }).getByText("Hola Claude, ¿me explicas los closures?").first().click();
+  await page.locator(OBOX).waitFor();
+  await page.waitForTimeout(500);
+  await page.locator(OBOX).fill("palabra ".repeat(260));
+  await page.locator(OBOX).click();
+  await page.keyboard.press("Control+End");
+  await page.locator(OBOX).pressSequentially("y herrores ", { delay: 40 });
+  await page.getByTestId("word-morph").first().waitFor({ timeout: 8000 });
+  const where = await page.evaluate((q) => {
+    const t = document.querySelector(q).getBoundingClientRect();
+    const p = document.querySelector("[data-testid=word-morph]").getBoundingClientRect();
+    return { top: p.top - t.top, bottomGap: t.bottom - p.bottom, inside: p.left >= t.left - 3 && p.right <= t.right + 3 && p.top >= t.top - 1 && p.bottom <= t.bottom + 1 };
+  }, OBOX);
+  await shot("08g-morph-long");
+  check(where.inside && where.bottomGap < 60, `the morph stays on its word in a long, scrolling text ${JSON.stringify(where)}`);
+  await page.locator(OBOX).fill("");
   // Not only the message boxes: any field for prose (a task's title and description) is corrected too, and searches are left alone.
   await page.goto(`${base}/tasks`);
   await page.getByRole("button", { name: "Nueva tarea" }).first().click();
