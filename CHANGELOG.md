@@ -3,6 +3,17 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.58.0] - 2026-11-09
+
+### Añadido
+- **Orchestrator con ramas de verdad: quién escribe, quién lee y cómo se pasan el contexto.**
+  - **Roles de subagente** con un clic: **Escritor, Lector, Revisor, Investigador, Probador** (y Subagente libre). Cada rol trae su modelo, sus instrucciones y sus herramientas ya puestos; un **Lector** o un **Revisor** son de **solo lectura**: no tienen ninguna herramienta que pueda cambiar un archivo, y el cubo lo indica («solo lee»).
+  - **Cada conexión dice qué viaja por ella:** un **resumen**, **todo el contexto**, **solo las rutas** de los archivos (ahorra contexto) o **nada** (empieza de cero), con una nota opcional. Se ve en una etiqueta sobre la línea y se cambia pulsándola. Vale tanto para lo que el planificador le da a cada subagente como para lo que se pasan entre ellos.
+  - **Cómo se lanza:** desde el planificador, cada rama puede lanzarse **a la vez (en paralelo)** o **una tras otra**, esperando su resultado.
+  - Todo esto se traduce a instrucciones claras para Claude («lanza a la vez…», «a “escritor” pásale solo las rutas…», «“lector” solo lee y no puede modificar archivos») y se ve en la **Vista previa**.
+  - **Plantillas nuevas:** «Planificador, lector, escritor y revisor» (el lector localiza el código y le pasa solo las rutas al escritor) e «Investigar, escribir y probar»; el equipo de revisión lanza a sus especialistas en paralelo.
+  - Los dibujos de la 0.57.0 siguen funcionando.
+
 ## [0.57.0] - 2026-11-09
 
 ### Añadido

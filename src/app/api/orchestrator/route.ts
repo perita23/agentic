@@ -1,8 +1,8 @@
 import { route } from "@/lib/server/api";
-import { MODELS, PRESETS, TOOLS } from "@/lib/server/orchestrator";
+import { JOB_INFO, MODELS, PRESETS, TOOLS } from "@/lib/server/orchestrator";
 
 /** The orchestrator graph (how Claude works as a team), its building blocks and ready-made starting points. */
-const view = (c: Parameters<Parameters<typeof route>[0]>[0]["c"]) => ({ graph: c.orchestrator.get(), models: MODELS, tools: TOOLS, presets: PRESETS });
+const view = (c: Parameters<Parameters<typeof route>[0]>[0]["c"]) => ({ graph: c.orchestrator.get(), models: MODELS, tools: TOOLS, jobs: JOB_INFO, presets: PRESETS });
 export const GET = route(({ c }) => view(c));
 export const PUT = route(async ({ c, body }) => {
   c.orchestrator.set(await body());

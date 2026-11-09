@@ -980,10 +980,10 @@ try {
   await page.getByText("Dibuja cómo quieres que trabaje Claude").waitFor();
   await page.getByLabel("Plantillas").selectOption("planner-cheap-writers");
   await page.getByRole("button", { name: /Planificador/ }).first().waitFor();
-  check((await page.locator("[data-node-id]").count()) === 4 && (await page.getByTestId("orch-edge").count()) === 3, "a template draws the team: planner, writer, reviewer and the context policy, connected");
+  check((await page.locator("[data-node-id]").count()) === 5 && (await page.getByTestId("orch-edge").count()) === 5, "a template draws the team: planner, reader, writer, reviewer and the context policy, connected");
   await page.getByTestId("orch-status").getByText("Guardado").waitFor({ timeout: 5000 });
   let saved = await (await fetch(base + "/api/orchestrator", { headers: oauth })).json();
-  check(saved.graph.enabled === true && saved.graph.nodes.length === 4, "the graph is saved by itself");
+  check(saved.graph.enabled === true && saved.graph.nodes.length === 5, "the graph is saved by itself");
   await shot("09-orchestrator");
   // Select the writer: its model (a cheaper one) and tools are in the panel.
   await page.getByRole("button", { name: "Subagente: Escritor" }).click();
@@ -994,7 +994,13 @@ try {
   await page.getByLabel("Nombre del cubo").fill("Probador");
   await page.getByRole("button", { name: "Planificador: Planificador" }).click();
   await page.getByLabel("Conectar con").selectOption({ label: "Probador" });
-  check((await page.getByTestId("orch-edge").count()) === 4, "a subagent is connected to the planner from its panel");
+  check((await page.getByTestId("orch-edge").count()) === 6, "a subagent is connected to the planner from its panel");
+  check((await page.getByRole("button", { name: "Subagente: Lector" }).textContent()).includes("solo lee"), "a reader is read-only (no tool can change anything)");
+  // What travels along a connection: from the planner to the reader, everything, launched in parallel.
+  await page.getByRole("button", { name: /Conexión Planificador a Lector/ }).click();
+  await page.getByLabel("Qué se pasa").selectOption("full");
+  await page.getByLabel("Cómo se lanza").selectOption("parallel");
+  check((await page.getByRole("button", { name: /Conexión Planificador a Lector/ }).textContent()).includes("todo"), "each connection says what is handed over");
   // Dragging a cube moves it (and the move is saved).
   const cube = page.getByRole("button", { name: "Subagente: Revisor" });
   const cubeBefore = await cube.boundingBox();
@@ -1012,13 +1018,13 @@ try {
   check(saved.graph.nodes.find((n) => n.kind === "context").threshold === 60 && saved.graph.nodes.find((n) => n.label === "Escritor").model === "sonnet" && saved.graph.nodes.some((n) => n.label === "Probador"), "every change is saved");
   await page.getByRole("button", { name: "Vista previa" }).click();
   await page.getByRole("dialog").getByText("al 60%", { exact: true }).waitFor();
-  check((await page.getByRole("dialog").getByText("probador", { exact: true }).count()) >= 1 && (await page.getByRole("dialog").getByText("Orquestación").count()) >= 1, "the preview shows what Claude receives (subagents, models, instructions, compaction)");
+  check((await page.getByRole("dialog").getByText("probador", { exact: true }).count()) >= 1 && (await page.getByRole("dialog").getByText("Orquestación").count()) >= 1 && (await page.getByRole("dialog").getByText(/«lector» puede lanzarse a la vez/).count()) >= 1 && (await page.getByRole("dialog").getByText(/A «lector» pásale todo el contexto relevante/).count()) >= 1, "the preview shows what Claude receives (subagents, models, instructions, compaction)");
   await shot("09b-orchestrator-preview");
   await page.keyboard.press("Escape");
   // Delete removes what is selected.
   await page.getByRole("button", { name: "Subagente: Probador" }).click();
   await page.keyboard.press("Delete");
-  await page.waitForFunction(() => document.querySelectorAll("[data-node-id]").length === 4);
+  await page.waitForFunction(() => document.querySelectorAll("[data-node-id]").length === 5);
   check(true, "Delete removes the selected cube and its connections");
   await fetch(base + "/api/orchestrator", { method: "PUT", headers: oauth, body: JSON.stringify({ enabled: false, nodes: [], edges: [] }) });
 
