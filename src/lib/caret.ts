@@ -8,6 +8,9 @@ export function rangeRect(el: HTMLTextAreaElement | HTMLInputElement, start: num
   const cs = getComputedStyle(el);
   const mirror = document.createElement("div");
   for (const k of COPY) (mirror.style as unknown as Record<string, string>)[k] = cs[k];
+  // The text area is as wide as its content box minus the scrollbar (if it has one): the copy must wrap the same way.
+  mirror.style.boxSizing = "border-box";
+  mirror.style.width = `${el.clientWidth + (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0)}px`;
   Object.assign(mirror.style, { position: "fixed", visibility: "hidden", pointerEvents: "none", top: "0", left: "-9999px", height: "auto", overflow: "hidden", whiteSpace: el instanceof HTMLTextAreaElement ? "pre-wrap" : "pre", overflowWrap: "break-word" });
   const span = document.createElement("span");
   span.textContent = el.value.slice(start, end) || "​";

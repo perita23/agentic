@@ -3,6 +3,12 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.56.1] - 2026-11-09
+
+### Corregido
+- **La palabra autocorregida aparecía desplazada en la caja de escritura.** El efecto de transformación de la palabra corregida se colocaba con una medida tomada una sola vez y calculada como si la caja no tuviera barra de desplazamiento; en textos largos (la caja crece, hace scroll y se reajustan las líneas) quedaba fuera de su sitio. Ahora la medición respeta la barra de desplazamiento y el efecto **sigue a la palabra en cada fotograma** mientras dura: si la caja crece, se hace scroll o la palabra se edita o sale de la vista, se mueve con ella o desaparece.
+- Pegar un texto largo ya no manda al diccionario la misma palabra una y otra vez: cada palabra (con su contexto) se consulta una sola vez.
+
 ## [0.56.0] - 2026-11-09
 
 ### Añadido
