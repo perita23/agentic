@@ -62,6 +62,25 @@ if ((prompt.includes("closures") || prompt.includes("modo voz")) && process.env.
       .join("\n") + "\n",
   );
 }
+if (prompt.includes("CREAFICHERO") && process.env.CLAUDE_HOME) {
+  // Claude writes a file (its Write tool) and says so: the chat offers it for download.
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const file = path.join(process.cwd(), "informe-morphy.md");
+  fs.writeFileSync(file, "# Informe de prueba\n\nEscrito por Morphy.\n");
+  const dir = path.join(process.env.CLAUDE_HOME, "projects", "-chat");
+  fs.mkdirSync(dir, { recursive: true });
+  const now = Date.now();
+  fs.appendFileSync(
+    path.join(dir, `${sid}.jsonl`),
+    [
+      { type: "user", cwd: process.cwd(), timestamp: new Date(now).toISOString(), message: { role: "user", content: prompt } },
+      { type: "assistant", timestamp: new Date(now + 1).toISOString(), message: { role: "assistant", model: "claude", content: [{ type: "text", text: "He creado el informe." }, { type: "tool_use", id: "w1", name: "Write", input: { file_path: file, content: "# Informe de prueba" } }] } },
+    ]
+      .map((l) => JSON.stringify(l))
+      .join("\n") + "\n",
+  );
+}
 if (prompt.includes("CURLLONG")) {
   // A long curl (a token with no spaces, a long URL) as a command, its output, and written in the answer.
   const tok = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9".repeat(6);

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowDownIcon, ArrowUpIcon, BookOpenIcon, CheckIcon, CodeIcon, CopyIcon, ListChecksIcon, ListPlusIcon, Loader2Icon, MessageSquarePlusIcon, PencilIcon, PinIcon, RegexIcon, SearchIcon, SparklesIcon, SquareIcon, Trash2Icon, WrenchIcon, XIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowUpIcon, BookOpenIcon, CheckIcon, CodeIcon, CopyIcon, DownloadIcon, FileIcon, ListChecksIcon, ListPlusIcon, Loader2Icon, MessageSquarePlusIcon, PencilIcon, PinIcon, RegexIcon, SearchIcon, SparklesIcon, SquareIcon, Trash2Icon, WrenchIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,7 +23,7 @@ import { describeTool } from "@/lib/tool-cards";
 import type { Activity } from "@/lib/orb-state";
 import { errorMessage, PageHeader } from "@/components/app/common";
 import { api, refresh, useApi } from "@/lib/api";
-import { cn, timeAgo } from "@/lib/utils";
+import { cn, formatBytes, timeAgo } from "@/lib/utils";
 
 interface ChatItem {
   id: string;
@@ -35,8 +35,15 @@ interface ChatItem {
   activity?: Activity | null;
   live?: (LiveStats & { startedAt: string }) | null;
 }
+interface ChatFile {
+  path: string;
+  name: string;
+  size: number;
+}
 interface ChatMessage {
   role: "user" | "assistant";
+  /** Files Claude created while writing this message (to download). */
+  files?: ChatFile[];
   text: string;
   tools?: { name: string; input: string }[];
   timestamp?: string;
@@ -68,6 +75,32 @@ function toolLabel(t: { name: string; input: string }) {
   } catch {}
   const info = describeTool(t.name, input);
   return { group: info.group, title: info.title };
+}
+
+/** The files Claude created: each one with its own download button. */
+function FileCards({ chatId, files }: { chatId: string; files: ChatFile[] }) {
+  return (
+    <div data-testid="chat-files" className="mt-3 grid gap-2 sm:grid-cols-2">
+      {files.map((f) => (
+        <div key={f.path} className="appear flex min-w-0 items-center gap-3 rounded-lg border bg-card px-3 py-2.5">
+          <span className="grid size-9 shrink-0 place-items-center rounded-md border bg-inset text-muted-foreground">
+            <FileIcon className="size-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-medium" title={f.path}>
+              {f.name}
+            </div>
+            <div className="text-xs text-muted-foreground">{formatBytes(f.size)}</div>
+          </div>
+          <Button asChild size="sm" variant="outline" className="shrink-0">
+            <a href={`/api/chats/${chatId}/file?path=${encodeURIComponent(f.path)}`} download={f.name} aria-label={`Descargar ${f.name}`}>
+              <DownloadIcon /> Descargar
+            </a>
+          </Button>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /** Copies a message's text; the icon says it worked. */
@@ -103,7 +136,7 @@ function editInBox(text: string) {
 }
 
 /** The user's message on the right; Claude's answer as plain Markdown across the column (no avatar clutter). */
-function BubbleImpl({ m, reveal }: { m: ChatMessage; reveal?: boolean }) {
+function BubbleImpl({ m, reveal, chatId }: { m: ChatMessage; reveal?: boolean; chatId?: string }) {
   if (m.role === "user")
     return (
       <div className="group flex items-end justify-end gap-1">
@@ -132,6 +165,7 @@ function BubbleImpl({ m, reveal }: { m: ChatMessage; reveal?: boolean }) {
         </div>
       )}
       {m.text.trim() && <Markdown reveal={reveal}>{m.text}</Markdown>}
+      {chatId && m.files && m.files.length > 0 && <FileCards chatId={chatId} files={m.files} />}
       {m.text.trim() && (
         <div className="-ml-1.5 mt-1 flex opacity-50 transition-opacity focus-within:opacity-100 hover:opacity-100">
           <CopyButton text={m.text} />
@@ -143,7 +177,7 @@ function BubbleImpl({ m, reveal }: { m: ChatMessage; reveal?: boolean }) {
 }
 
 /** The poll brings new message objects every 700 ms: a bubble is drawn again only if what it shows changed. */
-const Bubble = React.memo(BubbleImpl, (a, b) => a.reveal === b.reveal && a.m.role === b.m.role && a.m.text === b.m.text && (a.m.tools?.length ?? 0) === (b.m.tools?.length ?? 0));
+const Bubble = React.memo(BubbleImpl, (a, b) => a.reveal === b.reveal && a.m.role === b.m.role && a.m.text === b.m.text && (a.m.tools?.length ?? 0) === (b.m.tools?.length ?? 0) && a.chatId === b.chatId && (a.m.files ?? []).map((f) => `${f.path}:${f.size}`).join() === (b.m.files ?? []).map((f) => `${f.path}:${f.size}`).join());
 
 /** The conversation's scrolling area: it always follows the end (orb and status included) until you scroll up. */
 function ChatScroll({ children }: { children: React.ReactNode }) {
@@ -464,7 +498,7 @@ export default function ChatPage() {
               <ChatScroll key={selected ?? "new"}>
                   {!chat && <Skeleton className="h-40" />}
                   {chat?.messages.map((m, i) => (
-                    <Appear key={i} live={!!chat.running}><Bubble m={m} reveal={i === chat.messages.length - 1} /></Appear>
+                    <Appear key={i} live={!!chat.running}><Bubble m={m} reveal={i === chat.messages.length - 1} chatId={chat.id} /></Appear>
                   ))}
                   {(chat?.pendingPrompt ?? optimisticShown) && <Appear><Bubble m={{ role: "user", text: (chat?.pendingPrompt ?? optimisticShown)! }} /></Appear>}
                   {/* The orb closes the conversation: step, time and tokens while Claude works (with the answer's skeleton), calm when done. */}
