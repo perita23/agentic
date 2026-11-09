@@ -199,6 +199,14 @@ server.stdout.on("data", (d) => (out += d));
 server.stderr.on("data", (d) => (out += d));
 
 const failures = [];
+/** The chat shows its message box once the page has settled (the welcome one and the chat's own can overlap for a moment). */
+async function settleBox(page) {
+  for (let ok = 0, tries = 0; ok < 6 && tries < 100; tries++) {
+    ok = (await page.locator("textarea[aria-label='Mensaje para Claude']").count()) === 1 ? ok + 1 : 0;
+    await page.waitForTimeout(100);
+  }
+}
+
 const check = (cond, msg) => {
   if (cond) console.log("  ✓", msg);
   else {
@@ -963,6 +971,7 @@ try {
   await page.locator("main").getByText("después, otra cosa").first().waitFor({ timeout: 15000 });
   check(true, "stopping the answer sends the waiting message");
   // Subagents Claude launches are shown as a team of cards, with their own steps and what they handed back.
+  await fetch(base + "/api/orchestrator", { method: "PUT", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ enabled: true, nodes: [{ id: "planner", kind: "planner", label: "Jefe" }, { id: "l", kind: "agent", label: "Lector", job: "reader", x: 300 }, { id: "e", kind: "agent", label: "Escritor", job: "writer", x: 300, y: 200 }], edges: [{ from: "planner", to: "l", run: "parallel" }, { from: "planner", to: "e", run: "parallel" }, { from: "l", to: "e", pass: "paths" }] }) });
   const subRun = await (await fetch(base + "/api/runs", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ projectPath: project, prompt: "SUBAGENTES reparte el trabajo" }) })).json();
   await page.goto(`${base}/runs/${subRun.id}`);
   await page.getByTestId("subagent-group").waitFor({ timeout: 15000 });
@@ -973,9 +982,13 @@ try {
   await page.getByText("Busca dónde se valida el login.").waitFor();
   await page.getByText(/El login se valida en/).waitFor();
   check(true, "opening a card shows what it was asked and what it handed back");
+  check((await page.getByTestId("subagent-flow").textContent()).includes("lector") && (await page.getByTestId("subagent-flow").textContent()).includes("escritor") && (await page.getByTestId("subagent-flow").textContent()).includes("solo las rutas"), "the team shows how its members pass the work to each other");
+  await fetch(base + "/api/orchestrator", { method: "PUT", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ enabled: false, nodes: [], edges: [] }) });
   await shot("09c-subagents");
   await page.goto(`${base}/chat`);
   await page.getByRole("navigation", { name: "Historial de chats" }).getByText("Hola Claude, ¿me explicas los closures?").first().click();
+  // the welcome box is replaced by the chat's own: wait until only one is left
+  await settleBox(page);
   await page.getByLabel("Mensaje para Claude").waitFor();
   // Files Claude creates in a chat come with a download button.
   await page.getByLabel("Mensaje para Claude").fill("CREAFICHERO haz un informe");
@@ -1084,6 +1097,7 @@ try {
   await fetch(base + "/api/ollama", { method: "PUT", headers: auth, body: JSON.stringify({ enabled: true, baseUrl: ollamaUrl, model: "fake:1b", autocorrect: "auto" }) });
   await page.goto(`${base}/chat`);
   const OBOX = "textarea[aria-label='Mensaje para Claude']";
+  await settleBox(page);
   await page.locator(OBOX).waitFor();
   await page.waitForTimeout(600); // the settings reach the page
   await page.locator(OBOX).fill("hola q tal, tengo herrores en mi codigo");
@@ -1103,6 +1117,7 @@ try {
   // Word by word: each finished word is checked, and a wrong one is fixed on the spot, morphing.
   await fetch(base + "/api/spell", { method: "PUT", headers: auth, body: JSON.stringify({ mode: "words", lang: "auto" }) });
   await page.goto(`${base}/chat`);
+  await settleBox(page);
   await page.locator(OBOX).waitFor();
   await page.waitForTimeout(600);
   await page.locator(OBOX).click();
@@ -1123,6 +1138,7 @@ try {
   await page.locator(OBOX).fill("");
   // The morph stays on its word in a long text (the box wraps and scrolls): reply composer of an existing chat.
   await page.getByRole("navigation", { name: "Historial de chats" }).getByText("Hola Claude, ¿me explicas los closures?").first().click();
+  await settleBox(page);
   await page.locator(OBOX).waitFor();
   await page.waitForTimeout(500);
   await page.locator(OBOX).fill("palabra ".repeat(260));

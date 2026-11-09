@@ -26,6 +26,7 @@ const MODEL_LABEL: Record<string, string> = { opus: "Opus", sonnet: "Sonnet", ha
 const POWER: Record<string, number> = { opus: 3, sonnet: 2, haiku: 1 };
 
 interface Preview {
+  flow?: { from: string; to: string; pass: string }[];
   agents?: Record<string, { description: string; model?: string; tools?: string[] }>;
 }
 
@@ -134,7 +135,11 @@ export function SubagentCard({ input, result, finished, steps }: { id: string; i
 }
 
 /** Several subagents launched together, as a team. */
-export function SubagentGroup({ children, count, parallel }: { children: React.ReactNode; count: number; parallel: boolean }) {
+const PASS_LABEL: Record<string, string> = { summary: "un resumen", full: "todo el resultado", paths: "solo las rutas", none: "nada" };
+
+export function SubagentGroup({ children, count, parallel, names = [] }: { children: React.ReactNode; count: number; parallel: boolean; names?: string[] }) {
+  const { data } = useApi<{ chats?: Preview | null; runs?: Preview | null }>("/api/orchestrator/preview", { revalidateOnFocus: false });
+  const flow = (data?.chats?.flow ?? data?.runs?.flow ?? []).filter((f) => names.includes(f.from) && names.includes(f.to));
   return (
     <div data-testid="subagent-group" className="ml-6 grid gap-2">
       <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
@@ -143,6 +148,28 @@ export function SubagentGroup({ children, count, parallel }: { children: React.R
         {count > 1 && parallel && <span className="rounded-full border px-2 py-0.5">en paralelo</span>}
         <span className="h-px flex-1 bg-border" />
       </div>
+      {flow.length > 0 && (
+        <div data-testid="subagent-flow" className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+          <span>Se pasan el trabajo:</span>
+          {flow.map((f) => (
+            <span key={`${f.from}>${f.to}`} className="flex items-center gap-1.5">
+              <b className="font-medium text-foreground/80">{f.from}</b>
+              <svg width="26" height="8" viewBox="0 0 26 8" aria-hidden>
+                <path d="M0 4 H22" stroke="url(#sub-grad)" strokeWidth="1.5" strokeDasharray="3 3" className="orch-edge" />
+                <path d="M19 1 L24 4 L19 7" fill="none" stroke="#5aa9ff" strokeWidth="1.5" />
+                <defs>
+                  <linearGradient id="sub-grad" x1="0" x2="1">
+                    <stop offset="0" stopColor="#8b6cf5" />
+                    <stop offset="1" stopColor="#5aa9ff" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <b className="font-medium text-foreground/80">{f.to}</b>
+              <span>({PASS_LABEL[f.pass] ?? f.pass})</span>
+            </span>
+          ))}
+        </div>
+      )}
       <div className={cn("grid gap-2", count > 1 && "md:grid-cols-2")}>{children}</div>
     </div>
   );

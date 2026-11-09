@@ -57,6 +57,7 @@ describe("what the graph becomes for claude", () => {
     expect(c.agents!["escritor-nandu"]).toEqual({ description: "Escribe código.", prompt: "Escribe código.", tools: ["Read", "Edit"], model: "haiku" });
     expect(c.agents!.revisor).toEqual({ description: "Revisa.", prompt: "Revisa." }); // «default»: the planner's own model
     expect(c.env).toEqual({ CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: "70" });
+    expect(c.flow).toEqual([{ from: "escritor-nandu", to: "revisor", pass: "summary" }]); // how the subagents hand work over, to show it
     expect(c.appendPrompt).toContain("«Planificador»");
     expect(c.appendPrompt).toContain("Sé breve.");
     expect(c.appendPrompt).toContain("«escritor-nandu» (Haiku)");
