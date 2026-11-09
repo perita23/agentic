@@ -10,6 +10,7 @@ import { Markdown } from "@/components/app/markdown";
 import { CyclingOrb, LiquidOrb } from "@/components/app/liquid-orb";
 import { LiveStatus } from "@/components/app/live-status";
 import { Appear } from "@/components/app/appear";
+import { isSubagentTool, SubagentChips } from "@/components/app/subagent-card";
 import { AssistChip, ImproveButton, usePromptAssist, WordMorphs } from "@/components/app/prompt-assist";
 import { AnimatePresence, ReadAloudButton, useSpeaker, VoiceLoop, VoiceModeButton, VoiceStage } from "@/components/app/speak";
 import { VoiceButton, VoiceInline } from "@/components/app/voice";
@@ -151,9 +152,10 @@ function BubbleImpl({ m, reveal, chatId }: { m: ChatMessage; reveal?: boolean; c
     );
   return (
     <div className="min-w-0">
-      {m.tools && m.tools.length > 0 && (
+      {m.tools && m.tools.some((t) => isSubagentTool(t.name)) && <SubagentChips tools={m.tools} />}
+      {m.tools && m.tools.some((t) => !isSubagentTool(t.name)) && (
         <div className="mb-2 flex flex-wrap gap-1.5">
-          {m.tools.map((t, i) => {
+          {m.tools.filter((t) => !isSubagentTool(t.name)).map((t, i) => {
             const l = toolLabel(t);
             return (
               <span key={i} className="flex max-w-full items-center gap-1.5 rounded-md border bg-inset px-2 py-0.5 text-[11px] text-muted-foreground" title={t.input}>

@@ -3,6 +3,16 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.59.0] - 2026-11-09
+
+### Añadido
+- **Ver los subagentes que Claude lanza, con el estilo de Agentic.** En la página de una ejecución, cuando Claude lanza subagentes aparecen como un **equipo de tarjetas** («2 subagentes · en paralelo»): cada una con una mini bola de Morphy que refleja su estado, su nombre, su modelo (con los puntos de potencia) y si es de solo lectura, lo que se le pidió, **qué está haciendo ahora mismo** (el texto cambia con el morphing de siempre), los pasos que ha dado y, al abrirla, lo que le encargaron y lo que devolvió. Mientras trabaja, el borde fluye con los colores de la bola. Los pasos de cada subagente ya no se mezclan con los del agente principal: se quedan dentro de su tarjeta. En el chat se ven como tarjetas más pequeñas debajo de cada mensaje.
+- **Orchestrator estilo «Omega», pero ligero.** Nuevos cubos: **Objetivo** (qué se quiere y cuándo se da por terminado), **Memoria** (lo que hay que leer antes de empezar: CLAUDE.md, docs/…) y **Comprobación**, una condición que debe cumplirse tras un trabajo: **si pasa**, el flujo sigue; **si falla**, el trabajo **vuelve atrás** a rehacerse (línea roja animada) con el motivo, con un máximo de reintentos. Los subagentes se pueden lanzar **en paralelo** (con un máximo a la vez).
+- **Esfuerzo de pensamiento del planificador** (bajo, medio, alto, muy alto, máximo): se pasa a Claude Code con `--effort`. Con **medio** gasta mucho menos que con «máximo».
+- **Ahorro de tokens a la vista.** Un medidor de **peso estimado** (de «muy ligero» a «muy pesado») que cambia según lo que dibujas (Opus con mucho esfuerzo, muchos subagentes a la vez, sin compactar el contexto, reintentos…) y te dice por qué; y dos ajustes: **máximo de subagentes a la vez** y **líneas máximas por respuesta de subagente**. Compactar al 40 % también ahorra.
+- **Plantilla «Omega ligero (pocos tokens)»:** Opus con esfuerzo medio planifica y verifica; Haiku investiga, construye, prueba y revisa en paralelo; una comprobación devuelve lo que falla (hasta 2 veces); memoria y objetivo; compacta al 40 %.
+- **Vista previa** más completa: ahora muestra también el esfuerzo, las comprobaciones, el objetivo y la memoria que recibirá Claude.
+
 ## [0.58.1] - 2026-11-09
 
 ### Añadido

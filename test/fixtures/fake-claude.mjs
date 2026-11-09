@@ -62,6 +62,14 @@ if ((prompt.includes("closures") || prompt.includes("modo voz")) && process.env.
       .join("\n") + "\n",
   );
 }
+if (prompt.includes("SUBAGENTES")) {
+  // Claude launches two subagents together; their own steps arrive tagged with the call that launched them.
+  out({ type: "assistant", message: { id: "sa1", role: "assistant", content: [{ type: "text", text: "Reparto el trabajo." }, { type: "tool_use", id: "ag1", name: "Agent", input: { description: "Localizar el login", prompt: "Busca dónde se valida el login.", subagent_type: "lector" } }, { type: "tool_use", id: "ag2", name: "Agent", input: { description: "Escribir el arreglo", prompt: "Arregla la validación.", subagent_type: "escritor", model: "haiku" } }] } });
+  out({ type: "assistant", parent_tool_use_id: "ag1", message: { role: "assistant", content: [{ type: "tool_use", id: "c1", name: "Grep", input: { pattern: "login" } }] } });
+  out({ type: "user", parent_tool_use_id: "ag1", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "c1", content: "src/auth.ts:12" }] } });
+  out({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "ag1", content: "El login se valida en `src/auth.ts`, línea 12." }] } });
+  out({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "ag2", content: "Hecho: validación arreglada." }] } });
+}
 if (prompt.includes("CREAFICHERO") && process.env.CLAUDE_HOME) {
   // Claude writes a file (its Write tool) and says so: the chat offers it for download.
   const fs = await import("node:fs");

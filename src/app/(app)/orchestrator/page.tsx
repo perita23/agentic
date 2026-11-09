@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { BookOpenIcon, BotIcon, EyeIcon, FlaskConicalIcon, GaugeIcon, LayoutTemplateIcon, PencilLineIcon, PlusIcon, SearchIcon, ShieldCheckIcon, Trash2Icon, WorkflowIcon } from "lucide-react";
+import { BookOpenIcon, BotIcon, BrainIcon, CircleCheckBigIcon, EyeIcon, FlaskConicalIcon, GaugeIcon, LayoutTemplateIcon, PencilLineIcon, PlusIcon, SearchIcon, ShieldCheckIcon, TargetIcon, Trash2Icon, WorkflowIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -14,7 +14,8 @@ import { errorMessage, PageHeader } from "@/components/app/common";
 import { api, useApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-type Kind = "planner" | "agent" | "context";
+type Kind = "planner" | "agent" | "context" | "goal" | "memory" | "check";
+type Effort = "default" | "low" | "medium" | "high" | "xhigh" | "max";
 type Model = "default" | "opus" | "sonnet" | "haiku" | "opusplan";
 type Job = "custom" | "writer" | "reader" | "reviewer" | "researcher" | "tester";
 type Pass = "summary" | "full" | "paths" | "none";
@@ -38,6 +39,8 @@ interface ONode {
   prompt: string;
   tools: string[];
   threshold: number;
+  effort: Effort;
+  retries: number;
 }
 interface Edge {
   from: string;
@@ -45,22 +48,31 @@ interface Edge {
   pass: Pass;
   run: "parallel" | "sequence";
   note: string;
+  on: "pass" | "fail";
 }
 interface Graph {
   enabled: boolean;
   scope: { chats: boolean; runs: boolean; tasks: boolean };
   nodes: ONode[];
   edges: Edge[];
+  options: { maxParallel: number; replyLines: number };
+}
+interface Load {
+  level: 1 | 2 | 3 | 4 | 5;
+  label: string;
+  reasons: string[];
 }
 interface View {
   graph: Graph;
   models: Model[];
   tools: string[];
   jobs: Record<Job, JobInfo>;
+  load: Load;
   presets: { id: string; name: string; description: string; graph: Omit<Graph, "enabled" | "scope"> }[];
 }
 interface Preview {
   model?: string;
+  effort?: string;
   agents?: Record<string, { description: string; prompt: string; tools?: string[]; model?: string }>;
   appendPrompt: string;
   env: Record<string, string>;
@@ -80,6 +92,9 @@ const KIND: Record<Kind, { label: string; help: string; ring: string; chip: stri
   planner: { label: "Planificador", help: "El agente principal: planifica y reparte el trabajo.", ring: "border-purple/60 shadow-[0_0_0_1px_rgb(139_108_245/0.25)]", chip: "bg-purple/15 text-purple" },
   agent: { label: "Subagente", help: "Trabaja para el planificador, con su propio modelo.", ring: "border-border-strong", chip: "bg-secondary text-muted-foreground" },
   context: { label: "Contexto", help: "Cuándo compactar la conversación.", ring: "border-warning/50", chip: "bg-warning/15 text-warning" },
+  goal: { label: "Objetivo", help: "Qué se quiere conseguir y cuándo se da por terminado.", ring: "border-success/50", chip: "bg-success/15 text-success" },
+  memory: { label: "Memoria", help: "Lo que Claude debe leer antes de empezar (CLAUDE.md, docs/…).", ring: "border-link/50", chip: "bg-link/15 text-link" },
+  check: { label: "Comprobación", help: "Una condición que debe cumplirse; si falla, el trabajo vuelve atrás.", ring: "border-orange/50", chip: "bg-orange/15 text-orange" },
 };
 const JOB_ICON: Record<Job, React.ElementType> = { custom: BotIcon, writer: PencilLineIcon, reader: BookOpenIcon, reviewer: ShieldCheckIcon, researcher: SearchIcon, tester: FlaskConicalIcon };
 const PASS: Record<Pass, { label: string; short: string; help: string }> = {
@@ -99,10 +114,14 @@ function whyNot(nodes: ONode[], edges: Edge[], from: string, to: string): string
   const a = nodes.find((n) => n.id === from);
   const b = nodes.find((n) => n.id === to);
   if (!a || !b || from === to) return "Elige otro cubo";
-  const ok = (a.kind === "planner" && b.kind === "agent") || (a.kind === "agent" && b.kind === "agent") || (a.kind === "context" && b.kind === "planner");
-  if (!ok) return "Se conecta así: planificador → subagente, subagente → subagente, contexto → planificador";
+  if (!canLink(a.kind, b.kind)) return "Se conecta así: objetivo, memoria y contexto → planificador; planificador → subagente; subagente → subagente o comprobación; comprobación → subagente o planificador";
   if (edges.some((e) => e.from === from && e.to === to)) return "Ya están conectados";
   return null;
+}
+
+/** Who can hand work to whom (the same rules as the server). */
+function canLink(from: Kind, to: Kind): boolean {
+  return (from === "planner" && to === "agent") || (from === "agent" && (to === "agent" || to === "check")) || (from === "check" && (to === "agent" || to === "planner")) || ((from === "context" || from === "goal" || from === "memory") && to === "planner");
 }
 
 function Dots({ model }: { model: Model }) {
@@ -133,7 +152,7 @@ function Cube({ n, selected, onPointerDown, onSelect, onPortDown, linking, hot }
       style={{ left: n.x, top: n.y, width: W, height: H }}
     >
       <div className="flex items-start gap-2.5">
-        <span className={cn("grid size-9 shrink-0 place-items-center rounded-xl", k.chip)}>{n.kind === "planner" ? <LiquidOrb state="thinking" size={22} /> : n.kind === "agent" ? (() => { const I = JOB_ICON[n.job]; return <I className="size-4" />; })() : <GaugeIcon className="size-4" />}</span>
+        <span className={cn("grid size-9 shrink-0 place-items-center rounded-xl", k.chip)}>{n.kind === "planner" ? <LiquidOrb state="thinking" size={22} /> : n.kind === "agent" ? (() => { const I = JOB_ICON[n.job]; return <I className="size-4" />; })() : n.kind === "goal" ? <TargetIcon className="size-4" /> : n.kind === "memory" ? <BrainIcon className="size-4" /> : n.kind === "check" ? <CircleCheckBigIcon className="size-4" /> : <GaugeIcon className="size-4" />}</span>
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold">{n.label}</div>
           <div className="text-[11px] text-muted-foreground">{n.kind === "agent" && n.job !== "custom" ? `${k.label} · ${JOBLABEL[n.job]}` : k.label}</div>
@@ -142,10 +161,16 @@ function Cube({ n, selected, onPointerDown, onSelect, onPortDown, linking, hot }
       <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
         {n.kind === "context" ? (
           <span>Compacta al {n.threshold}%</span>
+        ) : n.kind === "goal" ? (
+          <span className="truncate">{n.role || "Define el objetivo"}</span>
+        ) : n.kind === "memory" ? (
+          <span className="truncate">{n.prompt || "¿Qué debe leer?"}</span>
+        ) : n.kind === "check" ? (
+          <span>{n.retries ? `hasta ${n.retries} reintentos` : "sin reintentos"}</span>
         ) : (
           <>
             <span className="flex items-center gap-1.5">
-              <b className="font-medium text-foreground/80">{n.model === "default" && n.kind === "agent" ? "Igual que el planificador" : MODEL_LABEL[n.model]}</b>
+              <b className="font-medium text-foreground/80">{n.model === "default" && n.kind === "agent" ? "Igual que el planificador" : MODEL_LABEL[n.model]}{n.kind === "planner" && n.effort !== "default" ? ` · ${n.effort}` : ""}</b>
               <Dots model={n.model} />
             </span>
             {n.kind === "agent" && <span title={n.tools.join(", ") || "todas las herramientas"}>{n.tools.length && !n.tools.some((t) => WRITE_TOOLS.includes(t)) ? "solo lee" : n.tools.length ? `${n.tools.length} herram.` : "todas"}</span>}
@@ -153,7 +178,7 @@ function Cube({ n, selected, onPointerDown, onSelect, onPortDown, linking, hot }
         )}
       </div>
       {/* Where a connection comes in, and where it goes out */}
-      {n.kind !== "context" && <span aria-hidden data-port="in" className="absolute top-1/2 -left-1.5 size-3 -translate-y-1/2 rounded-full border-2 border-border-strong bg-card" />}
+      {n.kind !== "context" && n.kind !== "goal" && n.kind !== "memory" && <span aria-hidden data-port="in" className="absolute top-1/2 -left-1.5 size-3 -translate-y-1/2 rounded-full border-2 border-border-strong bg-card" />}
       {n.kind !== "agent" || true ? (
         <span
           aria-hidden
@@ -183,6 +208,7 @@ function Editor({ initial }: { initial: View }) {
   const [linking, setLinking] = React.useState<{ from: string; x: number; y: number } | null>(null);
   const [hot, setHot] = React.useState<string | null>(null);
   const [previewing, setPreviewing] = React.useState(false);
+  const [load, setLoad] = React.useState<Load>(initial.load);
   const inner = React.useRef<HTMLDivElement>(null);
   const scroller = React.useRef<HTMLDivElement>(null);
   const [panning, setPanning] = React.useState(false);
@@ -205,7 +231,8 @@ function Editor({ initial }: { initial: View }) {
     if (!touched.current) return;
     const t = setTimeout(async () => {
       try {
-        await api("PUT", "/api/orchestrator", latest.current);
+        const r = await api<View>("PUT", "/api/orchestrator", latest.current);
+        setLoad(r.load);
         setStatus("saved");
       } catch (e) {
         setStatus("error");
@@ -219,12 +246,12 @@ function Editor({ initial }: { initial: View }) {
   const patch = (id: string, p: Partial<ONode>) => change((cur) => ({ ...cur, nodes: cur.nodes.map((n) => (n.id === id ? { ...n, ...p } : n)) }));
 
   function add(kind: Kind, job: Job = "custom") {
-    if (kind !== "agent" && g.nodes.some((n) => n.kind === kind)) return toast.message(kind === "planner" ? "Ya hay un planificador" : "Ya hay una política de contexto");
+    if (kind !== "agent" && kind !== "memory" && kind !== "check" && g.nodes.some((n) => n.kind === kind)) return toast.message(kind === "planner" ? "Ya hay un planificador" : kind === "goal" ? "Ya hay un objetivo" : "Ya hay una política de contexto");
     const i = g.nodes.length;
     const n: ONode = {
       id: newId(kind),
       kind,
-      label: kind === "planner" ? "Planificador" : kind === "agent" ? (job === "custom" ? `Subagente ${g.nodes.filter((x) => x.kind === "agent").length + 1}` : initial.jobs[job].label) : "Contexto",
+      label: kind === "planner" ? "Planificador" : kind === "agent" ? (job === "custom" ? `Subagente ${g.nodes.filter((x) => x.kind === "agent").length + 1}` : initial.jobs[job].label) : KIND[kind].label,
       job,
       x: 70 + ((i * 60) % 700),
       y: 70 + ((i * 90) % 500),
@@ -232,7 +259,9 @@ function Editor({ initial }: { initial: View }) {
       role: kind === "agent" ? initial.jobs[job].role : "",
       prompt: kind === "agent" ? initial.jobs[job].prompt : "",
       tools: kind === "agent" ? initial.jobs[job].tools : [],
-      threshold: 80,
+      threshold: kind === "context" ? 50 : 80,
+      effort: kind === "planner" ? "medium" : "default",
+      retries: 2,
     };
     change((cur) => ({ ...cur, nodes: [...cur.nodes, n] }));
     setSel({ type: "node", id: n.id });
@@ -241,7 +270,10 @@ function Editor({ initial }: { initial: View }) {
   function connect(from: string, to: string) {
     const why = whyNot(g.nodes, g.edges, from, to);
     if (why) return toast.message(why);
-    change((cur) => ({ ...cur, edges: [...cur.edges, { from, to, pass: "summary", run: "sequence", note: "" }] }));
+    // From a check back to the work it checked: «if it fails»; anywhere else: «if it passes».
+    const a = g.nodes.find((n) => n.id === from);
+    const back = a?.kind === "check" && g.edges.some((e) => e.from === to && e.to === from);
+    change((cur) => ({ ...cur, edges: [...cur.edges, { from, to, pass: "summary", run: "sequence", note: "", on: back ? "fail" : "pass" }] }));
   }
 
   const patchEdge = (i: number, p: Partial<Edge>) => change((cur) => ({ ...cur, edges: cur.edges.map((e, k) => (k === i ? { ...e, ...p } : e)) }));
@@ -367,6 +399,48 @@ function Editor({ initial }: { initial: View }) {
         </div>
       </div>
 
+      <div data-testid="orch-load" className="flex flex-wrap items-start gap-x-8 gap-y-3 rounded-xl border bg-card px-4 py-3 text-sm">
+        <div>
+          <div className="text-xs text-muted-foreground">Peso estimado en tokens</div>
+          <div className="mt-1 flex items-center gap-2">
+            <span className="flex gap-1" aria-hidden>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <i key={i} className={cn("h-2 w-5 rounded-full transition-colors duration-500", i <= load.level ? (load.level <= 2 ? "bg-success" : load.level === 3 ? "bg-warning" : "bg-destructive") : "bg-foreground/10")} />
+              ))}
+            </span>
+            <b data-testid="orch-load-label">{g.nodes.length ? load.label : "—"}</b>
+          </div>
+        </div>
+        <label className="grid gap-1 text-xs text-muted-foreground">
+          Subagentes a la vez, como mucho
+          <select aria-label="Máximo de subagentes a la vez" value={g.options.maxParallel} onChange={(e) => change((cur) => ({ ...cur, options: { ...cur.options, maxParallel: Number(e.target.value) } }))} className="h-8 rounded-md border bg-transparent px-2 text-sm text-foreground">
+            {[1, 2, 3, 4, 6, 8, 12, 16].map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs text-muted-foreground">
+          Respuesta de cada subagente
+          <select aria-label="Líneas por respuesta" value={g.options.replyLines} onChange={(e) => change((cur) => ({ ...cur, options: { ...cur.options, replyLines: Number(e.target.value) } }))} className="h-8 rounded-md border bg-transparent px-2 text-sm text-foreground">
+            <option value={0}>Sin límite</option>
+            {[5, 10, 20, 30].map((n) => (
+              <option key={n} value={n}>
+                Hasta {n} líneas
+              </option>
+            ))}
+          </select>
+        </label>
+        {g.nodes.length > 0 && load.reasons.length > 0 && (
+          <ul className="min-w-0 flex-1 basis-64 list-disc pl-4 text-xs text-muted-foreground">
+            {load.reasons.slice(0, 3).map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="min-w-0">
           <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -381,9 +455,11 @@ function Editor({ initial }: { initial: View }) {
                 </Button>
               );
             })}
-            <Button size="sm" variant="outline" onClick={() => add("context")} title={KIND.context.help}>
-              <GaugeIcon /> Contexto
-            </Button>
+            {(["check", "goal", "memory", "context"] as const).map((k) => (
+              <Button key={k} size="sm" variant="outline" onClick={() => add(k)} title={KIND[k].help}>
+                {k === "check" ? <CircleCheckBigIcon /> : k === "goal" ? <TargetIcon /> : k === "memory" ? <BrainIcon /> : <GaugeIcon />} {KIND[k].label}
+              </Button>
+            ))}
             <span className="text-xs text-muted-foreground">Arrastra el círculo de un cubo hasta otro para conectarlos.</span>
           </div>
           <div ref={scroller} className={cn("relative h-[620px] overflow-auto rounded-xl border bg-inset", panning ? "cursor-grabbing select-none" : "cursor-grab")} data-testid="orch-canvas" onPointerDown={startPan}>
@@ -403,7 +479,7 @@ function Editor({ initial }: { initial: View }) {
                   const on = sel?.type === "edge" && sel.i === i;
                   return (
                     <g key={`${e.from}>${e.to}`}>
-                      <path d={curve(a, b)} fill="none" stroke="url(#orch-grad)" strokeWidth={on ? 3.5 : 2} strokeLinecap="round" className="orch-edge" opacity={on ? 1 : 0.8} />
+                      <path d={curve(a, b)} fill="none" stroke={e.on === "fail" ? "#ef4444" : "url(#orch-grad)"} strokeWidth={on ? 3.5 : 2} strokeLinecap="round" className={e.on === "fail" ? "orch-edge-fail" : "orch-edge"} opacity={on ? 1 : 0.8} />
                       <path d={curve(a, b)} fill="none" stroke="transparent" strokeWidth={16} style={{ pointerEvents: "stroke", cursor: "pointer" }} data-testid="orch-edge" onClick={() => setSel({ type: "edge", i })} />
                     </g>
                   );
@@ -461,14 +537,14 @@ function Editor({ initial }: { initial: View }) {
               {g.edges.map((e, i) => {
                 const a = byId.get(e.from);
                 const b = byId.get(e.to);
-                if (!a || !b || a.kind === "context") return null;
+                if (!a || !b || a.kind === "context" || a.kind === "goal" || a.kind === "memory") return null;
                 const x = (a.x + W + b.x) / 2;
                 const y = (a.y + b.y) / 2 + H / 2;
                 const on = sel?.type === "edge" && sel.i === i;
                 return (
                   <button key={`l${e.from}>${e.to}`} type="button" data-testid="orch-edge-label" aria-label={`Conexión ${a.label} a ${b.label}: ${PASS[e.pass].label}`} onClick={() => setSel({ type: "edge", i })} className={cn("absolute z-10 -translate-x-1/2 -translate-y-1/2 cursor-pointer rounded-full border bg-card px-2 py-0.5 text-[10px] leading-4 whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground", on && "border-purple/70 text-foreground")} style={{ left: x, top: y }}>
                     {a.kind === "planner" && e.run === "parallel" ? "∥ " : ""}
-                    {PASS[e.pass].short}
+                    {a.kind === "check" ? (e.on === "fail" ? "✗ si falla" : "✓ si pasa") : PASS[e.pass].short}
                   </button>
                 );
               })}
@@ -522,7 +598,7 @@ function Editor({ initial }: { initial: View }) {
                   </select>
                 </label>
               )}
-              {selected.kind !== "context" && (
+              {(selected.kind === "planner" || selected.kind === "agent") && (
                 <>
                   <label className="grid gap-1.5">
                     <span className="text-xs font-medium">Modelo</span>
@@ -534,6 +610,20 @@ function Editor({ initial }: { initial: View }) {
                       {selected.kind === "planner" && <option value="opusplan">Opus planifica, Sonnet ejecuta</option>}
                     </select>
                   </label>
+                  {selected.kind === "planner" && (
+                    <label className="grid gap-1.5">
+                      <span className="text-xs font-medium">Esfuerzo de pensamiento</span>
+                      <select aria-label="Esfuerzo" value={selected.effort} onChange={(e) => patch(selected.id, { effort: e.target.value as Effort })} className="h-9 rounded-md border bg-transparent px-2 text-sm">
+                        <option value="default">El de Claude Code por defecto</option>
+                        <option value="low">Bajo · el que menos gasta</option>
+                        <option value="medium">Medio · recomendado para ahorrar</option>
+                        <option value="high">Alto</option>
+                        <option value="xhigh">Muy alto</option>
+                        <option value="max">Máximo · el que más gasta</option>
+                      </select>
+                      <span className="text-xs text-muted-foreground">Cuánto piensa Claude antes de responder. Más esfuerzo = mejores respuestas difíciles, pero muchos más tokens. Solo lo usan los modelos que lo admiten.</span>
+                    </label>
+                  )}
                   <label className="grid gap-1.5">
                     <span className="text-xs font-medium">{selected.kind === "agent" ? "Cuándo usarlo" : "Para qué sirve"}</span>
                     <Textarea aria-label="Descripción" rows={2} maxLength={400} value={selected.role} onChange={(e) => patch(selected.id, { role: e.target.value })} placeholder={selected.kind === "agent" ? "Escribe y edita código siguiendo el plan…" : "Entiende la petición y reparte el trabajo…"} />
@@ -559,6 +649,49 @@ function Editor({ initial }: { initial: View }) {
                   </div>
                 </div>
               )}
+              {selected.kind === "goal" && (
+                <>
+                  <label className="grid gap-1.5">
+                    <span className="text-xs font-medium">Qué se quiere conseguir</span>
+                    <Textarea aria-label="Objetivo" rows={2} maxLength={400} value={selected.role} onChange={(e) => patch(selected.id, { role: e.target.value })} placeholder="Entregar el flujo de pago, sin ampliar el alcance" />
+                  </label>
+                  <label className="grid gap-1.5">
+                    <span className="text-xs font-medium">Se da por terminado cuando…</span>
+                    <Textarea aria-label="Criterio de terminado" rows={2} maxLength={4000} value={selected.prompt} onChange={(e) => patch(selected.id, { prompt: e.target.value })} placeholder="todas las pruebas pasan y el resumen final es corto" />
+                  </label>
+                </>
+              )}
+              {selected.kind === "memory" && (
+                <>
+                  <label className="grid gap-1.5">
+                    <span className="text-xs font-medium">Qué es</span>
+                    <Input aria-label="Qué es la memoria" value={selected.role} maxLength={400} onChange={(e) => patch(selected.id, { role: e.target.value })} placeholder="Lo que ya se sabe del proyecto" />
+                  </label>
+                  <label className="grid gap-1.5">
+                    <span className="text-xs font-medium">Qué debe leer antes de empezar</span>
+                    <Textarea aria-label="Qué leer" rows={2} maxLength={4000} value={selected.prompt} onChange={(e) => patch(selected.id, { prompt: e.target.value })} placeholder="CLAUDE.md y la carpeta docs/" />
+                  </label>
+                </>
+              )}
+              {selected.kind === "check" && (
+                <>
+                  <label className="grid gap-1.5">
+                    <span className="text-xs font-medium">Qué debe cumplirse</span>
+                    <Textarea aria-label="Criterio de la comprobación" rows={3} maxLength={4000} value={selected.prompt} onChange={(e) => patch(selected.id, { prompt: e.target.value })} placeholder="las pruebas pasan y no se ha tocado nada fuera del alcance" />
+                  </label>
+                  <label className="grid gap-1.5">
+                    <span className="text-xs font-medium">Si no se cumple, volver a intentarlo</span>
+                    <select aria-label="Reintentos" value={selected.retries} onChange={(e) => patch(selected.id, { retries: Number(e.target.value) })} className="h-9 rounded-md border bg-transparent px-2 text-sm">
+                      {[0, 1, 2, 3, 4, 5].map((n) => (
+                        <option key={n} value={n}>
+                          {n === 0 ? "Nunca: parar y avisar" : `Hasta ${n} ${n === 1 ? "vez" : "veces"}`}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-xs text-muted-foreground">Cada reintento gasta tokens: con 1 o 2 suele bastar.</span>
+                  </label>
+                </>
+              )}
               {selected.kind === "context" && (
                 <label className="grid gap-1.5">
                   <span className="flex items-center justify-between text-xs font-medium">
@@ -576,7 +709,7 @@ function Editor({ initial }: { initial: View }) {
                     <div key={`${e.from}>${e.to}`} className="flex items-center justify-between gap-2 rounded-md border px-2 py-1 text-xs">
                       <button type="button" className="min-w-0 cursor-pointer truncate text-left hover:text-foreground" onClick={() => setSel({ type: "edge", i: g.edges.indexOf(e) })}>
                         {e.from === selected.id ? "→" : "←"} {other?.label}
-                        {other?.kind !== "context" && selected.kind !== "context" ? <span className="text-muted-foreground"> · {PASS[e.pass].short}</span> : null}
+                        {["planner", "agent", "check"].includes(other?.kind ?? "") && ["planner", "agent", "check"].includes(selected.kind) ? <span className="text-muted-foreground"> · {e.on === "fail" ? "si falla" : PASS[e.pass].short}</span> : null}
                       </button>
                       <button type="button" aria-label="Quitar la conexión" className="cursor-pointer text-muted-foreground hover:text-destructive" onClick={() => change((cur) => ({ ...cur, edges: cur.edges.filter((x) => x !== e) }))}>
                         <Trash2Icon className="size-3.5" />
@@ -608,11 +741,20 @@ function Editor({ initial }: { initial: View }) {
                   <p>
                     <b>{a?.label}</b> → <b>{b?.label}</b>
                   </p>
-                  {a?.kind === "context" ? (
-                    <p className="text-xs text-muted-foreground">La política de contexto se aplica al planificador.</p>
+                  {a?.kind === "context" || a?.kind === "goal" || a?.kind === "memory" ? (
+                    <p className="text-xs text-muted-foreground">{a.kind === "context" ? "La política de contexto se aplica al planificador." : a.kind === "goal" ? "El planificador trabaja hacia este objetivo." : "El planificador lee esta memoria antes de empezar."}</p>
                   ) : (
                     <>
                       <p className="text-xs text-muted-foreground">{fromPlanner ? "El planificador puede delegar en este subagente." : "Cuando termina el primero, el segundo recibe su trabajo."} Los resultados siempre vuelven al planificador.</p>
+                      {a?.kind === "check" && (
+                        <label className="grid gap-1.5">
+                          <span className="text-xs font-medium">Cuándo se sigue por aquí</span>
+                          <select aria-label="Cuándo" value={e.on} onChange={(ev) => patchEdge(sel.i, { on: ev.target.value as Edge["on"] })} className="h-9 rounded-md border bg-transparent px-2 text-sm">
+                            <option value="pass">Si se cumple</option>
+                            <option value="fail">Si falla (vuelve atrás a rehacerlo)</option>
+                          </select>
+                        </label>
+                      )}
                       <label className="grid gap-1.5">
                         <span className="text-xs font-medium">{fromPlanner ? "Qué le da el planificador" : "Qué se pasa"}</span>
                         <select aria-label="Qué se pasa" value={e.pass} onChange={(ev) => patchEdge(sel.i, { pass: ev.target.value as Pass })} className="h-9 rounded-md border bg-transparent px-2 text-sm">
@@ -677,7 +819,11 @@ function PreviewDialog({ open, onClose }: { open: boolean; onClose: () => void }
         {data && !p && <p className="text-sm text-muted-foreground">Todavía no hay nada que enviar: añade un planificador o un subagente.</p>}
         {p && (
           <div className="grid gap-4 text-sm">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-lg border p-3">
+                <div className="text-xs text-muted-foreground">Esfuerzo de pensamiento</div>
+                <div className="font-medium">{p.effort ?? "el de Claude Code"}</div>
+              </div>
               <div className="rounded-lg border p-3">
                 <div className="text-xs text-muted-foreground">Modelo principal</div>
                 <div className="font-medium">{p.model ? MODEL_LABEL[p.model as Model] : "El de Claude Code por defecto"}</div>

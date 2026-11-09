@@ -37,6 +37,7 @@ import { useStickToBottom } from "@/lib/use-stick-bottom";
 import { AnimatedNumber } from "@/components/app/animated-number";
 import { Markdown } from "@/components/app/markdown";
 import { PlanCard } from "@/components/app/plan-card";
+import { isSubagentTool, SubagentCard, SubagentGroup, type SubStep } from "@/components/app/subagent-card";
 import { ToolCard, type ToolResult } from "@/components/app/tool-card";
 import { EditCard, FileChangeCard } from "@/components/app/file-change";
 import type { FileChange } from "@/lib/server/run-changes";
@@ -70,7 +71,7 @@ function ResultCard({ e, jira, duplicate }: { e: Ev; jira: (t: string) => React.
   );
 }
 
-function EventViewImpl({ e, run, results, finished, paired, planId, planText, changes, lastText }: { e: Ev; run: Run; results: Map<string, ToolResult>; finished: boolean; paired: Set<string>; planId: string | null; planText: string; changes: Map<string, FileChange[]>; lastText: string }) {
+function EventViewImpl({ e, run, results, finished, paired, planId, planText, changes, lastText, sub }: { e: Ev; run: Run; results: Map<string, ToolResult>; finished: boolean; paired: Set<string>; planId: string | null; planText: string; changes: Map<string, FileChange[]>; lastText: string; sub: Map<string, SubStep[]> }) {
   const jira = (text: string) => <JiraCommentButton text={text} hints={[run.prompt, run.resultText]} taskId={run.taskId} />;
   if (e.type === "agentic" && e.subtype === "start")
     return <div className="font-mono text-xs text-muted-foreground">$ {(e.args as string[]).join(" ")}</div>;
@@ -88,10 +89,20 @@ function EventViewImpl({ e, run, results, finished, paired, planId, planText, ch
     );
   if (e.type === "assistant") {
     const blocks: Ev[] = Array.isArray(e.message?.content) ? e.message.content : [];
+    // The subagents launched in this message are shown together, as a team, where the first of them is.
+    const launched = blocks.filter((b) => b.type === "tool_use" && isSubagentTool(b.name));
     return (
       <div className="flex flex-col gap-1.5">
         {blocks.map((b, i) =>
-          b.type === "text" ? (
+          b.type === "tool_use" && isSubagentTool(b.name) ? (
+            b === launched[0] ? (
+              <SubagentGroup key={i} count={launched.length} parallel={launched.length > 1}>
+                {launched.map((l) => (
+                  <SubagentCard key={String(l.id)} id={String(l.id)} input={l.input} result={results.get(String(l.id))} finished={finished} steps={sub.get(String(l.id)) ?? []} />
+                ))}
+              </SubagentGroup>
+            ) : null
+          ) : b.type === "text" ? (
             <div key={i} className="flex gap-2">
               <BotIcon className="mt-0.5 size-4 shrink-0 text-orange" />
               <div className="min-w-0 flex-1">
@@ -157,6 +168,7 @@ const EventView = React.memo(EventViewImpl, (a: EventViewProps, b: EventViewProp
     const rb = b.results.get(id);
     if (ra?.content !== rb?.content || ra?.isError !== rb?.isError || a.paired.has(id) !== b.paired.has(id)) return false;
     if ((a.changes.get(id)?.length ?? 0) !== (b.changes.get(id)?.length ?? 0)) return false;
+    if ((a.sub.get(id)?.length ?? 0) !== (b.sub.get(id)?.length ?? 0) || a.sub.get(id)?.at(-1)?.result !== b.sub.get(id)?.at(-1)?.result) return false;
   }
   return true;
 });
@@ -269,7 +281,8 @@ function Segment({ run, index, latest, onEvents }: { run: Run; index: number; la
   const { events, live, partial, stats } = useRunEvents(run.id);
   React.useEffect(() => onEvents(run.id, events, live, partial, stats), [run.id, events, live, partial, stats, onEvents]);
   // Replies reuse the session: hide the repeated command line, init and exit noise.
-  const shown = index === 0 ? events : events.filter((e) => !(e.type === "agentic" && (e.subtype === "start" || e.subtype === "exit")) && !(e.type === "system" && e.subtype === "init"));
+  const shown0 = events.filter((e) => typeof e.parent_tool_use_id !== "string"); // the subagents' own messages stay in their cards
+  const shown = index === 0 ? shown0 : shown0.filter((e) => !(e.type === "agentic" && (e.subtype === "start" || e.subtype === "exit")) && !(e.type === "system" && e.subtype === "init"));
   // Pair each tool call with its result (they arrive as separate events) so a call renders as one card.
   const { results, paired } = React.useMemo(() => {
     const results = new Map<string, ToolResult>();
@@ -285,6 +298,18 @@ function Segment({ run, index, latest, onEvents }: { run: Run; index: number; la
     return { results, paired: new Set([...results.keys()].filter((k) => used.has(k))) };
   }, [events]);
   const finished = run.status !== "running";
+  // What each subagent did (its own tool calls arrive tagged with the call that launched it): shown inside its card,
+  // not as if the main agent had done it.
+  const sub = React.useMemo(() => {
+    const m = new Map<string, SubStep[]>();
+    for (const e of events) {
+      const parent = typeof e.parent_tool_use_id === "string" ? e.parent_tool_use_id : null;
+      if (!parent || e.type !== "assistant") continue;
+      const blocks: Ev[] = Array.isArray(e.message?.content) ? e.message.content : [];
+      for (const b of blocks) if (b.type === "tool_use" && b.id) m.set(parent, [...(m.get(parent) ?? []), { id: String(b.id), name: String(b.name), input: b.input, result: results.get(String(b.id)) }]);
+    }
+    return m;
+  }, [events, results]);
   // Changes found in the working tree after a command hang under that command's card, in place.
   const { changes, inline } = React.useMemo(() => {
     const toolIds = new Set<string>();
@@ -336,7 +361,7 @@ function Segment({ run, index, latest, onEvents }: { run: Run; index: number; la
       )}
       {shown.filter((e) => !inline.has(e) && !(e.type === "agentic" && e.subtype === "partial")).map((e, i) => (
         <Appear key={i} live={!finished}>
-        <EventView e={e} run={run} results={results} finished={finished} paired={paired} planId={planId} planText={planText} changes={changes} lastText={lastText} />
+        <EventView e={e} run={run} results={results} finished={finished} paired={paired} planId={planId} planText={planText} changes={changes} lastText={lastText} sub={sub} />
         </Appear>
       ))}
       {/* Plan written to a plan file without calling ExitPlanMode: still offer it as a plan. */}

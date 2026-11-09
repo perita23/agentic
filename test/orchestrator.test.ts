@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createContext } from "@/lib/server/context";
-import { compile, graphSchema, PRESETS, type Graph } from "@/lib/server/orchestrator";
+import { canLink, compile, estimateLoad, graphSchema, PRESETS, type Graph } from "@/lib/server/orchestrator";
 import { FAKE_CLAUDE, tmpDir, waitFor } from "./helpers";
 
-const node = (id: string, kind: "planner" | "agent" | "context", extra: object = {}) => ({ id, kind, label: id, x: 0, y: 0, ...extra });
+const node = (id: string, kind: "planner" | "agent" | "context" | "goal" | "memory" | "check", extra: object = {}) => ({ id, kind, label: id, x: 0, y: 0, ...extra });
 const graph = (g: object): Graph => graphSchema.parse({ enabled: true, ...g });
 
 describe("the graph", () => {
@@ -85,7 +85,7 @@ describe("what the graph becomes for claude", () => {
     expect(t).toContain("«lector» (el modelo por defecto): lee; Lee el código. Sólo lee: no puede modificar archivos.");
     expect(t).toContain("«escritor» (el modelo por defecto): escribe; Escribe.");
     expect(t).not.toMatch(/«escritor»[^\n]*Sólo lee/);
-    expect(t).toContain("Lanza a la vez, en una misma respuesta con varias llamadas a Task: «lector», «probador».");
+    expect(t).toContain("Lanza a la vez, en una misma respuesta con varias llamadas a Agent: «lector», «probador».");
     expect(t).toContain("Lanza uno tras otro, esperando su resultado antes de seguir: «escritor».");
     expect(t).toContain("A «lector» pásale sólo la tarea, sin contexto previo.");
     expect(t).toContain("A «probador» pásale todo el contexto relevante de la conversación. Dale también el comando de pruebas.");
@@ -97,7 +97,9 @@ describe("what the graph becomes for claude", () => {
 
   it("an old graph (without jobs or connection details) still loads, with sensible defaults", () => {
     const old = graphSchema.parse({ enabled: true, nodes: [node("p", "planner"), node("a", "agent")], edges: [{ from: "p", to: "a" }] });
-    expect(old.edges[0]).toEqual({ from: "p", to: "a", pass: "summary", run: "sequence", note: "" });
+    expect(old.edges[0]).toEqual({ from: "p", to: "a", pass: "summary", run: "sequence", note: "", on: "pass" });
+    expect(old.options).toEqual({ maxParallel: 4, replyLines: 0 });
+    expect(old.nodes[0]!.effort).toBe("default");
     expect(old.nodes[1]!.job).toBe("custom");
     expect(graphSchema.safeParse({ nodes: [], edges: [{ from: "a", to: "b", pass: "todo" }] }).success).toBe(false);
   });
@@ -122,7 +124,70 @@ async function firstMessage(c: ReturnType<typeof setup>, input: object) {
   return JSON.parse(ev!.message!.content![0]!.text!) as { args: string[]; compact: string | null };
 }
 
+describe("goal, memory, checks and the effort", () => {
+  const team = graph({
+    nodes: [
+      node("o", "goal", { label: "Objetivo", role: "Arreglar el login", prompt: "las pruebas pasan" }),
+      node("m", "memory", { label: "Memoria", role: "Lo ya sabido", prompt: "CLAUDE.md y docs/" }),
+      node("p", "planner", { label: "Omega", model: "opus", effort: "medium" }),
+      node("b", "agent", { label: "Construir", role: "Construye." }),
+      node("c", "check", { label: "Comprobar", prompt: "las pruebas pasan", retries: 2 }),
+    ],
+    edges: [{ from: "o", to: "p" }, { from: "m", to: "p" }, { from: "p", to: "b" }, { from: "b", to: "c" }, { from: "c", to: "p", on: "pass" }, { from: "c", to: "b", on: "fail" }],
+    options: { maxParallel: 3, replyLines: 8 },
+  });
+
+  it("knows who can be connected to whom", () => {
+    expect(canLink("goal", "planner")).toBe(true);
+    expect(canLink("memory", "planner")).toBe(true);
+    expect(canLink("agent", "check")).toBe(true);
+    expect(canLink("check", "agent")).toBe(true);
+    expect(canLink("check", "planner")).toBe(true);
+    expect(canLink("planner", "check")).toBe(false);
+    expect(canLink("goal", "agent")).toBe(false);
+    expect(graphSchema.safeParse({ ...team, nodes: [...team.nodes, node("o2", "goal")] }).success).toBe(false);
+    expect(graphSchema.safeParse({ ...team, edges: [{ from: "p", to: "b", on: "fail" }] }).success).toBe(false); // only a check has «if it fails»
+  });
+
+  it("gives the effort, the goal, the memory, the checks and the ways to spend fewer tokens", () => {
+    const c = compile(team, "chats")!;
+    expect(c.effort).toBe("medium");
+    expect(c.model).toBe("opus");
+    expect(c.appendPrompt).toContain("Objetivo: Arreglar el login. Se considera terminado cuando: las pruebas pasan");
+    expect(c.appendPrompt).toContain("Memoria «Memoria» (Lo ya sabido): antes de empezar, lee CLAUDE.md y docs/");
+    expect(c.appendPrompt).toContain("Comprobación «Comprobar» (tras «construir»): las pruebas pasan.");
+    expect(c.appendPrompt).toContain("devuélvelo a «construir» con el motivo concreto");
+    expect(c.appendPrompt).toContain("Reintenta como máximo 2 veces");
+    expect(c.appendPrompt).toContain("lo revisas tú y sigues");
+    expect(c.appendPrompt).toContain("No lances más de 3 subagentes a la vez.");
+    expect(c.appendPrompt).toContain("8 líneas como máximo");
+    expect(compile(graph({ nodes: [node("p", "planner")] }), "chats")!.effort).toBeUndefined();
+  });
+
+  it("estimates how heavy a team is, and why", () => {
+    const heavy = estimateLoad(graph({ nodes: [node("p", "planner", { model: "opus", effort: "max" }), ...["a", "b", "c", "d", "e", "f", "g", "h", "i"].map((id) => node(id, "agent", { model: "opus" }))], edges: [], options: { maxParallel: 16, replyLines: 0 } }));
+    expect(heavy.level).toBeGreaterThanOrEqual(4);
+    expect(heavy.reasons.join(" ")).toMatch(/Opus/);
+    const light = estimateLoad(graph({ nodes: [node("p", "planner", { model: "sonnet", effort: "low" }), node("c", "context", { threshold: 40 }), node("a", "agent", { model: "haiku" })], edges: [{ from: "p", to: "a" }, { from: "c", to: "p" }], options: { maxParallel: 2, replyLines: 10 } }));
+    expect(light.level).toBe(1);
+    const omega = PRESETS.find((p) => p.id === "omega-light")!;
+    const og = graphSchema.parse({ enabled: true, ...omega.graph });
+    expect(estimateLoad(og).level).toBeLessThanOrEqual(3); // Opus, but medium effort, Haiku workers, compacts at 40%
+    expect(compile(og, "chats")!.effort).toBe("medium");
+    expect(compile(og, "chats")!.env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE).toBe("40");
+    expect(Object.values(compile(og, "chats")!.agents!).every((a) => a.model === "haiku")).toBe(true);
+  });
+});
+
 describe("applied to the runs Agentic starts", () => {
+  it("passes the effort to claude", async () => {
+    const c = setup();
+    c.orchestrator.set({ enabled: true, nodes: [node("p", "planner", { model: "opus", effort: "medium" })], edges: [] });
+    const m = await firstMessage(c, {});
+    expect(m.args[m.args.indexOf("--effort") + 1]).toBe("medium");
+    expect(m.args[m.args.indexOf("--model") + 1]).toBe("opus");
+  });
+
   it("hands claude the model, the subagents, the instructions and the compaction threshold", async () => {
     const c = setup();
     c.orchestrator.set({ enabled: true, nodes: g().nodes, edges: g().edges });
