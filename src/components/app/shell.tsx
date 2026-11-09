@@ -26,7 +26,8 @@ import {
   SettingsIcon,
   TicketIcon,
   EyeIcon, EyeOffIcon, MailIcon, SlidersHorizontalIcon, CheckIcon,
-  TerminalSquareIcon, SparklesIcon, ServerIcon, ShieldCheckIcon, AlarmClockIcon, LibraryIcon, UserRoundIcon } from "lucide-react";
+  TerminalSquareIcon, SparklesIcon, ServerIcon, ShieldCheckIcon, AlarmClockIcon, LibraryIcon, UserRoundIcon, WorkflowIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { api, refresh, useApi, type Overview, type ProjectListItem, type SessionSummary } from "@/lib/api";
@@ -51,6 +52,7 @@ const NAV = [
   { href: "/jira", label: "Jira", icon: TicketIcon },
   { href: "/templates", label: "Plantillas", icon: FileStackIcon },
   { href: "/agents", label: "Agentes", icon: BotIcon },
+  { href: "/orchestrator", label: "Orchestrator", icon: WorkflowIcon },
   { href: "/mcp", label: "MCP", icon: ServerIcon },
   { href: "/permissions", label: "Permisos", icon: ShieldCheckIcon },
   { href: "/projects", label: "Proyectos", icon: FolderGit2Icon },

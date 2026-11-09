@@ -217,6 +217,11 @@ html[data-desktop="mac"]:not([data-fullscreen]) .traffic-light-gap {
   [data-composer]:has([data-improved]) textarea { animation: none; }
 }
 
+/* ---- Orchestrator: the connections of the graph flow with the orb's colours ---- */
+@keyframes orch-flow { to { stroke-dashoffset: -28; } }
+.orch-edge { stroke-dasharray: 6 8; animation: orch-flow 1.1s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .orch-edge { animation: none; } }
+
 /* ---- Liquid orb: Claude's live status ----
    Eight blobs share one clock (--t, advanced from JS at a per-state speed that eases). A state decides
    HOW MANY blobs are alive (--k), how big (--bs), their orbit (--ax/--ay) and spacing (--gap), so each

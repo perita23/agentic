@@ -118,7 +118,7 @@ export const runCreateSchema = z
     images: z.array(z.uuid()).max(6).optional(),
   })
   .refine((r) => r.mode === "tmux" || r.prompt.trim().length > 0, { message: "prompt is required for headless runs", path: ["prompt"] });
-export type RunInput = z.infer<typeof runCreateSchema> & { addDirs?: string[]; allowedTools?: string[]; appendPrompt?: string; mcpConfig?: string };
+export type RunInput = z.infer<typeof runCreateSchema> & { addDirs?: string[]; allowedTools?: string[]; appendPrompt?: string; mcpConfig?: string; agentsJson?: string };
 
 export interface RunOptions {
   dataDir: string;
@@ -130,6 +130,8 @@ export interface RunOptions {
   obsidian?: (cwd: string) => { addDir: string; allow: string[]; hint: string } | null;
   /** Agentic's own MCP server (tools to look into Agentic): what to hand a headless run (null = off). */
   mcp?: () => { configPath: string; allow: string; hint: string } | null;
+  /** The orchestrator graph compiled for this kind of run: model, subagents, instructions, environment (null = off). */
+  orchestrator?: (kind: "chats" | "runs" | "tasks") => { model?: string; agents?: Record<string, unknown>; appendPrompt: string; env: Record<string, string> } | null;
 }
 
 const R = "runs";
@@ -185,6 +187,7 @@ export function buildClaudeArgs(input: RunInput): string[] {
   if (input.mcpConfig) args.push("--mcp-config", input.mcpConfig);
   if (input.model) args.push("--model", input.model);
   if (input.agent) args.push("--agent", input.agent);
+  if (input.agentsJson) args.push("--agents", input.agentsJson);
   for (const d of input.addDirs ?? []) args.push("--add-dir", d);
   if (input.permissionMode && input.permissionMode !== "default") args.push("--permission-mode", input.permissionMode);
   if (input.resumeSessionId) args.push("--resume", input.resumeSessionId);
@@ -321,10 +324,27 @@ export class RunManager {
     }
     // Obsidian: the vault's Agentic folder is handed to Claude, with permission to write notes there (and only there).
     const ob = input.mode === "headless" ? this.opts.obsidian?.(cwd) : null;
-    if (ob) claudeInput = { ...claudeInput, addDirs: [...(claudeInput.addDirs ?? []), ob.addDir], allowedTools: ob.allow, appendPrompt: ob.hint };
+    if (ob) claudeInput = { ...claudeInput, addDirs: [...(claudeInput.addDirs ?? []), ob.addDir], allowedTools: ob.allow, appendPrompt: [claudeInput.appendPrompt, ob.hint].filter(Boolean).join("\n\n") };
     // Agentic's own tools (tasks, runs, notes…) for Claude, when the person has them on.
     const mcp = input.mode === "headless" ? this.opts.mcp?.() : null;
     if (mcp) claudeInput = { ...claudeInput, mcpConfig: mcp.configPath, allowedTools: [...(claudeInput.allowedTools ?? []), mcp.allow], appendPrompt: [claudeInput.appendPrompt, mcp.hint].filter(Boolean).join("\n\n") };
+    // The orchestrator: how Claude works as a team (planner model, cheaper subagents, when to compact). What was chosen
+    // explicitly for this run (a model, an Agentic agent) always wins over it.
+    let extraEnv: Record<string, string> = {};
+    if (input.mode === "headless" && !input.agent) {
+      const chatDir = path.join(this.opts.dataDir, "chat");
+      const inChat = [chatDir, (() => { try { return fs.realpathSync(chatDir); } catch { return chatDir; } })()].includes(cwd);
+      const orch = this.opts.orchestrator?.(input.taskId ? "tasks" : inChat ? "chats" : "runs");
+      if (orch) {
+        claudeInput = {
+          ...claudeInput,
+          model: claudeInput.model ?? orch.model,
+          agentsJson: orch.agents ? JSON.stringify(orch.agents) : undefined,
+          appendPrompt: [claudeInput.appendPrompt, orch.appendPrompt].filter(Boolean).join("\n\n"),
+        };
+        extraEnv = orch.env;
+      }
+    }
     const args = buildClaudeArgs(claudeInput);
     run.git = await captureBaseline(cwd);
 
@@ -366,7 +386,7 @@ export class RunManager {
     try {
       child = spawn(this.opts.claudeBin, args, {
         cwd,
-        env: { ...process.env, AGENTIC_RUN_ID: run.id },
+        env: { ...process.env, ...extraEnv, AGENTIC_RUN_ID: run.id },
         stdio: ["ignore", "pipe", "pipe"],
         shell: false,
         windowsHide: true,
@@ -379,7 +399,7 @@ export class RunManager {
     this.saveNew(run);
     this.procs.set(run.id, child);
     // The long instruction passed with --append-system-prompt would flood the header: it is shown shortened.
-    const shownArgs = args.slice(0, -1).map((a, i, all) => (all[i - 1] === "--append-system-prompt" ? "<instrucciones>" : all[i - 1] === "--allowedTools" ? "<permiso>" : all[i - 1] === "--mcp-config" ? "<mcp>" : a));
+    const shownArgs = args.slice(0, -1).map((a, i, all) => (all[i - 1] === "--append-system-prompt" ? "<instrucciones>" : all[i - 1] === "--allowedTools" ? "<permiso>" : all[i - 1] === "--mcp-config" ? "<mcp>" : all[i - 1] === "--agents" ? "<subagentes>" : a));
     writeLog({ type: "agentic", subtype: "start", args: [this.opts.claudeBin, ...shownArgs, "<prompt>"], cwd, at: run.startedAt });
 
     // Changes made through the terminal show up in the chat where they happened (see ChangeWatcher).
