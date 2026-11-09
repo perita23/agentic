@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { CheckIcon, SparklesIcon, Undo2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -227,7 +228,10 @@ export function MorphPill({ m }: { m: Morph }) {
     raf = requestAnimationFrame(follow);
     return () => cancelAnimationFrame(raf);
   }, [m]);
-  return (
+  // In the document's body, not inside the page: whatever transforms, filters or scroll containers the page has around
+  // the box cannot move it (a fixed element is placed against the viewport only when nothing in between transforms).
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <span
       ref={box}
       data-testid="word-morph"
@@ -236,7 +240,8 @@ export function MorphPill({ m }: { m: Morph }) {
       style={{ left: m.left - 2, top: m.top, minWidth: m.width + 4, height: m.height, padding: "0 2px", background: m.bg, opacity: fading ? 0 : 1, ...m.font }}
     >
       <MorphText text={text} state="writing" glow className="" />
-    </span>
+    </span>,
+    document.body,
   );
 }
 

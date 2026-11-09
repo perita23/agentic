@@ -985,6 +985,19 @@ try {
   let saved = await (await fetch(base + "/api/orchestrator", { headers: oauth })).json();
   check(saved.graph.enabled === true && saved.graph.nodes.length === 5, "the graph is saved by itself");
   await shot("09-orchestrator");
+  // Dragging the empty canvas pans the view.
+  const orchCanvas = page.getByTestId("orch-canvas");
+  await orchCanvas.evaluate((e) => e.scrollIntoView({ block: "start" }));
+  await page.waitForTimeout(300);
+  const orchBox = await orchCanvas.boundingBox();
+  const pan0 = await orchCanvas.evaluate((e) => [e.scrollLeft, e.scrollTop]);
+  await page.mouse.move(orchBox.x + 300, orchBox.y + 500);
+  await page.mouse.down();
+  await page.mouse.move(orchBox.x + 100, orchBox.y + 410, { steps: 8 });
+  await page.mouse.up();
+  const pan1 = await orchCanvas.evaluate((e) => [e.scrollLeft, e.scrollTop]);
+  check(pan1[0] - pan0[0] > 150 && pan1[1] - pan0[1] > 60, `dragging the empty canvas moves the view ${JSON.stringify([pan0, pan1])}`);
+  await orchCanvas.evaluate((e) => e.scrollTo(0, 0));
   // Select the writer: its model (a cheaper one) and tools are in the panel.
   await page.getByRole("button", { name: "Subagente: Escritor" }).click();
   check((await page.getByLabel("Modelo", { exact: true }).inputValue()) === "haiku", "the writer works with the cheaper model");
@@ -1086,6 +1099,19 @@ try {
   }, OBOX);
   await shot("08g-morph-long");
   check(where.inside && where.bottomGap < 60, `the morph stays on its word in a long, scrolling text ${JSON.stringify(where)}`);
+  await page.locator(OBOX).fill("");
+  // Even with a transform around the page (which would carry a fixed element away), the morph stays on its word.
+  await page.evaluate(() => (document.querySelector("main").style.transform = "translate(41px, 27px)"));
+  await page.locator(OBOX).click();
+  await page.locator(OBOX).pressSequentially("mira los herrores ", { delay: 40 });
+  await page.getByTestId("word-morph").first().waitFor({ timeout: 8000 });
+  const shifted = await page.evaluate((q) => {
+    const t = document.querySelector(q).getBoundingClientRect();
+    const p = document.querySelector("[data-testid=word-morph]").getBoundingClientRect();
+    return { inside: p.left >= t.left - 3 && p.right <= t.right + 3 && p.top >= t.top - 1 && p.bottom <= t.bottom + 1 };
+  }, OBOX);
+  await page.evaluate(() => (document.querySelector("main").style.transform = ""));
+  check(shifted.inside, "the morph stays on its word even inside a transformed page");
   await page.locator(OBOX).fill("");
   // Not only the message boxes: any field for prose (a task's title and description) is corrected too, and searches are left alone.
   await page.goto(`${base}/tasks`);

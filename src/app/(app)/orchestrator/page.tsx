@@ -184,6 +184,8 @@ function Editor({ initial }: { initial: View }) {
   const [hot, setHot] = React.useState<string | null>(null);
   const [previewing, setPreviewing] = React.useState(false);
   const inner = React.useRef<HTMLDivElement>(null);
+  const scroller = React.useRef<HTMLDivElement>(null);
+  const [panning, setPanning] = React.useState(false);
   const drag = React.useRef<{ id: string; ox: number; oy: number; moved: boolean } | null>(null);
   const touched = React.useRef(false);
   const latest = React.useRef(g);
@@ -247,6 +249,31 @@ function Editor({ initial }: { initial: View }) {
   function removeNode(id: string) {
     change((cur) => ({ ...cur, nodes: cur.nodes.filter((n) => n.id !== id), edges: cur.edges.filter((e) => e.from !== id && e.to !== id) }));
     setSel(null);
+  }
+
+  /** Dragging the empty canvas moves the view (the mouse and the pen; a finger already scrolls it). */
+  function startPan(e: React.PointerEvent) {
+    const box = scroller.current;
+    const t = e.target as HTMLElement;
+    if (!box || e.button !== 0 || e.pointerType === "touch" || t.closest("[data-node-id], button, a, select, input, textarea, [data-testid=orch-edge]")) return;
+    const from = { x: e.clientX, y: e.clientY, left: box.scrollLeft, top: box.scrollTop };
+    let moved = false;
+    const move = (ev: PointerEvent) => {
+      const dx = ev.clientX - from.x;
+      const dy = ev.clientY - from.y;
+      if (!moved && Math.hypot(dx, dy) < 4) return;
+      if (!moved) setPanning(true);
+      moved = true;
+      box.scrollLeft = from.left - dx;
+      box.scrollTop = from.top - dy;
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      setPanning(false);
+      if (!moved) setSel(null); // a click on the empty canvas deselects
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up, { once: true });
   }
 
   const point = (e: { clientX: number; clientY: number }) => {
@@ -359,7 +386,7 @@ function Editor({ initial }: { initial: View }) {
             </Button>
             <span className="text-xs text-muted-foreground">Arrastra el círculo de un cubo hasta otro para conectarlos.</span>
           </div>
-          <div className="relative h-[620px] overflow-auto rounded-xl border bg-inset" data-testid="orch-canvas" onPointerDown={(e) => e.target === e.currentTarget || (e.target as HTMLElement).dataset.bg ? setSel(null) : undefined}>
+          <div ref={scroller} className={cn("relative h-[620px] overflow-auto rounded-xl border bg-inset", panning ? "cursor-grabbing select-none" : "cursor-grab")} data-testid="orch-canvas" onPointerDown={startPan}>
             <div ref={inner} data-bg className="relative [background-image:radial-gradient(circle,var(--border)_1px,transparent_1px)] [background-size:24px_24px]" style={{ width: CANVAS_W, height: CANVAS_H }}>
               <svg className="pointer-events-none absolute inset-0" width={CANVAS_W} height={CANVAS_H} aria-hidden>
                 <defs>
