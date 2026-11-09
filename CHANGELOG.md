@@ -3,6 +3,14 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.58.1] - 2026-11-09
+
+### Añadido
+- **Orchestrator: mueve la vista arrastrando.** Arrastra el fondo del lienzo para desplazarte (el cursor pasa a la mano), sin usar las barras; un clic en el fondo sigue deseleccionando. Con el dedo se sigue desplazando como siempre.
+
+### Corregido
+- **El efecto de la palabra corregida aparecía lejos de su palabra.** Se hace más a prueba de diferencias del entorno: el efecto se dibuja ahora **fuera de la página, en el `body`**, así que ninguna transformación o contenedor de alrededor puede desplazarlo; la medición se hace en una copia de la caja **colocada en su mismo contenedor** (hereda lo mismo que ella) y copia **todas las propiedades de maquetación del texto** (variantes tipográficas, kerning, tamaño óptico…), no una lista corta. Hay una prueba que mete la página dentro de una transformación y comprueba que el efecto sigue sobre su palabra.
+
 ## [0.58.0] - 2026-11-09
 
 ### Añadido

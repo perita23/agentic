@@ -1,21 +1,27 @@
-const COPY = ["boxSizing", "width", "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth", "borderStyle", "paddingTop", "paddingRight", "paddingBottom", "paddingLeft", "fontStyle", "fontVariant", "fontWeight", "fontStretch", "fontSize", "fontFamily", "lineHeight", "letterSpacing", "wordSpacing", "textTransform", "textIndent", "tabSize", "textAlign", "direction"] as const;
+/** The properties that decide how text is laid out (and so where a word falls). */
+const LAYOUT = /^(font|text-(?!shadow|decoration|emphasis|underline)|letter-spacing|word-|line-|white-space|hyphens|tab-size|direction|writing-mode|unicode-bidi|padding-|border-(top|right|bottom|left)-(width|style)|box-sizing|overflow-wrap|-webkit-text-size)/;
 
 /**
- * Where a piece of a text field's text is on screen (viewport pixels): a hidden copy of the field with the same
- * look lays out the text, and the piece is measured in it.
+ * Where a piece of a text field's text is on screen (viewport pixels): a hidden copy of the field, placed in the same
+ * container (so it inherits what the field inherits) with the same layout properties, lays the text out and the piece
+ * is measured in it.
  */
 export function rangeRect(el: HTMLTextAreaElement | HTMLInputElement, start: number, end: number): { left: number; top: number; width: number; height: number } | null {
   const cs = getComputedStyle(el);
   const mirror = document.createElement("div");
-  for (const k of COPY) (mirror.style as unknown as Record<string, string>)[k] = cs[k];
+  // Every layout property, not a shortlist: font features, optical sizing, kerning… all change the width of a word.
+  for (let i = 0; i < cs.length; i++) {
+    const name = cs[i]!;
+    if (LAYOUT.test(name)) mirror.style.setProperty(name, cs.getPropertyValue(name));
+  }
   // The text area is as wide as its content box minus the scrollbar (if it has one): the copy must wrap the same way.
   mirror.style.boxSizing = "border-box";
   mirror.style.width = `${el.clientWidth + (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0)}px`;
-  Object.assign(mirror.style, { position: "fixed", visibility: "hidden", pointerEvents: "none", top: "0", left: "-9999px", height: "auto", overflow: "hidden", whiteSpace: el instanceof HTMLTextAreaElement ? "pre-wrap" : "pre", overflowWrap: "break-word" });
+  Object.assign(mirror.style, { position: "fixed", visibility: "hidden", pointerEvents: "none", top: "0", left: "-9999px", height: "auto", overflow: "hidden", whiteSpace: el instanceof HTMLTextAreaElement ? "pre-wrap" : "pre", overflowWrap: "break-word", transform: "none", zoom: "" });
   const span = document.createElement("span");
   span.textContent = el.value.slice(start, end) || "​";
   mirror.append(document.createTextNode(el.value.slice(0, start)), span);
-  document.body.append(mirror);
+  (el.parentElement ?? document.body).append(mirror);
   try {
     const r = span.getClientRects()[0];
     if (!r) return null;
