@@ -129,6 +129,8 @@ export interface Compiled {
   model?: string;
   effort?: string;
   agents?: Record<string, AgentDef>;
+  /** Who hands work to whom between the subagents (by their names), to show it. */
+  flow?: { from: string; to: string; pass: Pass }[];
   appendPrompt: string;
   env: Record<string, string>;
 }
@@ -188,6 +190,7 @@ export function compile(g: Graph, kind: Scope): Compiled | null {
     };
   }
 
+  const flow = g.edges.filter((e) => names.has(e.from) && names.has(e.to)).map((e) => ({ from: names.get(e.from)!, to: names.get(e.to)!, pass: e.pass }));
   const WRITES = new Set(["Edit", "Write", "NotebookEdit"]);
   const lines: string[] = ["# Orquestación (definida en Agentic)"];
   if (goal) {
@@ -251,7 +254,7 @@ export function compile(g: Graph, kind: Scope): Compiled | null {
   }
   const model = planner && planner.model !== "default" ? planner.model : undefined;
   const effort = planner && planner.effort !== "default" ? planner.effort : undefined;
-  return { ...(model ? { model } : {}), ...(effort ? { effort } : {}), ...(Object.keys(defs).length ? { agents: defs } : {}), appendPrompt: lines.join("\n").slice(0, 12_000), env };
+  return { ...(model ? { model } : {}), ...(effort ? { effort } : {}), ...(Object.keys(defs).length ? { agents: defs } : {}), ...(flow.length ? { flow } : {}), appendPrompt: lines.join("\n").slice(0, 12_000), env };
 }
 
 /** A rough idea of how many tokens a team uses, in five steps and with the reasons: not money, just weight. */

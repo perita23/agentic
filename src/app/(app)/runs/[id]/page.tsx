@@ -96,7 +96,7 @@ function EventViewImpl({ e, run, results, finished, paired, planId, planText, ch
         {blocks.map((b, i) =>
           b.type === "tool_use" && isSubagentTool(b.name) ? (
             b === launched[0] ? (
-              <SubagentGroup key={i} count={launched.length} parallel={launched.length > 1}>
+              <SubagentGroup key={i} count={launched.length} parallel={launched.length > 1} names={launched.map((l) => String((l.input as { subagent_type?: string } | undefined)?.subagent_type ?? ""))}>
                 {launched.map((l) => (
                   <SubagentCard key={String(l.id)} id={String(l.id)} input={l.input} result={results.get(String(l.id))} finished={finished} steps={sub.get(String(l.id)) ?? []} />
                 ))}
