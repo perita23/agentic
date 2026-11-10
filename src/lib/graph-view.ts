@@ -63,8 +63,6 @@ export class GraphEngine {
   private reduce: boolean;
   /** Until the person pans or zooms, the view keeps fitting the graph while it settles. */
   private userMoved = false;
-  private frames = 0;
-  private settled = false;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -85,11 +83,15 @@ export class GraphEngine {
   }
 
   setData(nodes: GNode[], links: GLink[]) {
-    const n = nodes.length;
+    const comms = [...new Set(nodes.map((g) => g.community))].sort((x, y) => x - y);
     this.nodes = nodes.map((g, i) => {
-      const a = (i / Math.max(1, n)) * Math.PI * 2 * 7;
-      const rad = 30 + Math.sqrt(i) * 16;
-      return { ...g, x: Math.cos(a) * rad, y: Math.sin(a) * rad, vx: 0, vy: 0, r: 3.5 + Math.sqrt(g.degree) * 1.9, fixed: false };
+      // each community starts in its own place around a ring (so the layout does not have to untangle a pile), jittered deterministically
+      const ci = comms.indexOf(g.community);
+      const ang = (ci / Math.max(1, comms.length)) * Math.PI * 2;
+      const rad = comms.length > 1 ? 120 + comms.length * 14 : 0;
+      const jx = ((Math.sin(i * 12.9898) * 43758.5453) % 1) * 90;
+      const jy = ((Math.sin(i * 78.233) * 12345.6789) % 1) * 90;
+      return { ...g, x: Math.cos(ang) * rad + jx, y: Math.sin(ang) * rad + jy, vx: 0, vy: 0, r: 3 + Math.min(13, Math.sqrt(g.degree) * 1.6), fixed: false };
     });
     this.byId = new Map(this.nodes.map((s) => [s.id, s]));
     this.edges = links.flatMap((l) => {
@@ -105,12 +107,18 @@ export class GraphEngine {
     this.selected = this.hover = null;
     this.matches = null;
     this.alpha = 1;
-    this.settled = false;
-    if (this.reduce) {
-      for (let i = 0; i < 320; i++) this.tick();
-      this.alpha = 0;
+    this.userMoved = false;
+    // Most of the layout is worked out before the first frame (a short budget), so it opens already arranged and framed.
+    const t0 = performance.now();
+    const budget = this.reduce ? 600 : 220;
+    for (let i = 0; i < 260 && performance.now() - t0 < budget; i++) this.tick();
+    if (this.reduce) this.alpha = 0;
+    const g = this.fitGoal();
+    if (g) {
+      this.scale = g.k;
+      this.tx = g.tx;
+      this.ty = g.ty;
     }
-    this.resetView();
     this.kick();
   }
 
@@ -122,12 +130,12 @@ export class GraphEngine {
     this.canvas.width = Math.round(this.w * this.dpr);
     this.canvas.height = Math.round(this.h * this.dpr);
     this.fg = getComputedStyle(this.canvas).color || "#fff";
-    this.kick();
+    this.kick(); // unless the person has moved the view, it glides to the new frame
   }
 
-  resetView() {
-    this.userMoved = false;
-    if (!this.nodes.length) return;
+  /** The scale and offset that frame the whole graph (null when there is nothing to frame). */
+  private fitGoal(): { k: number; tx: number; ty: number } | null {
+    if (!this.nodes.length) return null;
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const s of this.nodes) {
       minX = Math.min(minX, s.x - s.r);
@@ -135,10 +143,19 @@ export class GraphEngine {
       minY = Math.min(minY, s.y - s.r);
       maxY = Math.max(maxY, s.y + s.r);
     }
-    const k = Math.min(this.w / Math.max(80, maxX - minX + 80), this.h / Math.max(80, maxY - minY + 80), 1.6);
-    this.scale = k;
-    this.tx = this.w / 2 - ((minX + maxX) / 2) * k;
-    this.ty = this.h / 2 - ((minY + maxY) / 2) * k;
+    const k = Math.min(this.w / Math.max(80, maxX - minX + 90), this.h / Math.max(80, maxY - minY + 90), 1.8);
+    return { k, tx: this.w / 2 - ((minX + maxX) / 2) * k, ty: this.h / 2 - ((minY + maxY) / 2) * k };
+  }
+
+  /** Frames the whole graph again, and keeps it framed as it settles until the person moves or zooms. */
+  resetView() {
+    this.userMoved = false;
+    const g = this.fitGoal();
+    if (g) {
+      this.scale = g.k;
+      this.tx = g.tx;
+      this.ty = g.ty;
+    }
     this.kick();
   }
 
@@ -206,7 +223,7 @@ export class GraphEngine {
           d2 = 1;
         }
         const d = Math.sqrt(d2);
-        const f = ((p.r + q.r + 26) * 26 * a) / d2;
+        const f = ((p.r + q.r + 26) * 26 * a) / (d2 + 80);
         dx = (dx / d) * f;
         dy = (dy / d) * f;
         p.vx += dx;
@@ -234,8 +251,8 @@ export class GraphEngine {
         s.vx = s.vy = 0;
         continue;
       }
-      s.vx *= 0.82;
-      s.vy *= 0.82;
+      s.vx = Math.max(-25, Math.min(25, s.vx * 0.82));
+      s.vy = Math.max(-25, Math.min(25, s.vy * 0.82));
       s.x += s.vx;
       s.y += s.vy;
     }
@@ -250,10 +267,24 @@ export class GraphEngine {
         this.tick();
         this.tick();
       }
-      if (!this.userMoved && (++this.frames % 12 === 0 || (this.alpha <= 0.002 && !this.settled))) this.resetView();
-      if (this.alpha <= 0.002) this.settled = true;
+      let moving = false;
+      if (!this.userMoved) {
+        // autozoom: the view glides towards the frame of the whole graph
+        const g = this.fitGoal();
+        if (g) {
+          const dk = g.k - this.scale;
+          const dx = g.tx - this.tx;
+          const dy = g.ty - this.ty;
+          if (Math.abs(dk) > 0.0005 || Math.abs(dx) > 0.3 || Math.abs(dy) > 0.3) {
+            this.scale += dk * 0.14;
+            this.tx += dx * 0.14;
+            this.ty += dy * 0.14;
+            moving = true;
+          }
+        }
+      }
       this.draw();
-      if (this.alpha > 0.002 || this.drag) this.kick();
+      if (this.alpha > 0.002 || this.drag || moving) this.kick();
     });
   }
 
@@ -308,17 +339,23 @@ export class GraphEngine {
         c.stroke();
       }
     }
-    // labels: the best connected ones (more of them as you zoom in), and whatever is selected, hovered or found
+    // labels: the best connected ones (more of them as you zoom in) plus whatever is selected, hovered or found; none over another
     c.globalAlpha = 1;
     c.fillStyle = this.fg;
     c.textAlign = "center";
     c.font = `${10 / this.scale}px ui-monospace, "SF Mono", Menlo, monospace`;
-    const minDeg = this.scale > 2.2 ? 0 : this.scale > 1.2 ? 3 : 8;
-    for (const s of this.nodes) {
-      const show = s.id === this.selected || s.id === this.hover || (this.matches?.has(s.id) ?? false) || (!focus && !this.matches && s.degree >= minDeg) || (!!near?.has(s.id) && this.scale > 0.8);
-      if (!show) continue;
+    const minDeg = this.scale > 2.2 ? 0 : this.scale > 1.2 ? 3 : 6;
+    const must = (s: Sim) => s.id === this.selected || s.id === this.hover || (this.matches?.has(s.id) ?? false);
+    const want = this.nodes.filter((s) => must(s) || (!focus && !this.matches && s.degree >= minDeg) || (!!near?.has(s.id) && this.scale > 0.8)).sort((a, b) => Number(must(b)) - Number(must(a)) || b.degree - a.degree);
+    const placed: { x0: number; x1: number; y0: number; y1: number }[] = [];
+    for (const s of want.slice(0, 160)) {
+      const label = s.label.length > 28 ? `${s.label.slice(0, 27)}…` : s.label;
+      const hw = c.measureText(label).width / 2;
+      const box = { x0: s.x - hw, x1: s.x + hw, y0: s.y + s.r + 3 / this.scale, y1: s.y + s.r + 15 / this.scale };
+      if (!must(s) && placed.some((p) => box.x0 < p.x1 && box.x1 > p.x0 && box.y0 < p.y1 && box.y1 > p.y0)) continue;
+      placed.push(box);
       c.globalAlpha = lit(s.id) ? 0.95 : 0.2;
-      c.fillText(s.label.length > 28 ? `${s.label.slice(0, 27)}…` : s.label, s.x, s.y + s.r + 13 / this.scale);
+      c.fillText(label, s.x, box.y1 - 3 / this.scale);
     }
     c.globalAlpha = 1;
   }
