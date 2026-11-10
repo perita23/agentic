@@ -192,7 +192,7 @@ fs.writeFileSync(mailFixture, JSON.stringify([
   { uid: 1, fromName: "Ana", fromAddress: "ana@cliente.com", subject: "Bug en demo-app al pagar", snippet: "No funciona el checkout", html: "<p>Hola <b>Ana</b>, esto es el HTML original</p><script>alert(1)</script><a href=\"https://example.com/x\">enlace</a>", body: "Texto completo del correo de Ana.\nSegunda línea.\nhttps://tracking.example.com/" + "a".repeat(400) + "\nResolución &#x2192; hecha", date: new Date().toISOString(), unread: true, listUnsubscribe: false },
   { uid: 2, fromName: "Facturación", fromAddress: "billing@proveedor.com", subject: "Factura de octubre", snippet: "", date: new Date().toISOString(), unread: true, listUnsubscribe: false },
 ]));
-const env = { ...process.env, AGENTIC_MAIL_FIXTURE: mailFixture, AGENTIC_HOME: dataDir, CLAUDE_HOME: claudeHome, CLAUDE_BIN: path.join(root, "test/fixtures/fake-claude.mjs"), PORT: String(port), HOST: "127.0.0.1", AGENTIC_ALLOW_INSECURE_INTEGRATIONS: "1", AGENTIC_SLACK_API_URL: slackUrl };
+const env = { ...process.env, AGENTIC_MAIL_FIXTURE: mailFixture, AGENTIC_HOME: dataDir, CLAUDE_HOME: claudeHome, CLAUDE_BIN: path.join(root, "test/fixtures/fake-claude.mjs"), GRAPHIFY_BIN: path.join(root, "test/fixtures/fake-graphify.mjs"), PORT: String(port), HOST: "127.0.0.1", AGENTIC_ALLOW_INSECURE_INTEGRATIONS: "1", AGENTIC_SLACK_API_URL: slackUrl };
 const server = spawn(process.execPath, [path.join(root, "scripts/agentic.mjs"), "start"], { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] });
 let out = "";
 server.stdout.on("data", (d) => (out += d));
@@ -1001,6 +1001,14 @@ try {
   const evil = await fetch(`${base}/api/chats/${chats.chats[0].id}/file?path=${encodeURIComponent("/etc/passwd")}`, { headers: { authorization: `Bearer ${token}` } });
   check(evil.status === 404, "only files Claude wrote in that chat can be downloaded");
   await shot("08f-chat-files");
+  // Graphify: detects the command, builds the graph of a project and shows what it found.
+  await page.goto(`${base}/graphify`);
+  await page.getByRole("heading", { name: "Graphify" }).waitFor();
+  await page.getByText(/Instalado · 0\.9\.1/).waitFor();
+  await page.getByRole("button", { name: "Construir grafo" }).click();
+  await page.getByText(/3 nodos · 2 relaciones/).waitFor({ timeout: 15000 });
+  check((await page.getByRole("button", { name: /Ver informe/ }).count()) === 1 && (await page.getByText("grafo construido").count()) >= 1, "Graphify builds a project's graph and shows its size and the report");
+  await shot("08g-graphify");
   // The orchestrator: a graph of how Claude works as a team.
   const oauth = { authorization: `Bearer ${token}`, "content-type": "application/json" };
   await page.goto(`${base}/orchestrator`);

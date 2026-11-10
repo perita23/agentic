@@ -3,6 +3,16 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.61.0] - 2026-11-10
+
+### Añadido
+- **Graphify en Agentic** (nueva sección «Graphify» del menú). [Graphify](https://github.com/safishamsi/graphify) convierte un proyecto en un grafo de conocimiento (`graphify-out/graph.json` + `GRAPH_REPORT.md`) para que Claude consulte cómo se conecta el código en lugar de leer ficheros enteros. La sección explica qué es y cómo ahorra contexto (con la salvedad honesta de que en proyectos pequeños puede no compensar), enlaza a GitHub y PyPI, **detecta si está instalado** (y su versión, mirando también `~/.local/bin` y Homebrew, que una app abierta desde el Dock no ve) y, si no lo está, muestra los comandos para instalarlo (`uv tool install graphifyy`, `pipx`, `pip`, y `graphify install`) con botón de copiar.
+- **Por proyecto:** construir/actualizar el grafo (`graphify update .`, solo análisis local del código), instalar el hook de git, registrarlo en Claude Code, ver el informe `GRAPH_REPORT.md`, y **preguntar al grafo** desde Agentic. Se ve cuántos nodos y relaciones tiene, cuántas son inferidas, y una comparación orientativa entre los tokens del informe y los del código del proyecto (no es el ahorro real de una tarea).
+- **Claude lo usa solo en las ejecuciones:** en los proyectos con grafo, las ejecuciones headless le dicen a Claude que lea el informe y consulte el grafo antes de buscar en los ficheros, con permiso para `graphify query/path/explain`. Se puede apagar en la misma sección.
+
+### Nota
+- Los comandos de Graphify están sacados de su documentación; Agentic no lo instala por ti ni lo trae incluido. Las pruebas usan un `graphify` de mentira: no se ha probado todavía con el real.
+
 ## [0.60.1] - 2026-11-09
 
 ### Corregido
