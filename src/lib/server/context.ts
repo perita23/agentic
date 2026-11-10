@@ -20,6 +20,7 @@ import { CommandService } from "./commands";
 import { LibraryService } from "./library";
 import { PrefsService } from "./prefs";
 import { AgenticMcp } from "./agentic-mcp";
+import { GraphifyService } from "./graphify";
 import { ObsidianService } from "./obsidian";
 import { OllamaService } from "./ollama";
 import { OrchestratorService } from "./orchestrator";
@@ -62,6 +63,7 @@ export interface Context {
   library: LibraryService;
   prefs: PrefsService;
   obsidian: ObsidianService;
+  graphify: GraphifyService;
   ollama: OllamaService;
   orchestrator: OrchestratorService;
   spell: SpellService;
@@ -82,6 +84,8 @@ export function createContext(config: Config): Context {
   const tasks = new TaskService(store);
   const integrations = new IntegrationService(store, tasks);
   const obsidian = new ObsidianService(store);
+  let isKnown = (_p: string) => false; // the project service is created after the run manager
+  const graphify = new GraphifyService(store, (p) => isKnown(p));
   const ollama = new OllamaService(store);
   const spell = new SpellService(store, ollama);
   const agenticMcp = new AgenticMcp(store, config.dataDir);
@@ -89,6 +93,7 @@ export function createContext(config: Config): Context {
   const runs = new RunManager(store, {
     dataDir: config.dataDir,
     obsidian: (cwd) => obsidian.forRun(cwd),
+    graphify: (cwd) => graphify.forRun(cwd),
     mcp: () => agenticMcp.forRun(),
     orchestrator: (kind) => orchestrator.forRun(kind),
     claudeBin: config.claudeBin,
@@ -109,6 +114,7 @@ export function createContext(config: Config): Context {
   });
   // The neutral chat folder and task worktrees are not projects.
   const projects = new ProjectService(store, sessions, [chatDir(config.dataDir), worktreesRoot(config.dataDir)]);
+  isKnown = (p) => projects.isKnown(p);
   const schedules = new ScheduleService(store, runs, (p) => projects.isKnown(p));
   const budgets = new BudgetService(store, runs, sessions, (msg, over) => integrations.notify("budget", msg, over));
   schedules.guard = queue.guard = () => budgets.assertAutomationAllowed();
@@ -138,6 +144,7 @@ export function createContext(config: Config): Context {
     library: new LibraryService(sessions),
     prefs: new PrefsService(store),
     obsidian,
+    graphify,
     ollama,
     orchestrator,
     spell,
