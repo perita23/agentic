@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { CheckCircle2Icon, CircleDashedIcon, ExternalLinkIcon, FileTextIcon, GitBranchIcon, LoaderCircleIcon, NetworkIcon, PlayIcon, RefreshCwIcon, SearchIcon, SparklesIcon } from "lucide-react";
+import { GraphDialog } from "@/components/app/graph-dialog";
+import { CheckCircle2Icon, CircleDashedIcon, ExternalLinkIcon, FileTextIcon, GitBranchIcon, ShareIcon, LoaderCircleIcon, NetworkIcon, PlayIcon, RefreshCwIcon, SearchIcon, SparklesIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -202,6 +203,7 @@ function ProjectPanel({ path }: { path: string }) {
   const [out, setOut] = React.useState<{ title: string; ok: boolean; text: string } | null>(null);
   const [q, setQ] = React.useState("");
   const [report, setReport] = React.useState<string | null>(null);
+  const [graphOpen, setGraphOpen] = React.useState(false);
 
   async function run(action: "update" | "hook" | "claude" | "query", title: string, query?: string) {
     setBusy(action);
@@ -244,6 +246,11 @@ function ProjectPanel({ path }: { path: string }) {
         <Button variant="outline" onClick={() => void run("claude", "Registrar en Claude Code")} disabled={!!busy} title="Instala la skill y el aviso para Claude Code en este proyecto">
           {busy === "claude" ? <LoaderCircleIcon className="animate-spin" /> : <SparklesIcon />} Registrar en Claude Code {(data.skill || data.claudeMd) && <Badge variant="green">hecho</Badge>}
         </Button>
+        {data.hasGraph && (
+          <Button variant="secondary" onClick={() => setGraphOpen(true)}>
+            <ShareIcon /> Ver grafo
+          </Button>
+        )}
         {data.report && <ReportButton path={path} onOpen={setReport} />}
       </div>
 
@@ -275,6 +282,7 @@ function ProjectPanel({ path }: { path: string }) {
         </div>
       )}
 
+      <GraphDialog path={path} open={graphOpen} onOpenChange={setGraphOpen} />
       <Dialog open={report !== null} onOpenChange={(o) => !o && setReport(null)}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>

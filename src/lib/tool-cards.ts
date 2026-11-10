@@ -1,5 +1,5 @@
 /** Turns a tool call (Bash, Edit, Read, MCP…) into something a person can scan: what it is and what it does. */
-export type ToolIcon = "docker" | "git" | "package" | "test" | "kube" | "web" | "db" | "files" | "cloud" | "ssh" | "terminal" | "edit" | "read" | "search" | "agent" | "todo" | "mcp";
+export type ToolIcon = "docker" | "git" | "package" | "test" | "kube" | "web" | "db" | "files" | "cloud" | "ssh" | "terminal" | "edit" | "read" | "search" | "agent" | "todo" | "mcp" | "graph";
 
 export interface ToolInfo {
   icon: ToolIcon;
@@ -93,11 +93,41 @@ export function describeBash(command: string): ToolInfo {
   return mk("terminal", "Terminal", main.length > 70 ? main.slice(0, 70) + "…" : main || "Comando");
 }
 
+export interface GraphifyUse {
+  kind: "consulta" | "camino" | "explicación" | "actualizar" | "informe" | "grafo" | "MCP";
+  /** The question, the nodes or the file. */
+  title: string;
+}
+
+const GRAPHIFY_CLI = /(?:^|[\s;&|(])graphify\s+(query|path|explain|update)\b([^;&|\n]*)/;
+const KIND: Record<string, GraphifyUse["kind"]> = { query: "consulta", path: "camino", explain: "explicación", update: "actualizar" };
+
+/** Whether a tool call is Claude using Graphify: its CLI, the files it leaves in graphify-out/, or a Graphify MCP tool. */
+export function graphifyUse(name: string, input: unknown): GraphifyUse | null {
+  const i = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  const str = (k: string) => (typeof i[k] === "string" ? (i[k] as string) : "");
+  if (name === "Bash") {
+    const m = GRAPHIFY_CLI.exec(str("command"));
+    if (!m) return null;
+    const rest = m[2]!.replace(/--(?:graph|budget|depth)\s+\S+/g, "").replace(/["']/g, "").trim();
+    return { kind: KIND[m[1]!]!, title: (rest || ".").slice(0, 90) };
+  }
+  if (name === "Read" || name === "Grep" || name === "Glob") {
+    const target = [str("file_path"), str("path"), str("pattern")].find((x) => x.includes("graphify-out")) ?? "";
+    if (!target) return null;
+    return { kind: /GRAPH_REPORT/i.test(target) ? "informe" : "grafo", title: basename(target) };
+  }
+  if (/^mcp__graphify__/.test(name)) return { kind: "MCP", title: name.replace(/^mcp__graphify__/, "").replace(/_/g, " ") };
+  return null;
+}
+
 const basename = (p: string) => p.replace(/\/+$/, "").split("/").pop() || p;
 
 export function describeTool(name: string, input: unknown): ToolInfo {
   const i = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const str = (k: string) => (typeof i[k] === "string" ? (i[k] as string) : "");
+  const gf = graphifyUse(name, input);
+  if (gf) return { icon: "graph", group: `Graphify · ${gf.kind}`, title: gf.title, detail: str("command") || str("file_path") || str("path") || str("pattern") };
   switch (name) {
     case "Bash":
     case "BashOutput":

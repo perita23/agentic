@@ -57,6 +57,104 @@ export function summarizeGraph(raw: string): GraphSummary | null {
   return { nodes: g.nodes.length, edges: edges.length, inferredPct: edges.length ? Math.round((inferred / edges.length) * 100) : null, version: typeof v === "string" ? v.slice(0, 40) : null };
 }
 
+export interface ViewNode {
+  id: string;
+  label: string;
+  file: string;
+  community: number;
+  degree: number;
+}
+export interface ViewLink {
+  source: string;
+  target: string;
+  relation: string;
+  inferred: boolean;
+}
+export interface GraphView {
+  nodes: ViewNode[];
+  links: ViewLink[];
+  total: { nodes: number; edges: number };
+  communities: { id: number; size: number; name: string }[];
+}
+
+const str = (v: unknown, max: number) => (typeof v === "string" || typeof v === "number" ? String(v).slice(0, max) : "");
+
+/**
+ * The graph the app draws: the `max` best-connected nodes of graph.json (a full graph can have tens of thousands: too many to
+ * draw or to read), the links between them and their communities (the ones Graphify saved, or found here by label propagation).
+ */
+export function compactGraph(raw: string, max = 700): GraphView | null {
+  let g: { nodes?: unknown; links?: unknown; edges?: unknown };
+  try {
+    g = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!g || typeof g !== "object" || !Array.isArray(g.nodes)) return null;
+  type RawNode = Record<string, unknown>;
+  type RawLink = Record<string, unknown>;
+  const rawLinks = (Array.isArray(g.links) ? g.links : Array.isArray(g.edges) ? g.edges : []) as RawLink[];
+  const byId = new Map<string, RawNode>();
+  for (const n of g.nodes as RawNode[]) if (n && typeof n === "object" && (typeof n.id === "string" || typeof n.id === "number")) byId.set(String(n.id), n);
+  const edges = rawLinks.filter((e) => e && byId.has(str(e.source, 400)) && byId.has(str(e.target, 400)) && str(e.source, 400) !== str(e.target, 400));
+  const degree = new Map<string, number>();
+  for (const e of edges) for (const k of [str(e.source, 400), str(e.target, 400)]) degree.set(k, (degree.get(k) ?? 0) + 1);
+  const kept = [...byId.keys()].sort((a, b) => (degree.get(b) ?? 0) - (degree.get(a) ?? 0) || (a < b ? -1 : 1)).slice(0, Math.max(10, Math.min(max, 2000)));
+  const keep = new Set(kept);
+  const links = edges.filter((e) => keep.has(str(e.source, 400)) && keep.has(str(e.target, 400)));
+  const adj = new Map<string, string[]>(kept.map((k) => [k, []]));
+  for (const e of links) {
+    adj.get(str(e.source, 400))!.push(str(e.target, 400));
+    adj.get(str(e.target, 400))!.push(str(e.source, 400));
+  }
+  // Communities: the saved ones when every kept node has one, otherwise label propagation (deterministic).
+  const saved = (n: RawNode) => [n.community, n.group, n.cluster].find((v) => typeof v === "number" || (typeof v === "string" && v !== "")) as number | string | undefined;
+  const label = new Map<string, string>();
+  if (kept.every((k) => saved(byId.get(k)!) !== undefined)) for (const k of kept) label.set(k, String(saved(byId.get(k)!)));
+  else {
+    for (const k of kept) label.set(k, k);
+    const order = [...kept].sort();
+    for (let round = 0; round < 8; round++) {
+      let changed = false;
+      for (const k of order) {
+        const count = new Map<string, number>();
+        for (const m of adj.get(k)!) count.set(label.get(m)!, (count.get(label.get(m)!) ?? 0) + 1);
+        let best = label.get(k)!;
+        let bn = count.get(best) ?? 0;
+        for (const [l, c] of [...count].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+          if (c > bn) {
+            best = l;
+            bn = c;
+          }
+        }
+        if (best !== label.get(k)) {
+          label.set(k, best);
+          changed = true;
+        }
+      }
+      if (!changed) break;
+    }
+  }
+  const sizes = new Map<string, number>();
+  for (const l of label.values()) sizes.set(l, (sizes.get(l) ?? 0) + 1);
+  const ranked = [...sizes].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
+  const num = new Map(ranked.map(([l], i) => [l, i]));
+  const nodes: ViewNode[] = kept.map((k) => {
+    const n = byId.get(k)!;
+    return { id: k, label: str(n.label ?? n.name ?? k, 120) || k, file: str(n.source_file ?? n.file, 300), community: num.get(label.get(k)!)!, degree: degree.get(k) ?? 0 };
+  });
+  const communities = ranked.slice(0, 40).map(([l, size], i) => {
+    const top = nodes.filter((n) => n.community === i).sort((a, b) => b.degree - a.degree)[0];
+    return { id: i, size, name: top?.label ?? l };
+  });
+  return {
+    nodes,
+    links: links.map((e) => ({ source: str(e.source, 400), target: str(e.target, 400), relation: str(e.relation ?? e.label, 40), inferred: e.confidence === "INFERRED" || e.confidence === "AMBIGUOUS" })),
+    total: { nodes: byId.size, edges: edges.length },
+    communities,
+  };
+}
+
 /** Total bytes of source/text files of a project (capped, skipping dependencies and build output). */
 export function sourceBytes(root: string, maxFiles = 6000): { bytes: number; files: number; truncated: boolean } {
   let bytes = 0;
@@ -204,6 +302,22 @@ export class GraphifyService {
       skill,
       claudeMd,
     };
+  }
+
+  /** The graph to draw (see compactGraph). */
+  view(projectPath: string, max = 700): GraphView {
+    const dir = this.projectDir(projectPath);
+    const f = path.join(dir, OUT, "graph.json");
+    let size: number;
+    try {
+      size = fs.statSync(f).size;
+    } catch {
+      throw new HttpError(404, "Todavía no hay grafo: constrúyelo primero");
+    }
+    if (size > MAX_GRAPH) throw new HttpError(413, "El grafo es demasiado grande para dibujarlo aquí");
+    const v = compactGraph(fs.readFileSync(f, "utf8"), max);
+    if (!v) throw new HttpError(422, "graph.json no tiene el formato esperado (nodos y relaciones)");
+    return v;
   }
 
   report(projectPath: string): string {
