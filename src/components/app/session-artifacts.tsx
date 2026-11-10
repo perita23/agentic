@@ -12,18 +12,18 @@ type Ev = Record<string, unknown> & { message?: { content?: unknown } };
 
 function Section({ icon: Icon, title, tone, count, children }: { icon: React.ElementType; title: string; tone: string; count: number; children: React.ReactNode }) {
   return (
-    <section aria-label={title}>
+    <section aria-label={title} className="min-w-0">
       <h3 className={`mb-1 flex items-center gap-1.5 text-[11px] font-medium tracking-wide uppercase ${tone}`}>
         <Icon className="size-3.5" /> {title} <span className="text-muted-foreground tabular-nums">{count}</span>
       </h3>
-      <ul className="grid gap-0.5">{children}</ul>
+      <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">{children}</ul>
     </section>
   );
 }
 
 function Row({ item, external }: { item: SessionItem; external?: string }) {
   return (
-    <li className="group/row flex items-center gap-2 rounded-md px-1.5 py-1 text-xs hover:bg-secondary/60">
+    <li className="group/row flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-xs hover:bg-secondary/60">
       <FileTextIcon className="size-3.5 shrink-0 text-muted-foreground" />
       <span className="min-w-0 flex-1" title={item.key}>
         <span className="block truncate font-medium text-foreground">{item.label}</span>
@@ -50,11 +50,11 @@ export function SessionArtifactsCard({ events }: { events: Ev[] }) {
   const a = React.useMemo(() => collectArtifacts(events, root), [events, root]);
   const total = a.artifacts.length + a.created.length + a.edited.length + a.notes.length;
   return (
-    <Card data-testid="session-artifacts">
+    <Card data-testid="session-artifacts" className="min-w-0 overflow-hidden">
       <CardHeader>
         <CardTitle>Artefactos de la sesión</CardTitle>
       </CardHeader>
-      <CardContent className="grid gap-3">
+      <CardContent className="grid grid-cols-[minmax(0,1fr)] gap-3">
         {total === 0 && <p className="text-xs text-muted-foreground">Todavía no ha creado ni abierto nada: aquí irán los artifacts, los archivos creados y las notas de Obsidian.</p>}
         {a.artifacts.length > 0 && (
           <Section icon={SparklesIcon} title="Artifacts" tone="text-purple" count={a.artifacts.length}>
@@ -79,12 +79,12 @@ export function SessionArtifactsCard({ events }: { events: Ev[] }) {
           </Section>
         )}
         {a.edited.length > 0 && (
-          <details className="group/ed">
+          <details className="group/ed min-w-0">
             <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
               <PencilLineIcon className="size-3.5" /> Archivos editados <span className="tabular-nums">{a.edited.length}</span>
               <ChevronDownIcon className="ml-auto size-3.5 transition-transform group-open/ed:rotate-180" />
             </summary>
-            <ul className="mt-1 grid gap-0.5">
+            <ul className="mt-1 grid grid-cols-[minmax(0,1fr)] gap-0.5">
               {a.edited.slice(0, 30).map((i) => (
                 <Row key={i.key} item={i} />
               ))}

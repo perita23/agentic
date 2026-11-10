@@ -72,7 +72,7 @@ if (prompt.includes("SUBAGENTES")) {
 }
 if (prompt.includes("ARTEFACTOS")) {
   // Claude creates a file and publishes an artifact: the run page lists both beside the conversation.
-  out({ type: "assistant", message: { id: "ar0", role: "assistant", content: [{ type: "text", text: "Creo el informe." }, { type: "tool_use", id: "w9", name: "Write", input: { file_path: "/tmp/demo/informe-final.md", content: "# Informe" } }, { type: "tool_use", id: "ar9", name: "Artifact", input: { file_path: "/tmp/demo/panel.html" } }] } });
+  out({ type: "assistant", message: { id: "ar0", role: "assistant", content: [{ type: "text", text: "Creo el informe." }, { type: "tool_use", id: "w9", name: "Write", input: { file_path: "/tmp/demo/informe-final.md", content: "# Informe" } }, { type: "tool_use", id: "w8", name: "Write", input: { file_path: "/Users/perita23/Documents/Inovum/inox/angular/src/app/reports/components/report-schedule-dialog/report-schedule-preview.component.with-a-very-long-name.html", content: "x" } }, { type: "tool_use", id: "ar9", name: "Artifact", input: { file_path: "/tmp/demo/panel.html" } }] } });
   out({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "w9", content: "ok" }, { type: "tool_result", tool_use_id: "ar9", content: "Published https://claude.ai/artifact/panel-123 (private)" }] } });
 }
 if (prompt.includes("USAGRAFO")) {

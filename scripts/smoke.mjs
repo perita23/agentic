@@ -996,6 +996,8 @@ try {
   await page.getByTestId("run-title").getByText("Informe de prueba").waitFor();
   check((await (await fetch(`${base}/api/runs/${artRun.id}`, { headers: { authorization: `Bearer ${token}` } })).json()).title === "Informe de prueba", "a run can be renamed");
   await shot("08j-run-side-panel");
+  const overflow = await page.evaluate(() => { const r = document.querySelector('[data-testid="session-artifacts"]').getBoundingClientRect(); return { page: document.documentElement.scrollWidth - document.documentElement.clientWidth, right: Math.round(r.right), vw: document.documentElement.clientWidth, widest: Math.max(...[...document.querySelectorAll('[data-testid="session-artifacts"] li')].map((li) => Math.round(li.getBoundingClientRect().right))) }; });
+  check(overflow.page <= 0 && overflow.right <= overflow.vw && overflow.widest <= overflow.right, "long paths in the side panel are cut inside it: the page does not scroll sideways");
   const allRuns = (await (await fetch(base + "/api/runs", { headers: { authorization: `Bearer ${token}` } })).json()).runs.filter((r) => !r.threadId);
   const oldest = allRuns[allRuns.length - 1];
   await page.goto(`${base}/runs/${oldest.id}`);
