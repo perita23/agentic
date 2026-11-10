@@ -792,7 +792,7 @@ export default function RunPage() {
         {run.error && <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">{run.error}</p>}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="min-w-0">
           <Tabs defaultValue="output">
             <TabsList>
@@ -812,10 +812,10 @@ export default function RunPage() {
             </TabsContent>
           </Tabs>
         </div>
-        <aside className="flex flex-col gap-4">
+        <aside className="flex min-w-0 flex-col gap-4">
           <SessionArtifactsCard events={events} />
           {(graphifyTold || graphifyUses > 0) && (
-            <div data-testid="graphify-usage" className={cn("flex items-center gap-2 rounded-lg border px-3 py-2 text-xs", graphifyUses > 0 ? "border-purple/40 bg-purple/10" : "border-warning/40 bg-warning/10")}>
+            <div data-testid="graphify-usage" className={cn("flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs", graphifyUses > 0 ? "border-purple/40 bg-purple/10" : "border-warning/40 bg-warning/10")}>
               <NetworkIcon className={cn("size-3.5 shrink-0", graphifyUses > 0 ? "text-purple" : "text-warning")} />
               <span className="font-medium">Graphify</span>
               <span className="text-muted-foreground">
@@ -823,7 +823,7 @@ export default function RunPage() {
               </span>
             </div>
           )}
-          <details className="group/det rounded-xl border bg-card">
+          <details className="group/det min-w-0 overflow-hidden rounded-xl border bg-card">
             <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-medium">
               Prompt y métricas
               <span className="text-xs font-normal text-muted-foreground tabular-nums">{tokens != null ? `${compactTokens(Math.round(tokens))} tokens` : ""}</span>

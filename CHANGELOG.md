@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.64.1] - 2026-11-10
+
+### Corregido
+- **El panel «Artefactos de la sesión» se desbordaba.** Las rutas largas (de los archivos creados y de las notas) ensanchaban la columna de la derecha y la página llegaba a hacer scroll hacia los lados. Ahora la columna mantiene su ancho, las rutas se cortan con «…» dentro de su tarjeta (la ruta completa sale al pasar el ratón) y la página no se desplaza. Hay una prueba que crea un archivo con una ruta larguísima y comprueba que nada se sale.
+
 ## [0.64.0] - 2026-11-10
 
 ### Añadido
