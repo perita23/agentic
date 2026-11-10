@@ -982,6 +982,28 @@ try {
   await page.goto(`${base}/runs/${gfIdle.id}`);
   await page.getByTestId("graphify-usage").getByText(/no lo ha usado|aún no lo ha usado/).waitFor({ timeout: 15000 });
   check(true, "a run that had the graph but did not use it says so");
+  // The side panel lists what the session produced; the prompt and metrics are folded; a run can be renamed and recent use sorts the list.
+  const artRun = await (await fetch(base + "/api/runs", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ projectPath: project, prompt: "ARTEFACTOS crea cosas" }) })).json();
+  await page.goto(`${base}/runs/${artRun.id}`);
+  const panel = page.getByTestId("session-artifacts");
+  await panel.getByText("informe-final.md").waitFor({ timeout: 15000 });
+  check((await panel.getByText("Archivos creados").count()) === 1 && (await panel.getByRole("link", { name: /Abrir artifact/ }).getAttribute("href")) === "https://claude.ai/artifact/panel-123", "the side panel lists the files created and the artifacts of the session");
+  check((await page.getByText("Prompt y métricas").count()) === 1 && !(await page.locator("details", { hasText: "Prompt y métricas" }).evaluate((d) => d.open)), "the prompt and the metrics are folded away");
+  await page.getByTestId("run-title").hover();
+  await page.getByRole("button", { name: "Renombrar la ejecución" }).click();
+  await page.getByLabel("Nombre de la ejecución").fill("Informe de prueba");
+  await page.keyboard.press("Enter");
+  await page.getByTestId("run-title").getByText("Informe de prueba").waitFor();
+  check((await (await fetch(`${base}/api/runs/${artRun.id}`, { headers: { authorization: `Bearer ${token}` } })).json()).title === "Informe de prueba", "a run can be renamed");
+  await shot("08j-run-side-panel");
+  const allRuns = (await (await fetch(base + "/api/runs", { headers: { authorization: `Bearer ${token}` } })).json()).runs.filter((r) => !r.threadId);
+  const oldest = allRuns[allRuns.length - 1];
+  await page.goto(`${base}/runs/${oldest.id}`);
+  await page.getByTestId("run-title").waitFor();
+  await page.waitForTimeout(600);
+  await page.goto(`${base}/runs`);
+  await page.getByText("Informe de prueba").first().waitFor();
+  check((await page.locator('a[href^="/runs/"]').first().getAttribute("href")) === `/runs/${oldest.id}`, "an old run you open goes back to the top of the list");
   // Subagents Claude launches are shown as a team of cards, with their own steps and what they handed back.
   await fetch(base + "/api/orchestrator", { method: "PUT", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ enabled: true, nodes: [{ id: "planner", kind: "planner", label: "Jefe" }, { id: "l", kind: "agent", label: "Lector", job: "reader", x: 300 }, { id: "e", kind: "agent", label: "Escritor", job: "writer", x: 300, y: 200 }], edges: [{ from: "planner", to: "l", run: "parallel" }, { from: "planner", to: "e", run: "parallel" }, { from: "l", to: "e", pass: "paths" }] }) });
   const subRun = await (await fetch(base + "/api/runs", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ projectPath: project, prompt: "SUBAGENTES reparte el trabajo" }) })).json();

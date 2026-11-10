@@ -33,7 +33,7 @@ export function RunNotifier() {
       const newAndFinished = !prev.has(r.id) && !!mountedAt.current && r.startedAt >= mountedAt.current;
       if (!wasRunning && !newAndFinished) continue;
       const title = `Ejecución ${LABEL[r.status] ?? r.status}`;
-      const body = `${baseName(r.projectPath)} · ${(r.prompt.split("\n")[0] || "sesión interactiva").slice(0, 100)}`;
+      const body = `${baseName(r.projectPath)} · ${(r.title || r.prompt.split("\n")[0] || "sesión interactiva").slice(0, 100)}`;
       const open = () => router.push(`/runs/${r.id}`);
       (r.status === "completed" ? toast.success : toast.error)(title, { description: body, action: { label: "Ver", onClick: open } });
       if (notificationsEnabled() && document.visibilityState !== "visible") {

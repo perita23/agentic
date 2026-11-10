@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowDownIcon, ArrowLeftIcon, BotIcon, NetworkIcon, FileDiffIcon, CornerDownLeftIcon, ListPlusIcon, ExternalLinkIcon, PlayIcon, SquareIcon, TerminalIcon, Trash2Icon, XIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowLeftIcon, BotIcon, NetworkIcon, PencilIcon, FileDiffIcon, CornerDownLeftIcon, ListPlusIcon, ExternalLinkIcon, PlayIcon, SquareIcon, TerminalIcon, Trash2Icon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,8 @@ import { SlashList, useSlashCommands, useSlashMenu } from "@/components/app/slas
 import { MODELS, parseSlash, type PermMode } from "@/lib/slash";
 import { ORB_LABEL, stateFromEvents } from "@/lib/orb-state";
 import { graphifyUse } from "@/lib/tool-cards";
-import { RUN_STATUS_LABEL, RUN_STATUS_VARIANT } from "@/components/app/run-row";
+import { runTitle } from "@/lib/threads";
+import { RunNameInput, RUN_STATUS_LABEL, RUN_STATUS_VARIANT } from "@/components/app/run-row";
 import { api, fetcher, refresh, useApi, type Run, type RunLog } from "@/lib/api";
 import { cn, shortPath, timeAgo } from "@/lib/utils";
 import { AttachButton, AttachmentBar, useAttachments } from "@/components/app/attachments";
@@ -30,7 +31,7 @@ import { BranchSwitcher } from "@/components/app/branch-switcher";
 import { FileList, useFileMenu } from "@/components/app/file-menu";
 import { LiveStatus } from "@/components/app/live-status";
 import { Appear } from "@/components/app/appear";
-import { ObsidianNotes } from "@/components/app/obsidian";
+import { SessionArtifactsCard } from "@/components/app/session-artifacts";
 import { AssistChip, ImproveButton, usePromptAssist, WordMorphs } from "@/components/app/prompt-assist";
 import { VoiceButton, VoiceInline } from "@/components/app/voice";
 import { LiveStatsAcc, compactTokens, type LiveStats } from "@/lib/live-stats";
@@ -376,7 +377,7 @@ function Segment({ run, index, latest, onEvents }: { run: Run; index: number; la
 }
 
 /** The whole conversation (first run + replies) in one place, like the chat. */
-function HeadlessLog({ thread }: { thread: Run[] }) {
+function HeadlessLog({ thread, onAll }: { thread: Run[]; onAll?: (events: Ev[]) => void }) {
   const run = thread[thread.length - 1];
   const [byRun, setByRun] = React.useState<Record<string, { events: Ev[]; live: boolean; partial: string; stats: LiveStats }>>({});
   const onEvents = React.useCallback(
@@ -391,9 +392,7 @@ function HeadlessLog({ thread }: { thread: Run[] }) {
   const latestEvents = byRun[run.id]?.events;
   const partial = byRun[run.id]?.partial ?? "";
   const allEvents = React.useMemo(() => thread.flatMap((r) => byRun[r.id]?.events ?? []), [thread, byRun]);
-  // Claude was told to use the project's Graphify graph: how many times it did (its report, a query…), subagents included.
-  const graphifyTold = thread.some((r) => r.graphify);
-  const graphifyUses = React.useMemo(() => allEvents.reduce((n, e) => n + (e.type === "assistant" && Array.isArray(e.message?.content) ? (e.message.content as { type?: string; name?: string; input?: unknown }[]).filter((b) => b.type === "tool_use" && graphifyUse(String(b.name), b.input)).length : 0), 0), [allEvents]);
+  React.useEffect(() => onAll?.(allEvents), [allEvents, onAll]); // the side panel (artifacts, Graphify use) reads them
   const base = byRun[run.id]?.stats;
   const stats = React.useMemo(() => (base ? { ...base, partial } : undefined), [base, partial]);
   const activity = partial ? { state: "writing" as const, label: ORB_LABEL.writing } : stateFromEvents(latestEvents ?? []);
@@ -418,16 +417,6 @@ function HeadlessLog({ thread }: { thread: Run[] }) {
           {thread.map((r, i) => (
             <Segment key={r.id} run={r} index={i} latest={i === thread.length - 1} onEvents={onEvents} />
           ))}
-          <ObsidianNotes events={allEvents} />
-          {(graphifyTold || graphifyUses > 0) && (
-            <div data-testid="graphify-usage" className={cn("flex items-center gap-2 rounded-lg border px-3 py-2 text-xs", graphifyUses > 0 ? "border-purple/40 bg-purple/10" : "border-warning/40 bg-warning/10")}>
-              <NetworkIcon className={cn("size-3.5 shrink-0", graphifyUses > 0 ? "text-purple" : "text-warning")} />
-              <span className="font-medium">Graphify</span>
-              <span className="text-muted-foreground">
-                {graphifyUses > 0 ? `Claude lo ha usado ${graphifyUses} ${graphifyUses === 1 ? "vez" : "veces"} en esta ejecución` : thread[thread.length - 1]?.status === "running" ? "Claude aún no lo ha usado" : "Claude tenía el grafo pero no lo ha usado en esta ejecución"}
-              </span>
-            </div>
-          )}
           {/* At the end of the output: what Claude is doing now (step, time, tokens) while it works, a calm orb when done. */}
           {run.status === "running" ? (
             <Appear><LiveStatus activity={activity} stats={stats} startedAt={run.startedAt} /></Appear>
@@ -701,6 +690,15 @@ export default function RunPage() {
   const launcher = useLauncher();
   const { data: self, error } = useApi<Run>(`/api/runs/${id}`, { refreshInterval: (r) => (r?.status === "running" ? 2000 : 0) });
   const { data: all } = useApi<{ runs: Run[] }>("/api/runs", { refreshInterval: (d) => (d?.runs.some((r) => r.status === "running") ? 2000 : 0) });
+  const [events, setEvents] = React.useState<Ev[]>([]);
+  const [renaming, setRenaming] = React.useState(false);
+  // The log hands its events up; a new array with the same events must not cause another render (that would loop).
+  const updateEvents = React.useCallback((next: Ev[]) => setEvents((prev) => (prev.length === next.length && prev.every((e, i) => e === next[i]) ? prev : next)), []);
+  const rootId = self ? (self.threadId ?? self.id) : null;
+  // Opening a run counts as recent use: it goes to the top of the list.
+  React.useEffect(() => {
+    if (rootId) void api("POST", `/api/runs/${rootId}/open`).then(() => refresh("/api/runs")).catch(() => {});
+  }, [rootId]);
 
   if (error) return <p className="text-sm text-destructive">{error.message}</p>;
   if (!self) return <Skeleton className="h-64" />;
@@ -714,6 +712,9 @@ export default function RunPage() {
   const tokens = sum((r) => r.tokens ?? null);
   const duration = sum((r) => r.durationMs);
   const turns = sum((r) => r.numTurns);
+  // Claude was told to use the project's Graphify graph: how many times it did (its report, a query…), subagents included.
+  const graphifyTold = thread.some((r) => r.graphify);
+  const graphifyUses = events.reduce((n, e) => n + (e.type === "assistant" && Array.isArray(e.message?.content) ? (e.message.content as { type?: string; name?: string; input?: unknown }[]).filter((b) => b.type === "tool_use" && graphifyUse(String(b.name), b.input)).length : 0), 0);
 
   async function stop() {
     try {
@@ -743,10 +744,17 @@ export default function RunPage() {
         </Link>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
-            <h1 className="flex items-center gap-2 text-xl font-semibold">
-              <StatusDot status={run.status} />
-              <span className="truncate">{root.prompt.split("\n")[0] || "Sesión interactiva"}</span>
-            </h1>
+            {renaming ? (
+              <RunNameInput run={root} onDone={() => setRenaming(false)} className="max-w-xl" />
+            ) : (
+              <h1 className="group flex items-center gap-2 text-xl font-semibold">
+                <StatusDot status={run.status} />
+                <span className="truncate" data-testid="run-title">{runTitle(root)}</span>
+                <button type="button" aria-label="Renombrar la ejecución" title="Renombrar" onClick={() => setRenaming(true)} className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-md text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-secondary hover:text-foreground focus-visible:opacity-100">
+                  <PencilIcon className="size-3.5" />
+                </button>
+              </h1>
+            )}
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <Badge variant={RUN_STATUS_VARIANT[run.status]}>{RUN_STATUS_LABEL[run.status]}</Badge>
               <Badge>{run.mode}</Badge>
@@ -797,7 +805,7 @@ export default function RunPage() {
             </TabsList>
             {/* forceMount keeps the live log polling while the diff tab is open */}
             <TabsContent value="output" forceMount className="data-[state=inactive]:hidden">
-              {run.mode === "tmux" ? <TmuxConsole run={run} /> : <HeadlessLog thread={thread} />}
+              {run.mode === "tmux" ? <TmuxConsole run={run} /> : <HeadlessLog thread={thread} onAll={updateEvents} />}
             </TabsContent>
             <TabsContent value="diff">
               <RunDiffView runId={root.id} live={run.status === "running"} />
@@ -805,26 +813,36 @@ export default function RunPage() {
           </Tabs>
         </div>
         <aside className="flex flex-col gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Prompt</CardTitle>
-              {root.prompt && <CopyButton value={root.prompt} />}
-            </CardHeader>
-            <CardContent>
-              <pre className="max-h-64 overflow-auto font-mono text-xs whitespace-pre-wrap text-muted-foreground">{root.prompt || "—"}</pre>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Métricas</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-3 text-sm">
-              <Metric k="Tokens" v={tokens != null ? <AnimatedNumber value={tokens} format={(n) => compactTokens(Math.round(n))} /> : "—"} />
-              <Metric k="Duración" v={duration != null ? <AnimatedNumber value={duration / 1000} format={(n) => `${n.toFixed(1)} s`} /> : "—"} />
-              <Metric k="Turnos" v={turns != null ? <AnimatedNumber value={turns} /> : "—"} />
-              <Metric k="Código salida" v={run.exitCode != null ? String(run.exitCode) : "—"} />
-            </CardContent>
-          </Card>
+          <SessionArtifactsCard events={events} />
+          {(graphifyTold || graphifyUses > 0) && (
+            <div data-testid="graphify-usage" className={cn("flex items-center gap-2 rounded-lg border px-3 py-2 text-xs", graphifyUses > 0 ? "border-purple/40 bg-purple/10" : "border-warning/40 bg-warning/10")}>
+              <NetworkIcon className={cn("size-3.5 shrink-0", graphifyUses > 0 ? "text-purple" : "text-warning")} />
+              <span className="font-medium">Graphify</span>
+              <span className="text-muted-foreground">
+                {graphifyUses > 0 ? `Claude lo ha usado ${graphifyUses} ${graphifyUses === 1 ? "vez" : "veces"} en esta ejecución` : run.status === "running" ? "Claude aún no lo ha usado" : "Claude tenía el grafo pero no lo ha usado en esta ejecución"}
+              </span>
+            </div>
+          )}
+          <details className="group/det rounded-xl border bg-card">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-medium">
+              Prompt y métricas
+              <span className="text-xs font-normal text-muted-foreground tabular-nums">{tokens != null ? `${compactTokens(Math.round(tokens))} tokens` : ""}</span>
+            </summary>
+            <div className="grid gap-4 border-t p-4">
+              <div>
+                <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+                  Prompt {root.prompt && <CopyButton value={root.prompt} />}
+                </div>
+                <pre className="max-h-64 overflow-auto font-mono text-xs whitespace-pre-wrap text-muted-foreground">{root.prompt || "—"}</pre>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <Metric k="Tokens" v={tokens != null ? <AnimatedNumber value={tokens} format={(n) => compactTokens(Math.round(n))} /> : "—"} />
+                <Metric k="Duración" v={duration != null ? <AnimatedNumber value={duration / 1000} format={(n) => `${n.toFixed(1)} s`} /> : "—"} />
+                <Metric k="Turnos" v={turns != null ? <AnimatedNumber value={turns} /> : "—"} />
+                <Metric k="Código salida" v={run.exitCode != null ? String(run.exitCode) : "—"} />
+              </div>
+            </div>
+          </details>
           <UsageCard />
           {run.taskId && (
             <Button variant="outline" asChild>

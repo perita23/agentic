@@ -3,6 +3,16 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.64.0] - 2026-11-10
+
+### Añadido
+- **Panel «Artefactos de la sesión» en la ejecución.** La columna de la derecha ya no es el prompt y las métricas: ahora lista, de lo más nuevo a lo más viejo, lo que la sesión ha producido: los **artifacts** que ha creado o abierto (con «Abrir artifact»), los **archivos creados** (con botón de copiar la ruta), las **notas de Obsidian** (con «Abrir en Obsidian») y, plegados, los **archivos editados**. Debajo va el aviso de uso de Graphify, y el prompt y las métricas siguen ahí pero plegados en «Prompt y métricas».
+- **Renombrar ejecuciones.** Un lápiz junto al título de la ejecución (y al pasar el ratón por una fila de la lista) para ponerle nombre; vacío vuelve a mostrar el prompt. El nombre se ve también en los avisos.
+
+### Cambiado
+- **La lista de ejecuciones se ordena por uso reciente.** Si abres una ejecución antigua, o respondes en ella, sube arriba. Cada conversación cuenta por lo último que pasó en ella.
+- **La nota de Obsidian ya no se queda fija dentro de la conversación** (ni el aviso de Graphify): ahora vive en el panel de la derecha.
+
 ## [0.63.0] - 2026-11-10
 
 ### Añadido
