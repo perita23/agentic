@@ -49,6 +49,10 @@ export interface Run {
   logBytes: number;
   /** Repository state captured right before launch, used to show what the run changed. */
   git?: GitBaseline | null;
+  /** A name the person gave this run (the prompt is shown when empty). Lives on the first run of a conversation. */
+  title?: string;
+  /** The last time the person opened this run: opening an old one brings it back to the top of the list. */
+  lastOpenedAt?: string;
   /** Claude was told to use the project's Graphify graph (so the run page can say whether it did). */
   graphify?: boolean;
 }
@@ -247,6 +251,20 @@ export class RunManager {
     const r = this.store.read<Run[]>(R, []).find((x) => x.id === id);
     if (!r) throw new HttpError(404, "Run not found");
     return r;
+  }
+
+  /** Names a run (empty text goes back to showing the prompt). */
+  rename(id: string, title: unknown): Run {
+    this.get(id);
+    const t = (typeof title === "string" ? title : "").replace(/\s+/g, " ").trim().slice(0, 120);
+    return this.patch(id, { title: t || undefined })!;
+  }
+
+  /** The person opened this run: it counts as recent use (written at most every 30 s). */
+  touch(id: string): Run {
+    const r = this.get(id);
+    if (r.lastOpenedAt && Date.now() - Date.parse(r.lastOpenedAt) < 30_000) return r;
+    return this.patch(id, { lastOpenedAt: nowIso() })!;
   }
 
   private patch(id: string, p: Partial<Run>): Run | undefined {

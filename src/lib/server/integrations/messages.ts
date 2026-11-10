@@ -9,7 +9,7 @@ const ICON: Record<string, string> = { completed: "✅", stopped: "⏹️", fail
 
 export function runMessage(run: Run): string {
   const cost = run.costUsd != null ? ` · $${run.costUsd.toFixed(4)}` : "";
-  const prompt = run.prompt.split("\n")[0].slice(0, 200) || "sesión interactiva";
+  const prompt = (run.title || run.prompt.split("\n")[0]).slice(0, 200) || "sesión interactiva";
   return `${ICON[run.status] ?? "•"} *Agentic* · ejecución ${run.status} en \`${slackEscape(path.basename(run.projectPath))}\`${cost}\n>${slackEscape(prompt)}`;
 }
 

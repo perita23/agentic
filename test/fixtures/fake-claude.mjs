@@ -70,6 +70,11 @@ if (prompt.includes("SUBAGENTES")) {
   out({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "ag1", content: "El login se valida en `src/auth.ts`, línea 12." }] } });
   out({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "ag2", content: "Hecho: validación arreglada." }] } });
 }
+if (prompt.includes("ARTEFACTOS")) {
+  // Claude creates a file and publishes an artifact: the run page lists both beside the conversation.
+  out({ type: "assistant", message: { id: "ar0", role: "assistant", content: [{ type: "text", text: "Creo el informe." }, { type: "tool_use", id: "w9", name: "Write", input: { file_path: "/tmp/demo/informe-final.md", content: "# Informe" } }, { type: "tool_use", id: "ar9", name: "Artifact", input: { file_path: "/tmp/demo/panel.html" } }] } });
+  out({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "w9", content: "ok" }, { type: "tool_result", tool_use_id: "ar9", content: "Published https://claude.ai/artifact/panel-123 (private)" }] } });
+}
 if (prompt.includes("USAGRAFO")) {
   // Claude looks in the Graphify graph before searching the files.
   out({ type: "assistant", message: { id: "gf1", role: "assistant", content: [{ type: "text", text: "Miro el grafo." }, { type: "tool_use", id: "g1", name: "Read", input: { file_path: "/tmp/p/graphify-out/GRAPH_REPORT.md" } }, { type: "tool_use", id: "g2", name: "Bash", input: { command: 'graphify query "qué conecta el login con la base de datos" --graph graphify-out/graph.json' } }] } });
