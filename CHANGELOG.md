@@ -6,7 +6,7 @@ Cada versión se etiqueta y publica automáticamente como GitHub Release cuando 
 ## [0.62.1] - 2026-11-10
 
 ### Cambiado
-- **Los nodos del grafo de Graphify son planos.** Círculos de un solo color (el de su comunidad), sin brillo ni resplandor.
+- **Los nodos del grafo de Graphify son planos.** Círculos de un solo color (el de su comunidad, con los colores de Agentic: violeta, coral, azul…) con el borde fino del icono de la app, sin brillo ni resplandor. Las relaciones resaltadas pasan de un color al otro, y los nombres usan la tipografía monoespaciada de la app.
 
 ## [0.62.0] - 2026-11-10
 
