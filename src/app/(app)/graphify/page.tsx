@@ -15,7 +15,7 @@ import { api, refresh, useApi } from "@/lib/api";
 import { shortPath, timeAgo } from "@/lib/utils";
 
 interface Overview {
-  settings: { useInRuns: boolean };
+  settings: { useInRuns: boolean; strictHook: boolean };
   installed: boolean;
   version: string | null;
   installers: { uv: boolean; pipx: boolean; pip: boolean };
@@ -32,6 +32,7 @@ interface ProjectStatus {
   source: { bytes: number; files: number; tokens: number; truncated: boolean };
   hook: boolean;
   skill: boolean;
+  claudeHook: boolean;
   claudeMd: boolean;
 }
 interface RunResult {
@@ -62,9 +63,9 @@ export default function GraphifyPage() {
   const [path, setPath] = React.useState<string | null>(null);
   const current = path ?? data?.projects[0]?.path ?? null;
 
-  async function setUse(useInRuns: boolean) {
+  async function setUse(patch: { useInRuns?: boolean; strictHook?: boolean }) {
     try {
-      await api("PUT", "/api/graphify", { useInRuns });
+      await api("PUT", "/api/graphify", patch);
       await mutate();
     } catch (e) {
       toast.error(errorMessage(e));
@@ -157,8 +158,18 @@ export default function GraphifyPage() {
                   <span className="block font-medium">Que Claude use el grafo en las ejecuciones</span>
                   <span className="block text-xs text-muted-foreground">En los proyectos que ya tengan grafo, le dice a Claude que lea el informe y consulte el grafo antes de buscar en los ficheros.</span>
                 </span>
-                <Switch aria-label="Que Claude use el grafo en las ejecuciones" checked={data.settings.useInRuns} onCheckedChange={(v) => void setUse(v)} />
+                <Switch aria-label="Que Claude use el grafo en las ejecuciones" checked={data.settings.useInRuns} onCheckedChange={(v) => void setUse({ useInRuns: v })} />
               </label>
+              <label className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
+                <span>
+                  <span className="block font-medium">Hook insistente</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Pide al hook de Graphify (el que se instala con «Registrar en Claude Code») que insista más cuando Claude vaya a buscar o leer ficheros a ciegas. Es un empujón, no un bloqueo: Claude puede seguir buscando sin el grafo. Según la documentación de Graphify; no lo he comprobado con la versión real.
+                  </span>
+                </span>
+                <Switch aria-label="Hook insistente" checked={data.settings.strictHook} onCheckedChange={(v) => void setUse({ strictHook: v })} />
+              </label>
+              <p className="text-xs text-muted-foreground">Para saber si Claude lo usa de verdad: cada ejecución muestra en «Métricas» cuántas veces consultó Graphify, y en el chat y las ejecuciones cada uso se marca en morado.</p>
             </>
           )}
           {!data && <p className="text-sm text-muted-foreground">Comprobando…</p>}
@@ -244,7 +255,7 @@ function ProjectPanel({ path }: { path: string }) {
           {busy === "hook" ? <LoaderCircleIcon className="animate-spin" /> : <GitBranchIcon />} Hook de git {data.hook && <Badge variant="green">activo</Badge>}
         </Button>
         <Button variant="outline" onClick={() => void run("claude", "Registrar en Claude Code")} disabled={!!busy} title="Instala la skill y el aviso para Claude Code en este proyecto">
-          {busy === "claude" ? <LoaderCircleIcon className="animate-spin" /> : <SparklesIcon />} Registrar en Claude Code {(data.skill || data.claudeMd) && <Badge variant="green">hecho</Badge>}
+          {busy === "claude" ? <LoaderCircleIcon className="animate-spin" /> : <SparklesIcon />} Registrar en Claude Code {(data.skill || data.claudeMd || data.claudeHook) && <Badge variant="green">{data.claudeHook ? "con hook" : "hecho"}</Badge>}
         </Button>
         {data.hasGraph && (
           <Button variant="secondary" onClick={() => setGraphOpen(true)}>

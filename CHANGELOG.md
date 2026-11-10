@@ -3,6 +3,12 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.63.0] - 2026-11-10
+
+### Añadido
+- **Se sabe si Claude usó Graphify en cada ejecución.** Las ejecuciones y chats headless de un proyecto con grafo ahora lo recuerdan: en la ejecución aparece un aviso «Graphify · Claude lo ha usado N veces en esta ejecución» (morado), o «Claude aún no lo ha usado» / «tenía el grafo pero no lo ha usado» (ámbar). Cuenta sus informes, consultas y búsquedas en `graphify-out/`, subagentes incluidos. Así se ve si compensa antes de endurecer nada.
+- **Hook insistente (opcional).** En Graphify, un interruptor que pide al hook de Graphify (el de «Registrar en Claude Code») que insista más cuando Claude vaya a buscar o leer ficheros a ciegas (`GRAPHIFY_HOOK_STRICT=1`, según la documentación de Graphify; sigue siendo un empujón, no un bloqueo). La tarjeta del proyecto ahora detecta si el hook ya está instalado en Claude Code.
+
 ## [0.62.3] - 2026-11-10
 
 ### Corregido

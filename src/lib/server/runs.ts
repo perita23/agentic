@@ -49,6 +49,8 @@ export interface Run {
   logBytes: number;
   /** Repository state captured right before launch, used to show what the run changed. */
   git?: GitBaseline | null;
+  /** Claude was told to use the project's Graphify graph (so the run page can say whether it did). */
+  graphify?: boolean;
 }
 
 export interface GitBaseline {
@@ -129,7 +131,7 @@ export interface RunOptions {
   /** Obsidian: what a headless run in this folder needs to write notes (null = off). */
   obsidian?: (cwd: string) => { addDir: string; allow: string[]; hint: string } | null;
   /** Graphify: a hint (and permission to query the graph) for a headless run in a project that has one (null = none). */
-  graphify?: (cwd: string) => { hint: string; allow: string[] } | null;
+  graphify?: (cwd: string) => { hint: string; allow: string[]; env: Record<string, string> } | null;
   /** Agentic's own MCP server (tools to look into Agentic): what to hand a headless run (null = off). */
   mcp?: () => { configPath: string; allow: string; hint: string } | null;
   /** The orchestrator graph compiled for this kind of run: model, subagents, instructions, environment (null = off). */
@@ -329,14 +331,16 @@ export class RunManager {
     const ob = input.mode === "headless" ? this.opts.obsidian?.(cwd) : null;
     if (ob) claudeInput = { ...claudeInput, addDirs: [...(claudeInput.addDirs ?? []), ob.addDir], allowedTools: ob.allow, appendPrompt: [claudeInput.appendPrompt, ob.hint].filter(Boolean).join("\n\n") };
     // Graphify: when the project has a knowledge graph, Claude is told to look in it before grepping (saves context).
+    let extraEnv: Record<string, string> = {};
     const gf = input.mode === "headless" ? this.opts.graphify?.(cwd) : null;
+    if (gf) run.graphify = true;
+    if (gf) extraEnv = { ...extraEnv, ...gf.env };
     if (gf) claudeInput = { ...claudeInput, allowedTools: [...(claudeInput.allowedTools ?? []), ...gf.allow], appendPrompt: [claudeInput.appendPrompt, gf.hint].filter(Boolean).join("\n\n") };
     // Agentic's own tools (tasks, runs, notes…) for Claude, when the person has them on.
     const mcp = input.mode === "headless" ? this.opts.mcp?.() : null;
     if (mcp) claudeInput = { ...claudeInput, mcpConfig: mcp.configPath, allowedTools: [...(claudeInput.allowedTools ?? []), mcp.allow], appendPrompt: [claudeInput.appendPrompt, mcp.hint].filter(Boolean).join("\n\n") };
     // The orchestrator: how Claude works as a team (planner model, cheaper subagents, when to compact). What was chosen
     // explicitly for this run (a model, an Agentic agent) always wins over it.
-    let extraEnv: Record<string, string> = {};
     if (input.mode === "headless" && !input.agent) {
       const chatDir = path.join(this.opts.dataDir, "chat");
       const inChat = [chatDir, (() => { try { return fs.realpathSync(chatDir); } catch { return chatDir; } })()].includes(cwd);
@@ -349,7 +353,7 @@ export class RunManager {
           agentsJson: orch.agents ? JSON.stringify(orch.agents) : undefined,
           appendPrompt: [claudeInput.appendPrompt, orch.appendPrompt].filter(Boolean).join("\n\n"),
         };
-        extraEnv = orch.env;
+        extraEnv = { ...extraEnv, ...orch.env };
       }
     }
     const args = buildClaudeArgs(claudeInput);

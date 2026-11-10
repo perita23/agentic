@@ -86,6 +86,9 @@ describe("GraphifyService", () => {
     expect(g.hint).toContain("GRAPH_REPORT.md");
     expect(g.hint).toContain("graphify query");
     expect(g.allow).toContain("Bash(graphify query:*)");
+    expect(g.env).toEqual({});
+    svc.set({ strictHook: true });
+    expect(svc.forRun(project)!.env).toEqual({ GRAPHIFY_HOOK_STRICT: "1" });
     svc.set({ useInRuns: false });
     expect(svc.forRun(project)).toBeNull();
   });
@@ -141,5 +144,24 @@ describe("compactGraph", () => {
     expect(compactGraph(JSON.stringify({ nodes, links }), 12)!.nodes).toHaveLength(12);
     expect(compactGraph("nope")).toBeNull();
     expect(compactGraph(JSON.stringify({ nodes: "x" }))).toBeNull();
+  });
+});
+
+describe("a run in a project with a graph", () => {
+  it("is marked as told to use Graphify, gets the hint and the strict-hook variable", async () => {
+    const { RunManager } = await import("@/lib/server/runs");
+    const { FAKE_CLAUDE } = await import("./helpers");
+    const { svc, project, dir } = setup();
+    await svc.run({ path: project, action: "update" });
+    svc.set({ strictHook: true });
+    const dataDir = path.join(dir, "rundata");
+    fs.mkdirSync(dataDir, { recursive: true });
+    const m = new RunManager(new JsonStore(dataDir), { dataDir, claudeBin: FAKE_CLAUDE, maxConcurrent: 2, maxLogBytes: 1024 * 1024, graphify: (cwd) => svc.forRun(cwd) });
+    const run = await m.start({ mode: "headless", projectPath: project, prompt: "hola", permissionMode: "default" } as never);
+    expect(run.graphify).toBe(true);
+    const plain = path.join(dir, "otro");
+    fs.mkdirSync(plain);
+    const other = await m.start({ mode: "headless", projectPath: plain, prompt: "hola", permissionMode: "default" } as never);
+    expect(other.graphify).toBeUndefined();
   });
 });

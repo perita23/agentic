@@ -975,7 +975,13 @@ try {
   await page.goto(`${base}/runs/${gfRun.id}`);
   await page.getByText("Graphify · consulta").first().waitFor({ timeout: 15000 });
   check((await page.getByText("Graphify · informe").count()) >= 1 && (await page.getByText("qué conecta el login con la base de datos").count()) >= 1, "a run shows each time Claude used Graphify (the report, a query and what it asked)");
+  check((await page.getByTestId("graphify-usage").textContent()).includes("lo ha usado 2 veces"), "the run says how many times Claude used Graphify");
   await shot("08i-graphify-in-run");
+  await fetch(base + "/api/graphify/project", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ path: project, action: "update" }) }); // this project has a graph, so Claude is told to use it
+  const gfIdle = await (await fetch(base + "/api/runs", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ projectPath: project, prompt: "no toques el grafo" }) })).json();
+  await page.goto(`${base}/runs/${gfIdle.id}`);
+  await page.getByTestId("graphify-usage").getByText(/no lo ha usado|aún no lo ha usado/).waitFor({ timeout: 15000 });
+  check(true, "a run that had the graph but did not use it says so");
   // Subagents Claude launches are shown as a team of cards, with their own steps and what they handed back.
   await fetch(base + "/api/orchestrator", { method: "PUT", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ enabled: true, nodes: [{ id: "planner", kind: "planner", label: "Jefe" }, { id: "l", kind: "agent", label: "Lector", job: "reader", x: 300 }, { id: "e", kind: "agent", label: "Escritor", job: "writer", x: 300, y: 200 }], edges: [{ from: "planner", to: "l", run: "parallel" }, { from: "planner", to: "e", run: "parallel" }, { from: "l", to: "e", pass: "paths" }] }) });
   const subRun = await (await fetch(base + "/api/runs", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ projectPath: project, prompt: "SUBAGENTES reparte el trabajo" }) })).json();
@@ -983,7 +989,7 @@ try {
   await page.getByTestId("subagent-group").waitFor({ timeout: 15000 });
   check((await page.getByTestId("subagent-card").count()) === 2 && (await page.getByTestId("subagent-group").getByText("en paralelo").count()) === 1, "the subagents launched together are shown as a team of cards, in parallel");
   check((await page.getByTestId("subagent-card").first().getByText("lector").count()) >= 1 && (await page.getByTestId("subagent-card").nth(1).getByText("Haiku").count()) >= 1, "each card says who it is and its model");
-  check((await page.getByTestId("subagent-card").first().getByText(/Buscar en el código · login/).count()) === 1 && (await page.locator("main").getByText("Grep").count()) === 0, "a subagent's own steps stay inside its card, not in the main timeline");
+  check((await page.getByTestId("subagent-card").first().getByText(/Buscar en el código · login/).count()) === 1 && (await page.locator("main").getByText("Grep", { exact: true }).count()) === 0, "a subagent's own steps stay inside its card, not in the main timeline");
   await page.getByTestId("subagent-card").first().getByRole("button").first().click();
   await page.getByText("Busca dónde se valida el login.").waitFor();
   await page.getByText(/El login se valida en/).waitFor();
@@ -1011,7 +1017,8 @@ try {
   await page.goto(`${base}/graphify`);
   await page.getByRole("heading", { name: "Graphify" }).waitFor();
   await page.getByText(/Instalado · 0\.9\.1/).waitFor();
-  await page.getByRole("button", { name: "Construir grafo" }).click();
+  await page.getByRole("button", { name: /(Construir|Actualizar) grafo/ }).click();
+  await page.getByText("grafo construido").first().waitFor({ timeout: 15000 });
   await page.getByText(/3 nodos · 2 relaciones/).waitFor({ timeout: 15000 });
   check((await page.getByRole("button", { name: /Ver informe/ }).count()) === 1 && (await page.getByText("grafo construido").count()) >= 1, "Graphify builds a project's graph and shows its size and the report");
   await shot("08g-graphify");
