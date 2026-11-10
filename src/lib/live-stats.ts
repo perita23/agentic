@@ -15,7 +15,7 @@ export interface LiveStats {
 }
 
 type Block = { type?: string; id?: string; name?: string; input?: unknown; text?: string; thinking?: string; tool_use_id?: string };
-type Ev = { type?: string; subtype?: string; delta?: string; message?: { id?: string; usage?: Record<string, unknown>; content?: unknown } } | null;
+type Ev = { type?: string; subtype?: string; delta?: string; parent_tool_use_id?: unknown; message?: { id?: string; usage?: Record<string, unknown>; content?: unknown } } | null;
 
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 
@@ -32,6 +32,8 @@ export class LiveStatsAcc {
   add(ev: unknown) {
     const e = ev as Ev;
     if (!e || typeof e !== "object") return;
+    // What a subagent does (its steps, its context, its words) is shown in its own card: it is not what the main Claude is doing.
+    if (typeof e.parent_tool_use_id === "string") return;
     const m = e.message;
     if (e.type === "agentic" && e.subtype === "partial" && typeof e.delta === "string") this.partial = (this.partial + e.delta).slice(-20_000);
     else if (e.type === "assistant" || e.type === "user" || e.type === "result") this.partial = "";

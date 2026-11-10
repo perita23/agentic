@@ -37,3 +37,15 @@ describe("orb state from stream-json events", () => {
     expect(stateFromEvents([{ type: "agentic", subtype: "exit", code: 0 }]).label).toBe("Terminado");
   });
 });
+
+describe("while a subagent works", () => {
+  const launch = assistant({ type: "tool_use", id: "ag1", name: "Agent", input: { description: "Investigar", subagent_type: "lector" } });
+  const sub = (name: string) => ({ type: "assistant", parent_tool_use_id: "ag1", message: { content: [{ type: "tool_use", id: "s1", name, input: {} }] } });
+  it("the main orb keeps its own state, not the subagent's step", () => {
+    expect(stateFromEvents([launch, sub("WebFetch")]).state).toBe("thinking");
+    expect(stateFromEvents([launch, sub("Read"), sub("Edit")]).state).toBe("thinking");
+  });
+  it("a subagent's own events never make the main Claude look finished or failed", () => {
+    expect(stateFromEvents([launch, { type: "result", parent_tool_use_id: "ag1", is_error: true }]).state).toBe("thinking");
+  });
+});
