@@ -1,5 +1,5 @@
 /**
- * A small force-directed graph on a canvas, drawn in Agentic's style (soft glowing blobs in Morphy's colours). No libraries:
+ * A small force-directed graph on a canvas, drawn in Agentic's style (flat discs in Morphy's colours). No libraries:
  * a few hundred nodes need repulsion between all pairs, springs on the links, a pull towards the community and a pull to the centre.
  */
 export interface GNode {
@@ -284,20 +284,8 @@ export class GraphEngine {
     for (const s of this.nodes) {
       const a = lit(s.id) ? 1 : 0.14;
       const col = colorOf(s.community);
-      c.globalAlpha = a * 0.28;
-      const glow = c.createRadialGradient(s.x, s.y, s.r * 0.6, s.x, s.y, s.r * 2.3);
-      glow.addColorStop(0, col);
-      glow.addColorStop(1, "transparent");
-      c.fillStyle = glow;
-      c.beginPath();
-      c.arc(s.x, s.y, s.r * 2.3, 0, Math.PI * 2);
-      c.fill();
       c.globalAlpha = a;
-      const g = c.createRadialGradient(s.x - s.r * 0.3, s.y - s.r * 0.4, s.r * 0.1, s.x, s.y, s.r);
-      g.addColorStop(0, "#ffffff");
-      g.addColorStop(0.35, col);
-      g.addColorStop(1, col);
-      c.fillStyle = g;
+      c.fillStyle = col;
       c.beginPath();
       c.arc(s.x, s.y, s.r, 0, Math.PI * 2);
       c.fill();
