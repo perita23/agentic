@@ -398,8 +398,8 @@ function HeadlessLog({ thread, onAll }: { thread: Run[]; onAll?: (events: Ev[]) 
   const activity = partial ? { state: "writing" as const, label: ORB_LABEL.writing } : stateFromEvents(latestEvents ?? []);
 
   return (
-    <Card className="gap-0 py-0">
-      <CardHeader className="items-center border-b py-2.5">
+    <Card className="gap-0 py-0 lg:min-h-0 lg:flex-1">
+      <CardHeader className="shrink-0 items-center border-b py-2.5">
         <CardTitle className="flex items-center gap-2">
           <TerminalIcon className="size-4" /> Salida
           {live && (
@@ -412,7 +412,7 @@ function HeadlessLog({ thread, onAll }: { thread: Run[]; onAll?: (events: Ev[]) 
           <input type="checkbox" checked={stuck} onChange={(e) => setStuck(e.target.checked)} className="accent-primary" /> Seguir
         </label>
       </CardHeader>
-      <CardContent ref={scroller} className="relative max-h-[65vh] min-h-64 overflow-y-auto bg-inset p-4" tabIndex={0} aria-label="Salida de Claude">
+      <CardContent ref={scroller} className="relative max-h-[65vh] min-h-64 overflow-y-auto bg-inset p-4 lg:max-h-none lg:min-h-0 lg:flex-1" tabIndex={0} aria-label="Salida de Claude">
         <div ref={body} className="flex flex-col gap-3">
           {thread.map((r, i) => (
             <Segment key={r.id} run={r} index={i} latest={i === thread.length - 1} onEvents={onEvents} />
@@ -549,7 +549,7 @@ function ReplyBox({ run }: { run: Run }) {
       onDragOver={(e) => { if (!off && e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDrag(true); } }}
       onDragLeave={() => setDrag(false)}
       onDrop={(e) => { setDrag(false); if (off || !e.dataTransfer.files.length) return; e.preventDefault(); void att.addFiles([...e.dataTransfer.files]); }}
-      className={cn("grid gap-2 border-t bg-card p-3 transition-colors", drag && "bg-accent/40 outline-2 -outline-offset-4 outline-dashed outline-primary/60")}
+      className={cn("grid shrink-0 gap-2 border-t bg-card p-3 transition-colors", drag && "bg-accent/40 outline-2 -outline-offset-4 outline-dashed outline-primary/60")}
     >
       {queue.length > 0 && (
         <div className="grid gap-1.5 rounded-lg border bg-inset p-2.5 text-xs" aria-label="Mensajes en cola">
@@ -659,8 +659,8 @@ function TmuxConsole({ run }: { run: Run }) {
   }
 
   return (
-    <Card className="gap-0 py-0">
-      <CardHeader className="items-center border-b py-2.5">
+    <Card className="gap-0 py-0 lg:min-h-0 lg:flex-1">
+      <CardHeader className="shrink-0 items-center border-b py-2.5">
         <CardTitle className="flex items-center gap-2">
           <TerminalIcon className="size-4" /> tmux · {run.tmuxSession}
         </CardTitle>
@@ -669,7 +669,7 @@ function TmuxConsole({ run }: { run: Run }) {
           <CopyButton value={`tmux attach -t ${run.tmuxSession}`} label="Copiar comando attach" />
         </div>
       </CardHeader>
-      <pre ref={pre} className="max-h-[60vh] min-h-64 overflow-auto bg-inset p-4 font-mono text-[12px] leading-snug text-foreground/85">
+      <pre ref={pre} className="max-h-[60vh] min-h-64 overflow-auto bg-inset p-4 lg:max-h-none lg:min-h-0 lg:flex-1 font-mono text-[12px] leading-snug text-foreground/85">
         {data?.text || (data && !data.alive ? "La sesión de tmux ha terminado." : "Conectando…")}
       </pre>
       {run.status === "running" && (
@@ -737,8 +737,10 @@ export default function RunPage() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3 border-b pb-4">
+    // On a wide screen the page is exactly as tall as the window: the conversation scrolls inside, the side panel scrolls on its own
+    // and the reply box is always in view. On a narrow one everything flows and the page scrolls.
+    <div className="flex flex-col gap-5 lg:h-[calc(100dvh-7.5rem)] lg:min-h-[520px]">
+      <div className="flex shrink-0 flex-col gap-3 border-b pb-4">
         <Link href="/runs" className="flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
           <ArrowLeftIcon className="size-3" /> Ejecuciones
         </Link>
@@ -792,9 +794,9 @@ export default function RunPage() {
         {run.error && <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">{run.error}</p>}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="min-w-0">
-          <Tabs defaultValue="output">
+      <div className="grid gap-6 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_280px] lg:grid-rows-[minmax(0,1fr)]">
+        <div className="min-w-0 lg:flex lg:min-h-0 lg:flex-col">
+          <Tabs defaultValue="output" className="lg:min-h-0 lg:flex-1">
             <TabsList>
               <TabsTrigger value="output">
                 <TerminalIcon /> Salida
@@ -804,15 +806,15 @@ export default function RunPage() {
               </TabsTrigger>
             </TabsList>
             {/* forceMount keeps the live log polling while the diff tab is open */}
-            <TabsContent value="output" forceMount className="data-[state=inactive]:hidden">
+            <TabsContent value="output" forceMount className="data-[state=active]:flex data-[state=active]:flex-col data-[state=inactive]:hidden lg:min-h-0">
               {run.mode === "tmux" ? <TmuxConsole run={run} /> : <HeadlessLog thread={thread} onAll={updateEvents} />}
             </TabsContent>
-            <TabsContent value="diff">
+            <TabsContent value="diff" className="lg:min-h-0 lg:overflow-y-auto">
               <RunDiffView runId={root.id} live={run.status === "running"} />
             </TabsContent>
           </Tabs>
         </div>
-        <aside className="flex min-w-0 flex-col gap-4">
+        <aside className="flex min-w-0 flex-col gap-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1" aria-label="Panel lateral de la ejecución">
           <SessionArtifactsCard events={events} />
           {(graphifyTold || graphifyUses > 0) && (
             <div data-testid="graphify-usage" className={cn("flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs", graphifyUses > 0 ? "border-purple/40 bg-purple/10" : "border-warning/40 bg-warning/10")}>

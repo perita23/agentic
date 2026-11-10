@@ -113,11 +113,11 @@ function Sidebar({ overview }: { overview?: Overview }) {
   const [editing, setEditing] = React.useState(false);
   const items = editing ? NAV : NAV.filter((n) => !hidden.includes(n.href));
   return (
-    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r bg-sidebar md:flex">
+    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col overflow-hidden border-r bg-sidebar md:flex">
       <div className="app-drag traffic-light-gap flex h-14 items-center border-b px-3">
         <Logo />
       </div>
-      <nav className="flex flex-1 flex-col gap-0.5 p-2" aria-label="Principal">
+      <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2" aria-label="Principal">
         {items.map((item) => {
           const active = isActive(pathname, item.href);
           const count = item.badge ? counts[item.badge] : 0;
