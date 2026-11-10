@@ -3,6 +3,12 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.65.0] - 2026-11-10
+
+### Cambiado
+- **La página de la ejecución se adapta a la altura de la ventana.** En pantallas anchas la página mide justo lo que la ventana: la conversación (la salida de Claude) hace scroll **dentro de su recuadro**, la **bandeja de escritura está siempre visible** debajo, y el **panel lateral tiene su propio scroll independiente** (con muchos archivos, notas o artifacts ya no arrastra la página). En pantallas estrechas todo fluye como antes. Vale también para las sesiones tmux y para la pestaña «Cambios».
+- El menú lateral izquierdo hace scroll por dentro si no cabe en la altura de la ventana (antes se salía unos píxeles y hacía scroll en toda la página).
+
 ## [0.64.1] - 2026-11-10
 
 ### Corregido

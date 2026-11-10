@@ -996,6 +996,15 @@ try {
   await page.getByTestId("run-title").getByText("Informe de prueba").waitFor();
   check((await (await fetch(`${base}/api/runs/${artRun.id}`, { headers: { authorization: `Bearer ${token}` } })).json()).title === "Informe de prueba", "a run can be renamed");
   await shot("08j-run-side-panel");
+  // The run page is as tall as the window: no page scroll, the reply box always in view, and the side panel scrolls on its own.
+  const fit = await page.evaluate(() => {
+    const doc = document.documentElement;
+    const box = [...document.querySelectorAll("textarea")].map((t) => t.getBoundingClientRect()).find((r) => r.width > 200);
+    const aside = document.querySelector('aside[aria-label="Panel lateral de la ejecución"]');
+    const log = document.querySelector('[aria-label="Salida de Claude"]');
+    return { pageScroll: doc.scrollHeight - doc.clientHeight, boxBottom: box ? Math.round(box.bottom) : -1, vh: doc.clientHeight, asideOverflow: getComputedStyle(aside).overflowY, logOverflow: getComputedStyle(log).overflowY, scrollY: window.scrollY };
+  });
+  check(fit.pageScroll <= 0 && fit.boxBottom > 0 && fit.boxBottom <= fit.vh && fit.asideOverflow === "auto" && fit.logOverflow === "auto", "the run page fits the window: the reply box stays in view and the log and the side panel scroll on their own");
   const overflow = await page.evaluate(() => { const r = document.querySelector('[data-testid="session-artifacts"]').getBoundingClientRect(); return { page: document.documentElement.scrollWidth - document.documentElement.clientWidth, right: Math.round(r.right), vw: document.documentElement.clientWidth, widest: Math.max(...[...document.querySelectorAll('[data-testid="session-artifacts"] li')].map((li) => Math.round(li.getBoundingClientRect().right))) }; });
   check(overflow.page <= 0 && overflow.right <= overflow.vw && overflow.widest <= overflow.right, "long paths in the side panel are cut inside it: the page does not scroll sideways");
   const allRuns = (await (await fetch(base + "/api/runs", { headers: { authorization: `Bearer ${token}` } })).json()).runs.filter((r) => !r.threadId);
