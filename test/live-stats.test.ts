@@ -43,3 +43,14 @@ describe("the answer so far", () => {
     expect(liveStats([...events, text("m3", "Ya lo he visto.")]).answer).toBe("Voy a revisar.\nYa lo he visto.");
   });
 });
+
+describe("while a subagent works", () => {
+  it("the status line, the tokens and the context are the main Claude's, not the subagent's", () => {
+    const main = asst("m1", 7, [{ type: "tool_use", id: "ag1", name: "Agent", input: { description: "Investigar DST" } }]);
+    const sub = { type: "assistant", parent_tool_use_id: "ag1", message: { id: "s1", usage: { input_tokens: 5, cache_read_input_tokens: 14_000, output_tokens: 500 }, content: [{ type: "tool_use", id: "w1", name: "WebFetch", input: { url: "https://x.dev" } }] } };
+    const s = liveStats([main, sub]);
+    expect(s.tool?.name).toBe("Agent");
+    expect(s.outputTokens).toBe(7);
+    expect(s.contextTokens).toBe(100);
+  });
+});

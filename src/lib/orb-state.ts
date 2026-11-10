@@ -39,6 +39,7 @@ export function stateFromEvents(events: unknown[]): Activity {
   for (let i = events.length - 1; i >= 0; i--) {
     const e = events[i] as Ev | null;
     if (!e || typeof e !== "object") continue;
+    if (typeof e.parent_tool_use_id === "string") continue; // a subagent's own step is not what the main Claude is doing: its card shows it
     let state: OrbState | null = null;
     if (e.type === "result") {
       // Finished, but Claude asked something (or a tool needed permission): it is waiting for the user.

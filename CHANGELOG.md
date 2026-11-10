@@ -3,6 +3,11 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.62.3] - 2026-11-10
+
+### Corregido
+- **La bola Morphy principal copiaba el estado del subagente.** Mientras un subagente trabajaba (por ejemplo abriendo una página), la bola de abajo y su línea de estado («Abrir página · …», los tokens y el contexto) mostraban lo que hacía el subagente, no lo que hace el Claude principal. Ahora los pasos, el contexto y los tokens de un subagente se quedan en su tarjeta, y la bola principal sigue en lo suyo: pensando y coordinando («Subagente · Investigar…») hasta que el subagente devuelve su resultado. Lo mismo vale para la isla y el estado de los chats.
+
 ## [0.62.2] - 2026-11-10
 
 ### Corregido
