@@ -74,7 +74,7 @@ function GraphStage({ data }: { data: GraphData }) {
   return (
     <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-[1fr_280px]">
       <div className="relative min-h-[300px] overflow-hidden rounded-lg border bg-black/30">
-        <canvas ref={canvasRef} className="size-full cursor-grab touch-none text-foreground" aria-label="Grafo de conocimiento del proyecto" />
+        <canvas ref={canvasRef} className="absolute inset-0 size-full cursor-grab touch-none text-foreground" aria-label="Grafo de conocimiento del proyecto" />
         {hovered && hover && (
           <div className="pointer-events-none absolute z-10 max-w-64 rounded-md border bg-popover px-2 py-1 text-xs shadow-md" style={{ left: Math.min(hover.x + 12, 9999), top: hover.y + 12 }}>
             <p className="font-medium">{hovered.label}</p>

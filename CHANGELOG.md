@@ -3,6 +3,12 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.62.2] - 2026-11-10
+
+### Corregido
+- **El grafo de Graphify se iba al abrirlo.** Con un grafo de verdad (cientos de nodos con ficheros enlazados a decenas de funciones) los nodos salían disparados al empezar y la vista se quedaba en un punto o descolocada. Ahora: el reparto se calcula casi entero **antes del primer fotograma** (se abre ya ordenado y encuadrado), cada comunidad arranca en su sitio, las fuerzas están suavizadas y con velocidad máxima, y hay **autozoom**: la vista se encuadra sola, con un deslizamiento suave, mientras el grafo termina de colocarse y cuando cambia el tamaño de la ventana, hasta que tú la mueves o haces zoom («Encajar en pantalla» lo vuelve a activar).
+- Los nodos más conectados ya no son enormes, y los nombres no se montan unos sobre otros (se muestran los más importantes y más al acercar).
+
 ## [0.62.1] - 2026-11-10
 
 ### Cambiado
