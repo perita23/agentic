@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowDownIcon, ArrowLeftIcon, BotIcon, FileDiffIcon, CornerDownLeftIcon, ListPlusIcon, ExternalLinkIcon, PlayIcon, SquareIcon, TerminalIcon, Trash2Icon, XIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowLeftIcon, BotIcon, NetworkIcon, FileDiffIcon, CornerDownLeftIcon, ListPlusIcon, ExternalLinkIcon, PlayIcon, SquareIcon, TerminalIcon, Trash2Icon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import { UsageCard } from "@/components/app/usage-card";
 import { SlashList, useSlashCommands, useSlashMenu } from "@/components/app/slash-menu";
 import { MODELS, parseSlash, type PermMode } from "@/lib/slash";
 import { ORB_LABEL, stateFromEvents } from "@/lib/orb-state";
+import { graphifyUse } from "@/lib/tool-cards";
 import { RUN_STATUS_LABEL, RUN_STATUS_VARIANT } from "@/components/app/run-row";
 import { api, fetcher, refresh, useApi, type Run, type RunLog } from "@/lib/api";
 import { cn, shortPath, timeAgo } from "@/lib/utils";
@@ -390,6 +391,9 @@ function HeadlessLog({ thread }: { thread: Run[] }) {
   const latestEvents = byRun[run.id]?.events;
   const partial = byRun[run.id]?.partial ?? "";
   const allEvents = React.useMemo(() => thread.flatMap((r) => byRun[r.id]?.events ?? []), [thread, byRun]);
+  // Claude was told to use the project's Graphify graph: how many times it did (its report, a query…), subagents included.
+  const graphifyTold = thread.some((r) => r.graphify);
+  const graphifyUses = React.useMemo(() => allEvents.reduce((n, e) => n + (e.type === "assistant" && Array.isArray(e.message?.content) ? (e.message.content as { type?: string; name?: string; input?: unknown }[]).filter((b) => b.type === "tool_use" && graphifyUse(String(b.name), b.input)).length : 0), 0), [allEvents]);
   const base = byRun[run.id]?.stats;
   const stats = React.useMemo(() => (base ? { ...base, partial } : undefined), [base, partial]);
   const activity = partial ? { state: "writing" as const, label: ORB_LABEL.writing } : stateFromEvents(latestEvents ?? []);
@@ -415,6 +419,15 @@ function HeadlessLog({ thread }: { thread: Run[] }) {
             <Segment key={r.id} run={r} index={i} latest={i === thread.length - 1} onEvents={onEvents} />
           ))}
           <ObsidianNotes events={allEvents} />
+          {(graphifyTold || graphifyUses > 0) && (
+            <div data-testid="graphify-usage" className={cn("flex items-center gap-2 rounded-lg border px-3 py-2 text-xs", graphifyUses > 0 ? "border-purple/40 bg-purple/10" : "border-warning/40 bg-warning/10")}>
+              <NetworkIcon className={cn("size-3.5 shrink-0", graphifyUses > 0 ? "text-purple" : "text-warning")} />
+              <span className="font-medium">Graphify</span>
+              <span className="text-muted-foreground">
+                {graphifyUses > 0 ? `Claude lo ha usado ${graphifyUses} ${graphifyUses === 1 ? "vez" : "veces"} en esta ejecución` : thread[thread.length - 1]?.status === "running" ? "Claude aún no lo ha usado" : "Claude tenía el grafo pero no lo ha usado en esta ejecución"}
+              </span>
+            </div>
+          )}
           {/* At the end of the output: what Claude is doing now (step, time, tokens) while it works, a calm orb when done. */}
           {run.status === "running" ? (
             <Appear><LiveStatus activity={activity} stats={stats} startedAt={run.startedAt} /></Appear>

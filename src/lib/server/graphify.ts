@@ -15,6 +15,8 @@ import { HttpError, parse, text } from "./util";
 export const graphifySettingsSchema = z.object({
   /** Tell Claude, in headless runs of projects that have a graph, to look in it before searching the files. */
   useInRuns: z.boolean().default(true),
+  /** Ask Graphify's Claude Code hook to insist (GRAPHIFY_HOOK_STRICT=1) when Claude is about to grep or read files blindly. */
+  strictHook: z.boolean().default(false),
 });
 export type GraphifySettings = z.infer<typeof graphifySettingsSchema>;
 
@@ -219,7 +221,7 @@ export class GraphifyService {
 
   get(): GraphifySettings {
     const r = graphifySettingsSchema.safeParse(this.store.read<unknown>("graphify", {}));
-    return r.success ? r.data : { useInRuns: true };
+    return r.success ? r.data : { useInRuns: true, strictHook: false };
   }
 
   set(body: unknown): GraphifySettings {
@@ -282,6 +284,14 @@ export class GraphifyService {
       }
     })();
     const skill = [path.join(dir, ".claude", "skills", "graphify", "SKILL.md"), path.join(this.home, ".claude", "skills", "graphify", "SKILL.md")].some((f) => fs.existsSync(f));
+    // The hook `graphify claude install` writes into Claude Code's settings (it nudges before Grep/Glob/Read).
+    const claudeHook = [path.join(dir, ".claude", "settings.json"), path.join(dir, ".claude", "settings.local.json"), path.join(this.home, ".claude", "settings.json")].some((f) => {
+      try {
+        return /graphify/i.test(fs.readFileSync(f, "utf8"));
+      } catch {
+        return false;
+      }
+    });
     const claudeMd = (() => {
       try {
         return /graphify/i.test(fs.readFileSync(path.join(dir, "CLAUDE.md"), "utf8"));
@@ -300,6 +310,7 @@ export class GraphifyService {
       source: { ...src, tokens: tokensOf(src.bytes) },
       hook,
       skill,
+      claudeHook,
       claudeMd,
     };
   }
@@ -356,7 +367,7 @@ export class GraphifyService {
   }
 
   /** For a headless run in `cwd`: a hint (and permission to ask the graph) when the project has one and the person wants it used. */
-  forRun(cwd: string): { hint: string; allow: string[] } | null {
+  forRun(cwd: string): { hint: string; allow: string[]; env: Record<string, string> } | null {
     if (!this.get().useInRuns) return null;
     try {
       if (!fs.statSync(path.join(cwd, OUT, "graph.json")).isFile()) return null;
@@ -369,6 +380,6 @@ export class GraphifyService {
       this.installed ? `y, para preguntas sobre cómo se conectan las piezas, usa «graphify query "<pregunta>"», «graphify path "A" "B"» o «graphify explain "X"».` : "y úsalo para saber dónde mirar.",
       "El grafo puede estar desactualizado: si algo no cuadra con el código, fíate del código.",
     ].join(" ");
-    return { hint, allow: this.installed ? ["Bash(graphify query:*)", "Bash(graphify path:*)", "Bash(graphify explain:*)"] : [] };
+    return { hint, allow: this.installed ? ["Bash(graphify query:*)", "Bash(graphify path:*)", "Bash(graphify explain:*)"] : [], env: this.get().strictHook ? { GRAPHIFY_HOOK_STRICT: "1" } : {} };
   }
 }
