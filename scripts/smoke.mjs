@@ -970,6 +970,12 @@ try {
   await page.getByTestId("queued").waitFor({ state: "detached", timeout: 15000 });
   await page.locator("main").getByText("después, otra cosa").first().waitFor({ timeout: 15000 });
   check(true, "stopping the answer sends the waiting message");
+  // Every time Claude uses Graphify (its report, a query) it is shown as such.
+  const gfRun = await (await fetch(base + "/api/runs", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ projectPath: project, prompt: "USAGRAFO mira el grafo" }) })).json();
+  await page.goto(`${base}/runs/${gfRun.id}`);
+  await page.getByText("Graphify · consulta").first().waitFor({ timeout: 15000 });
+  check((await page.getByText("Graphify · informe").count()) >= 1 && (await page.getByText("qué conecta el login con la base de datos").count()) >= 1, "a run shows each time Claude used Graphify (the report, a query and what it asked)");
+  await shot("08i-graphify-in-run");
   // Subagents Claude launches are shown as a team of cards, with their own steps and what they handed back.
   await fetch(base + "/api/orchestrator", { method: "PUT", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ enabled: true, nodes: [{ id: "planner", kind: "planner", label: "Jefe" }, { id: "l", kind: "agent", label: "Lector", job: "reader", x: 300 }, { id: "e", kind: "agent", label: "Escritor", job: "writer", x: 300, y: 200 }], edges: [{ from: "planner", to: "l", run: "parallel" }, { from: "planner", to: "e", run: "parallel" }, { from: "l", to: "e", pass: "paths" }] }) });
   const subRun = await (await fetch(base + "/api/runs", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ projectPath: project, prompt: "SUBAGENTES reparte el trabajo" }) })).json();
@@ -1009,6 +1015,14 @@ try {
   await page.getByText(/3 nodos · 2 relaciones/).waitFor({ timeout: 15000 });
   check((await page.getByRole("button", { name: /Ver informe/ }).count()) === 1 && (await page.getByText("grafo construido").count()) >= 1, "Graphify builds a project's graph and shows its size and the report");
   await shot("08g-graphify");
+  await page.getByRole("button", { name: "Ver grafo" }).click();
+  await page.getByText(/Se dibujan los 3 nodos más conectados de 3/).waitFor({ timeout: 10000 });
+  const canvasBox = await page.getByLabel("Grafo de conocimiento del proyecto").boundingBox();
+  check(!!canvasBox && canvasBox.width > 300 && canvasBox.height > 200, "the graph is drawn inside Agentic on a canvas");
+  await page.getByLabel("Buscar en el grafo").fill("a");
+  await page.getByText(/resultados · Intro para ir al primero|Sin resultados/).waitFor();
+  await shot("08h-graphify-view");
+  await page.keyboard.press("Escape");
   // The orchestrator: a graph of how Claude works as a team.
   const oauth = { authorization: `Bearer ${token}`, "content-type": "application/json" };
   await page.goto(`${base}/orchestrator`);

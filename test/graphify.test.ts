@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { GraphifyService, summarizeGraph, sourceBytes, tokensOf } from "@/lib/server/graphify";
+import { describeTool, graphifyUse } from "@/lib/tool-cards";
+import { compactGraph, GraphifyService, summarizeGraph, sourceBytes, tokensOf } from "@/lib/server/graphify";
 import { JsonStore } from "@/lib/server/store";
 import { tmpDir } from "./helpers";
 
@@ -94,5 +95,51 @@ describe("GraphifyService", () => {
     const a = svc.run({ path: project, action: "update" });
     await expect(svc.run({ path: project, action: "update" })).rejects.toMatchObject({ status: 409 });
     await a;
+  });
+});
+
+describe("seeing Graphify at work", () => {
+  it("recognises Claude using the CLI, the files in graphify-out/ and Graphify's MCP tools", () => {
+    expect(graphifyUse("Bash", { command: 'cd app && graphify query "qué conecta A con B" --graph graphify-out/graph.json' })).toEqual({ kind: "consulta", title: "qué conecta A con B" });
+    expect(graphifyUse("Bash", { command: 'graphify path "UserService" "DatabasePool"' })).toEqual({ kind: "camino", title: "UserService DatabasePool" });
+    expect(graphifyUse("Bash", { command: 'graphify explain "RateLimiter"' })?.kind).toBe("explicación");
+    expect(graphifyUse("Read", { file_path: "/x/graphify-out/GRAPH_REPORT.md" })).toEqual({ kind: "informe", title: "GRAPH_REPORT.md" });
+    expect(graphifyUse("Grep", { pattern: "foo", path: "/x/graphify-out" })?.kind).toBe("grafo");
+    expect(graphifyUse("mcp__graphify__query_graph", {})).toEqual({ kind: "MCP", title: "query graph" });
+    // not Graphify: other commands, other files, a word that only contains it
+    expect(graphifyUse("Bash", { command: "npm test" })).toBeNull();
+    expect(graphifyUse("Bash", { command: "pip install graphifyy" })).toBeNull();
+    expect(graphifyUse("Read", { file_path: "/x/src/app.ts" })).toBeNull();
+    expect(describeTool("Bash", { command: 'graphify query "x"' })).toMatchObject({ icon: "graph", group: "Graphify · consulta", title: "x" });
+  });
+});
+
+describe("compactGraph", () => {
+  const raw = JSON.stringify({
+    nodes: [{ id: "a", label: "A", source_file: "src/a.ts" }, { id: "b", label: "B" }, { id: "c", label: "C" }, { id: "d", label: "D" }, { id: "x", label: "X" }],
+    links: [
+      { source: "a", target: "b", relation: "calls", confidence: "EXTRACTED" },
+      { source: "a", target: "c", relation: "imports", confidence: "INFERRED" },
+      { source: "b", target: "c" },
+      { source: "a", target: "ghost" },
+      { source: "a", target: "a" },
+      { source: "d", target: "x" },
+    ],
+  });
+  it("keeps the best connected nodes, drops broken or self links, and groups communities", () => {
+    const v = compactGraph(raw, 10)!;
+    expect(v.total).toEqual({ nodes: 5, edges: 4 });
+    expect(v.nodes[0]).toMatchObject({ id: "a", label: "A", file: "src/a.ts", degree: 2 });
+    expect(v.links.find((l) => l.source === "a" && l.target === "c")).toMatchObject({ relation: "imports", inferred: true });
+    expect(v.nodes.find((n) => n.id === "a")!.community).toBe(v.nodes.find((n) => n.id === "b")!.community);
+    expect(v.nodes.find((n) => n.id === "d")!.community).not.toBe(v.nodes.find((n) => n.id === "a")!.community);
+    expect(v.communities[0]!.size).toBe(3);
+  });
+  it("trims big graphs and rejects what is not a graph", () => {
+    const nodes = Array.from({ length: 50 }, (_, i) => ({ id: `n${i}` }));
+    const links = nodes.slice(1).map((n, i) => ({ source: "n0", target: n.id, i }));
+    expect(compactGraph(JSON.stringify({ nodes, links }), 12)!.nodes).toHaveLength(12);
+    expect(compactGraph("nope")).toBeNull();
+    expect(compactGraph(JSON.stringify({ nodes: "x" }))).toBeNull();
   });
 });

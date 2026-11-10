@@ -70,6 +70,11 @@ if (prompt.includes("SUBAGENTES")) {
   out({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "ag1", content: "El login se valida en `src/auth.ts`, línea 12." }] } });
   out({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "ag2", content: "Hecho: validación arreglada." }] } });
 }
+if (prompt.includes("USAGRAFO")) {
+  // Claude looks in the Graphify graph before searching the files.
+  out({ type: "assistant", message: { id: "gf1", role: "assistant", content: [{ type: "text", text: "Miro el grafo." }, { type: "tool_use", id: "g1", name: "Read", input: { file_path: "/tmp/p/graphify-out/GRAPH_REPORT.md" } }, { type: "tool_use", id: "g2", name: "Bash", input: { command: 'graphify query "qué conecta el login con la base de datos" --graph graphify-out/graph.json' } }] } });
+  out({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "g1", content: "# Informe" }, { type: "tool_result", tool_use_id: "g2", content: "login -> auth -> db" }] } });
+}
 if (prompt.includes("CREAFICHERO") && process.env.CLAUDE_HOME) {
   // Claude writes a file (its Write tool) and says so: the chat offers it for download.
   const fs = await import("node:fs");

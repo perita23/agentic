@@ -3,7 +3,7 @@
 import * as React from "react";
 import {
   BotIcon, CheckIcon, ChevronDownIcon, CloudIcon, ContainerIcon, DatabaseIcon, FlaskConicalIcon, FolderIcon, GitBranchIcon, GlobeIcon,
-  KeyRoundIcon, ListChecksIcon, LoaderCircleIcon, PackageIcon, PencilIcon, PlugIcon, SearchIcon, ShipIcon, TerminalIcon, FileTextIcon, XIcon,
+  KeyRoundIcon, ListChecksIcon, NetworkIcon, LoaderCircleIcon, PackageIcon, PencilIcon, PlugIcon, SearchIcon, ShipIcon, TerminalIcon, FileTextIcon, XIcon,
 } from "lucide-react";
 import { describeTool, stripAnsi, type ToolIcon } from "@/lib/tool-cards";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,7 @@ const ICONS: Record<ToolIcon, { icon: React.ComponentType<{ className?: string }
   search: { icon: SearchIcon, tone: "bg-fuchsia-500/15 text-fuchsia-400" },
   agent: { icon: BotIcon, tone: "bg-purple-500/15 text-purple-400" },
   todo: { icon: ListChecksIcon, tone: "bg-teal-500/15 text-teal-400" },
+  graph: { icon: NetworkIcon, tone: "bg-purple-500/20 text-purple-300" },
   mcp: { icon: PlugIcon, tone: "bg-pink-500/15 text-pink-400" },
 };
 

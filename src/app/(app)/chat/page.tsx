@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowDownIcon, ArrowUpIcon, BookOpenIcon, CheckIcon, CodeIcon, CopyIcon, DownloadIcon, FileIcon, ListChecksIcon, ListPlusIcon, Loader2Icon, MessageSquarePlusIcon, PencilIcon, PinIcon, RegexIcon, SearchIcon, SparklesIcon, SquareIcon, Trash2Icon, WrenchIcon, XIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowUpIcon, BookOpenIcon, CheckIcon, CodeIcon, CopyIcon, DownloadIcon, FileIcon, ListChecksIcon, ListPlusIcon, NetworkIcon, Loader2Icon, MessageSquarePlusIcon, PencilIcon, PinIcon, RegexIcon, SearchIcon, SparklesIcon, SquareIcon, Trash2Icon, WrenchIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -157,9 +157,10 @@ function BubbleImpl({ m, reveal, chatId }: { m: ChatMessage; reveal?: boolean; c
         <div className="mb-2 flex flex-wrap gap-1.5">
           {m.tools.filter((t) => !isSubagentTool(t.name)).map((t, i) => {
             const l = toolLabel(t);
+            const gf = l.group.startsWith("Graphify");
             return (
-              <span key={i} className="flex max-w-full items-center gap-1.5 rounded-md border bg-inset px-2 py-0.5 text-[11px] text-muted-foreground" title={t.input}>
-                <WrenchIcon className="size-3 shrink-0" /> <span className="shrink-0 font-medium text-foreground/80">{l.group}</span>
+              <span key={i} data-graphify={gf ? "" : undefined} className={cn("flex max-w-full items-center gap-1.5 rounded-md border bg-inset px-2 py-0.5 text-[11px] text-muted-foreground", gf && "border-purple/40 bg-purple/10")} title={t.input}>
+                {gf ? <NetworkIcon className="size-3 shrink-0 text-purple" /> : <WrenchIcon className="size-3 shrink-0" />} <span className="shrink-0 font-medium text-foreground/80">{l.group}</span>
                 {l.title && <span className="truncate font-mono">{l.title}</span>}
               </span>
             );
