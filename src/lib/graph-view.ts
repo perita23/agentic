@@ -1,5 +1,5 @@
 /**
- * A small force-directed graph on a canvas, drawn in Agentic's style (soft glowing blobs in Morphy's colours). No libraries:
+ * A small force-directed graph on a canvas, drawn in Agentic's style (flat discs in Morphy's colours). No libraries:
  * a few hundred nodes need repulsion between all pairs, springs on the links, a pull towards the community and a pull to the centre.
  */
 export interface GNode {
@@ -16,7 +16,8 @@ export interface GLink {
   inferred: boolean;
 }
 
-export const PALETTE = ["#8b6cf5", "#ff8a5b", "#5aa9ff", "#34d399", "#ff6fa0", "#fbbf24", "#22d3ee", "#a78bfa"];
+/** Agentic's own colours, in the order of its gradient: violet, coral, blue, then the status greens and yellows. */
+export const PALETTE = ["#a78bfa", "#ff8a5b", "#5aa9ff", "#34d399", "#f472b6", "#fbbf24", "#22d3ee", "#8b6cf5"];
 export const colorOf = (community: number) => PALETTE[community % PALETTE.length]!;
 
 interface Sim extends GNode {
@@ -88,7 +89,7 @@ export class GraphEngine {
     this.nodes = nodes.map((g, i) => {
       const a = (i / Math.max(1, n)) * Math.PI * 2 * 7;
       const rad = 30 + Math.sqrt(i) * 16;
-      return { ...g, x: Math.cos(a) * rad, y: Math.sin(a) * rad, vx: 0, vy: 0, r: 4 + Math.sqrt(g.degree) * 2.1, fixed: false };
+      return { ...g, x: Math.cos(a) * rad, y: Math.sin(a) * rad, vx: 0, vy: 0, r: 3.5 + Math.sqrt(g.degree) * 1.9, fixed: false };
     });
     this.byId = new Map(this.nodes.map((s) => [s.id, s]));
     this.edges = links.flatMap((l) => {
@@ -272,7 +273,12 @@ export class GraphEngine {
       const on = focus ? e.a.id === focus || e.b.id === focus : this.matches ? this.matches.has(e.a.id) && this.matches.has(e.b.id) : false;
       const dim = (focus || this.matches) && !on;
       c.globalAlpha = on ? 0.85 : dim ? 0.04 : 0.16;
-      c.strokeStyle = on ? colorOf(e.a.community) : this.fg;
+      if (on) {
+        const g = c.createLinearGradient(e.a.x, e.a.y, e.b.x, e.b.y);
+        g.addColorStop(0, colorOf(e.a.community));
+        g.addColorStop(1, colorOf(e.b.community));
+        c.strokeStyle = g;
+      } else c.strokeStyle = this.fg;
       c.lineWidth = (on ? 1.6 : 0.9) / Math.sqrt(this.scale);
       c.setLineDash(e.inferred ? [4 / this.scale, 4 / this.scale] : []);
       c.beginPath();
@@ -284,23 +290,15 @@ export class GraphEngine {
     for (const s of this.nodes) {
       const a = lit(s.id) ? 1 : 0.14;
       const col = colorOf(s.community);
-      c.globalAlpha = a * 0.28;
-      const glow = c.createRadialGradient(s.x, s.y, s.r * 0.6, s.x, s.y, s.r * 2.3);
-      glow.addColorStop(0, col);
-      glow.addColorStop(1, "transparent");
-      c.fillStyle = glow;
-      c.beginPath();
-      c.arc(s.x, s.y, s.r * 2.3, 0, Math.PI * 2);
-      c.fill();
       c.globalAlpha = a;
-      const g = c.createRadialGradient(s.x - s.r * 0.3, s.y - s.r * 0.4, s.r * 0.1, s.x, s.y, s.r);
-      g.addColorStop(0, "#ffffff");
-      g.addColorStop(0.35, col);
-      g.addColorStop(1, col);
-      c.fillStyle = g;
+      c.fillStyle = col;
       c.beginPath();
       c.arc(s.x, s.y, s.r, 0, Math.PI * 2);
       c.fill();
+      c.globalAlpha = a * 0.3; // the hairline rim of the app icon
+      c.strokeStyle = this.fg;
+      c.lineWidth = 1 / this.scale;
+      c.stroke();
       if (s.id === this.selected) {
         c.globalAlpha = 1;
         c.strokeStyle = this.fg;
@@ -314,7 +312,7 @@ export class GraphEngine {
     c.globalAlpha = 1;
     c.fillStyle = this.fg;
     c.textAlign = "center";
-    c.font = `${11 / this.scale}px ui-sans-serif, system-ui, sans-serif`;
+    c.font = `${10 / this.scale}px ui-monospace, "SF Mono", Menlo, monospace`;
     const minDeg = this.scale > 2.2 ? 0 : this.scale > 1.2 ? 3 : 8;
     for (const s of this.nodes) {
       const show = s.id === this.selected || s.id === this.hover || (this.matches?.has(s.id) ?? false) || (!focus && !this.matches && s.degree >= minDeg) || (!!near?.has(s.id) && this.scale > 0.8);

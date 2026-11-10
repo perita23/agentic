@@ -3,10 +3,15 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 Cada versión se etiqueta y publica automáticamente como GitHub Release cuando el CI pasa en `main`.
 
+## [0.62.1] - 2026-11-10
+
+### Cambiado
+- **Los nodos del grafo de Graphify son planos.** Círculos de un solo color (el de su comunidad, con los colores de Agentic: violeta, coral, azul…) con el borde fino del icono de la app, sin brillo ni resplandor. Las relaciones resaltadas pasan de un color al otro, y los nombres usan la tipografía monoespaciada de la app.
+
 ## [0.62.0] - 2026-11-10
 
 ### Añadido
-- **El grafo de Graphify, dibujado dentro de Agentic.** En la sección Graphify, «Ver grafo» abre el grafo del proyecto con el estilo de la app: nodos como pequeñas gotas con brillo en los colores de Morphy (un color por comunidad), relaciones finas (discontinuas las inferidas), que se colocan solas. Se arrastra el fondo para moverte, la rueda acerca, se arrastra un nodo para recolocarlo y un clic muestra de qué fichero es y con qué se conecta (y desde ahí se salta a sus vecinos). Hay buscador, leyenda de comunidades y «Encajar en pantalla». Para que sea fluido se dibujan los 700 nodos más conectados (el diálogo dice cuántos de cuántos). Sin servidor ni `graph.html`: no hace falta abrir nada aparte.
+- **El grafo de Graphify, dibujado dentro de Agentic.** En la sección Graphify, «Ver grafo» abre el grafo del proyecto con el estilo de la app: nodos de colores de Morphy (un color por comunidad), relaciones finas (discontinuas las inferidas), que se colocan solas. Se arrastra el fondo para moverte, la rueda acerca, se arrastra un nodo para recolocarlo y un clic muestra de qué fichero es y con qué se conecta (y desde ahí se salta a sus vecinos). Hay buscador, leyenda de comunidades y «Encajar en pantalla». Para que sea fluido se dibujan los 700 nodos más conectados (el diálogo dice cuántos de cuántos). Sin servidor ni `graph.html`: no hace falta abrir nada aparte.
 - **Se ve cada vez que Claude usa Graphify.** En el chat y en las ejecuciones headless, cualquier uso aparece marcado en morado como «Graphify · consulta / camino / explicación / informe / grafo» con lo que preguntó o el fichero que leyó: `graphify query|path|explain|update`, lecturas o búsquedas en `graphify-out/` y las herramientas de un servidor MCP de Graphify.
 
 ## [0.61.0] - 2026-11-10
